@@ -287,8 +287,10 @@ function ComplyApp({ user, onSignOut }) {
                 <CheckCircle className="text-white" size={24} />
               </div>
               <div>
-                <h1 className="text-2xl font-semibold text-gray-900">comply</h1>
-                <p className="text-sm text-gray-500">Certificate Compliance Tracker</p>
+                <h1 className="text-2xl font-semibold text-gray-900">
+                  Smart<span className="text-green-500">COI</span>
+                </h1>
+                <p className="text-sm text-gray-500">AI-Powered Compliance Tracking</p>
               </div>
             </div>
             <div className="flex items-center space-x-4">

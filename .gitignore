@@ -1,30 +1,27 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
 # dependencies
 /node_modules
+/.pnp
+.pnp.js
 
-# environment variables
-.env.local
-.env
+# testing
+/coverage
 
-# build
+# production
 /build
 
 # misc
 .DS_Store
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
 npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
-cd C:\Users\tonyj\OneDrive\Desktop\Comply
-
-# Initialize (if not already done)
-git init
-
-# Add all files
-git add .
-
-# Commit
-git commit -m "Phase 3 Complete: Auth, Database, File Upload, Settings - Fully Working!"
-
-# Push to GitHub
-# (Create a new repo on GitHub, then:)
-git remote add origin https://github.com/YOUR-USERNAME/comply.git
-git branch -M main
-git push -u origin main
+# vercel
+.vercel
