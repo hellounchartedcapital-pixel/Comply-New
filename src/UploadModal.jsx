@@ -6,6 +6,7 @@ export function UploadModal({ isOpen, onClose, onUploadComplete }) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState(null);
   const [dragActive, setDragActive] = useState(false);
+  const [extractionStatus, setExtractionStatus] = useState(''); // New: track extraction progress
 
   if (!isOpen) return null;
 
@@ -63,13 +64,22 @@ export function UploadModal({ isOpen, onClose, onUploadComplete }) {
 
     setUploading(true);
     setError(null);
+    setExtractionStatus('Reading PDF...');
 
     try {
-      await onUploadComplete(selectedFile);
+      // Add progress callback
+      const progressCallback = (status) => {
+        setExtractionStatus(status);
+      };
+      
+      await onUploadComplete(selectedFile, progressCallback);
+      
       setSelectedFile(null);
+      setExtractionStatus('');
       onClose();
     } catch (err) {
       setError(err.message || 'Failed to upload file');
+      setExtractionStatus('');
     } finally {
       setUploading(false);
     }
@@ -164,12 +174,12 @@ export function UploadModal({ isOpen, onClose, onUploadComplete }) {
             {uploading ? (
               <>
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                <span>Uploading...</span>
+                <span>{extractionStatus || 'Processing...'}</span>
               </>
             ) : (
               <>
                 <Upload size={16} />
-                <span>Upload</span>
+                <span>Upload & Extract</span>
               </>
             )}
           </button>

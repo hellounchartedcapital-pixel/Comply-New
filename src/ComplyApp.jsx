@@ -194,12 +194,13 @@ function ComplyApp({ user, onSignOut }) {
   };
 
   // Handle file upload with AI extraction
-  const handleFileUpload = async (file) => {
+  const handleFileUpload = async (file, progressCallback) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
       // Step 1: Extract data using AI
+      if (progressCallback) progressCallback('🤖 AI extracting data...');
       console.log('Extracting COI data with AI...');
       const extractionResult = await extractCOIFromPDF(file);
       
@@ -211,6 +212,7 @@ function ComplyApp({ user, onSignOut }) {
       console.log('Extracted vendor data:', vendorData);
 
       // Step 2: Upload file to Storage
+      if (progressCallback) progressCallback('☁️ Uploading to cloud...');
       const fileExt = file.name.split('.').pop();
       const fileName = `${user.id}/${Date.now()}.${fileExt}`;
 
@@ -221,6 +223,7 @@ function ComplyApp({ user, onSignOut }) {
       if (storageError) throw storageError;
 
       // Step 3: Create vendor in database
+      if (progressCallback) progressCallback('💾 Saving vendor...');
       const result = await addVendor({
         ...vendorData,
         rawData: {
@@ -235,6 +238,7 @@ function ComplyApp({ user, onSignOut }) {
       }
 
       // Step 4: Refresh vendor list
+      if (progressCallback) progressCallback('✅ Complete!');
       await refreshVendors();
 
       // Success!
