@@ -56,7 +56,9 @@ export default function Signup({ onSwitchToLogin, onBack }) {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
             </div>
-            <h1 className="text-2xl font-bold text-gray-900">comply</h1>
+            <h1 className="text-2xl font-bold text-gray-900">
+              Smart<span className="text-green-500">COI</span>
+            </h1>
           </div>
           <h2 className="text-xl font-semibold text-gray-900">Create your account</h2>
           <p className="text-sm text-gray-600 mt-2">
