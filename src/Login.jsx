@@ -4,6 +4,7 @@
 import React, { useState } from 'react'
 import { useAuth } from './AuthContext'
 import { AlertCircle, CheckCircle } from 'lucide-react'
+import { Logo } from './Logo'
 
 export default function Login({ onSwitchToSignup, onBack }) {
   const [email, setEmail] = useState('')
@@ -55,15 +56,8 @@ export default function Login({ onSwitchToSignup, onBack }) {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-lg shadow-lg p-8 max-w-md w-full">
           <div className="mb-6">
-            <div className="flex items-center space-x-3 mb-2">
-              <div className="w-12 h-12 bg-green-500 rounded-lg flex items-center justify-center">
-                <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <h1 className="text-2xl font-bold text-gray-900">
-                Smart<span className="text-green-500">COI</span>
-              </h1>
+            <div className="mb-4">
+              <Logo size="default" />
             </div>
             <h2 className="text-xl font-semibold text-gray-900">Reset Password</h2>
             <p className="text-sm text-gray-600 mt-2">
@@ -127,15 +121,8 @@ export default function Login({ onSwitchToSignup, onBack }) {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-lg shadow-lg p-8 max-w-md w-full">
         <div className="mb-6">
-          <div className="flex items-center space-x-3 mb-2">
-            <div className="w-12 h-12 bg-green-500 rounded-lg flex items-center justify-center">
-              <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-            </div>
-            <h1 className="text-2xl font-bold text-gray-900">
-              Smart<span className="text-green-500">COI</span>
-            </h1>
+          <div className="mb-4">
+            <Logo size="default" />
           </div>
           <h2 className="text-xl font-semibold text-gray-900">Welcome back</h2>
           <p className="text-sm text-gray-600 mt-2">
