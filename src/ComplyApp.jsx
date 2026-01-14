@@ -5,6 +5,7 @@ import { UploadModal } from './UploadModal';
 import { Settings } from './Settings';
 import { supabase } from './supabaseClient';
 import { extractCOIFromPDF } from './extractCOI';
+import { Logo } from './Logo';
 
 // Initial vendor data
 const initialVendors = [
@@ -283,15 +284,7 @@ function ComplyApp({ user, onSignOut }) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center">
-                <CheckCircle className="text-white" size={24} />
-              </div>
-              <div>
-                <h1 className="text-2xl font-semibold text-gray-900">
-                  Smart<span className="text-green-500">COI</span>
-                </h1>
-                <p className="text-sm text-gray-500">AI-Powered Compliance Tracking</p>
-              </div>
+              <Logo size="default" showTagline={true} />
             </div>
             <div className="flex items-center space-x-4">
               <div className="text-right hidden sm:block">
