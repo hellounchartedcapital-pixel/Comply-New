@@ -32,7 +32,7 @@ export function useVendors() {
   const addVendor = async (vendorData) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      
+
       if (!user) throw new Error('Not authenticated');
 
       const { data, error } = await supabase
@@ -48,7 +48,18 @@ export function useVendors() {
           issues: vendorData.issues,
           raw_data: vendorData.rawData || null,
           requirements: vendorData.requirements || null,
-          additional_coverages: vendorData.additionalCoverages || []
+          additional_coverages: vendorData.additionalCoverages || [],
+          additional_insured: vendorData.additionalInsured || '',
+          certificate_holder: vendorData.certificateHolder || '',
+          has_additional_insured: vendorData.hasAdditionalInsured || false,
+          missing_additional_insured: vendorData.missingAdditionalInsured || false,
+          waiver_of_subrogation: vendorData.waiverOfSubrogation || '',
+          has_waiver_of_subrogation: vendorData.hasWaiverOfSubrogation || false,
+          missing_waiver_of_subrogation: vendorData.missingWaiverOfSubrogation || false,
+          contact_name: vendorData.contactName || null,
+          contact_email: vendorData.contactEmail || null,
+          contact_phone: vendorData.contactPhone || null,
+          contact_notes: vendorData.contactNotes || null
         }])
         .select()
         .single();
@@ -77,6 +88,12 @@ export function useVendors() {
         coverage: updates.coverage,
         issues: updates.issues
       };
+
+      // Add contact fields if present
+      if (updates.contactName !== undefined) dbUpdates.contact_name = updates.contactName;
+      if (updates.contactEmail !== undefined) dbUpdates.contact_email = updates.contactEmail;
+      if (updates.contactPhone !== undefined) dbUpdates.contact_phone = updates.contactPhone;
+      if (updates.contactNotes !== undefined) dbUpdates.contact_notes = updates.contactNotes;
 
       const { data, error } = await supabase
         .from('vendors')

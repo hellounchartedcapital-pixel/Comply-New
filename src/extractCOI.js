@@ -272,7 +272,8 @@ Extract the following information from this COI PDF and return it as a JSON obje
   ],
   "additionalInsured": "Names listed as additional insured (if any)",
   "certificateHolder": "Certificate holder name",
-  "insuranceCompany": "Insurance company/carrier name"
+  "insuranceCompany": "Insurance company/carrier name",
+  "waiverOfSubrogation": "yes or no - Check if waiver of subrogation is indicated on the COI (look for checkboxes, text, or notes mentioning waiver of subrogation)"
 }
 
 CRITICAL INSTRUCTIONS FOR EXPIRATION DATES:
@@ -471,6 +472,46 @@ Return ONLY the JSON object, no other text.`
         type: 'error',
         message: `Employers Liability below requirement: $${(vendorData.coverage.employersLiability.amount / 1000).toFixed(1)}K (requires $${(requirements.employers_liability / 1000).toFixed(1)}K)`
       });
+    }
+
+    // Store additional insured, certificate holder, and waiver info
+    vendorData.additionalInsured = extractedData.additionalInsured || '';
+    vendorData.certificateHolder = extractedData.certificateHolder || '';
+    vendorData.waiverOfSubrogation = extractedData.waiverOfSubrogation || '';
+
+    // Check waiver of subrogation requirement
+    if (requirements.require_waiver_of_subrogation) {
+      const waiverText = (vendorData.waiverOfSubrogation || '').toLowerCase();
+
+      // Check if waiver is present (look for "yes" or positive indicators)
+      if (waiverText.includes('yes') || waiverText.includes('included') || waiverText.includes('waived')) {
+        vendorData.hasWaiverOfSubrogation = true;
+      } else {
+        vendorData.status = 'non-compliant';
+        vendorData.missingWaiverOfSubrogation = true;
+        issues.push({
+          type: 'error',
+          message: 'Waiver of Subrogation not included'
+        });
+      }
+    }
+
+    // Check additional insured requirement
+    if (requirements.company_name && requirements.require_additional_insured) {
+      const additionalInsuredText = (vendorData.additionalInsured || '').toLowerCase();
+      const companyName = requirements.company_name.toLowerCase();
+
+      // Check if company name appears in additional insured field
+      if (!additionalInsuredText.includes(companyName)) {
+        vendorData.status = 'non-compliant';
+        vendorData.missingAdditionalInsured = true;
+        issues.push({
+          type: 'error',
+          message: `${requirements.company_name} not listed as Additional Insured`
+        });
+      } else {
+        vendorData.hasAdditionalInsured = true;
+      }
     }
 
     // Check custom coverage requirements

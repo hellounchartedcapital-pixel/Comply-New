@@ -9,7 +9,10 @@ export function Settings({ onClose }) {
     autoLiability: 1000000,
     workersComp: 'Statutory',
     employersLiability: 500000,
-    additionalRequirements: []
+    additionalRequirements: [],
+    companyName: '',
+    requireAdditionalInsured: true,
+    requireWaiverOfSubrogation: false
   });
 
   const [customCoverages, setCustomCoverages] = useState([]);
@@ -74,7 +77,10 @@ export function Settings({ onClose }) {
           autoLiability: data.auto_liability || 1000000,
           workersComp: data.workers_comp || 'Statutory',
           employersLiability: data.employers_liability || 500000,
-          additionalRequirements: textRequirements
+          additionalRequirements: textRequirements,
+          companyName: data.company_name || '',
+          requireAdditionalInsured: data.require_additional_insured !== false,
+          requireWaiverOfSubrogation: data.require_waiver_of_subrogation || false
         });
 
         // Load decoded custom coverages
@@ -183,7 +189,10 @@ export function Settings({ onClose }) {
         auto_liability: settings.autoLiability,
         workers_comp: settings.workersComp,
         employers_liability: settings.employersLiability,
-        additional_requirements: encodedRequirements
+        additional_requirements: encodedRequirements,
+        company_name: settings.companyName,
+        require_additional_insured: settings.requireAdditionalInsured,
+        require_waiver_of_subrogation: settings.requireWaiverOfSubrogation
       };
 
       const { error } = await supabase
@@ -260,31 +269,31 @@ export function Settings({ onClose }) {
 
   if (loading) {
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-lg max-w-2xl w-full p-8 text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-green-500 mb-4"></div>
-          <p className="text-gray-600">Loading settings...</p>
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+        <div className="bg-white rounded-lg max-w-2xl w-full p-6 sm:p-8 text-center">
+          <div className="inline-block animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-b-2 border-green-500 mb-4"></div>
+          <p className="text-sm sm:text-base text-gray-600">Loading settings...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-      <div className="bg-white rounded-lg max-w-3xl w-full my-8 max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4 overflow-y-auto">
+      <div className="bg-white rounded-lg max-w-3xl w-full my-4 sm:my-8 max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 sticky top-0 bg-white z-10">
+        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 sticky top-0 bg-white z-10">
           <div>
-            <h2 className="text-xl font-semibold">Compliance Requirements</h2>
-            <p className="text-sm text-gray-500 mt-1">Configure your insurance requirements</p>
+            <h2 className="text-lg sm:text-xl font-semibold">Compliance Requirements</h2>
+            <p className="text-xs sm:text-sm text-gray-500 mt-1">Configure your insurance requirements</p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-            <X size={24} />
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 flex-shrink-0 ml-2">
+            <X size={20} />
           </button>
         </div>
 
         {/* Content */}
-        <div className="p-6 space-y-6">
+        <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
           {/* Success Message */}
           {saveSuccess && (
             <div className="p-4 bg-green-50 border border-green-200 rounded-lg flex items-center space-x-3">
@@ -430,6 +439,64 @@ export function Settings({ onClose }) {
                   <span className="text-gray-600 font-medium min-w-[140px]">
                     {formatCurrency(settings.employersLiability)}
                   </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Additional Insured Settings */}
+          <div className="border-t pt-6">
+            <h3 className="text-lg font-semibold mb-4">Additional Insured Verification</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Your Company Name
+                </label>
+                <input
+                  type="text"
+                  value={settings.companyName}
+                  onChange={(e) => setSettings({...settings, companyName: e.target.value})}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  placeholder="e.g., Acme Corporation LLC"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  This name will be checked against the "Additional Insured" field on vendor COIs
+                </p>
+              </div>
+
+              <div className="flex items-start space-x-3 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <input
+                  type="checkbox"
+                  id="requireAdditionalInsured"
+                  checked={settings.requireAdditionalInsured}
+                  onChange={(e) => setSettings({...settings, requireAdditionalInsured: e.target.checked})}
+                  className="mt-1 w-4 h-4 text-green-600 rounded focus:ring-green-500"
+                />
+                <div className="flex-1">
+                  <label htmlFor="requireAdditionalInsured" className="font-medium text-gray-900 cursor-pointer">
+                    Require as Additional Insured
+                  </label>
+                  <p className="text-sm text-gray-600 mt-1">
+                    When enabled, vendors will be marked as non-compliant if your company is not listed as an Additional Insured on their COI
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start space-x-3 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                <input
+                  type="checkbox"
+                  id="requireWaiverOfSubrogation"
+                  checked={settings.requireWaiverOfSubrogation}
+                  onChange={(e) => setSettings({...settings, requireWaiverOfSubrogation: e.target.checked})}
+                  className="mt-1 w-4 h-4 text-green-600 rounded focus:ring-green-500"
+                />
+                <div className="flex-1">
+                  <label htmlFor="requireWaiverOfSubrogation" className="font-medium text-gray-900 cursor-pointer">
+                    Require Waiver of Subrogation
+                  </label>
+                  <p className="text-sm text-gray-600 mt-1">
+                    When enabled, vendors will be marked as non-compliant if their COI does not include a Waiver of Subrogation in your favor
+                  </p>
                 </div>
               </div>
             </div>

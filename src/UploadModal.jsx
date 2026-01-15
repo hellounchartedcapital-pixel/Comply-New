@@ -100,16 +100,16 @@ export function UploadModal({ isOpen, onClose, onUploadComplete }) {
   }`;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg max-w-lg w-full p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold">Upload COI</h3>
-          <button 
-            onClick={handleClose} 
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+      <div className="bg-white rounded-lg max-w-lg w-full p-4 sm:p-6">
+        <div className="flex items-center justify-between mb-3 sm:mb-4">
+          <h3 className="text-base sm:text-lg font-semibold">Upload COI</h3>
+          <button
+            onClick={handleClose}
             disabled={uploading}
-            className="text-gray-400 hover:text-gray-600 disabled:opacity-50"
+            className="text-gray-400 hover:text-gray-600 disabled:opacity-50 ml-2"
           >
-            <X size={20} />
+            <X size={18} />
           </button>
         </div>
 
@@ -120,7 +120,7 @@ export function UploadModal({ isOpen, onClose, onUploadComplete }) {
           onDragOver={handleDrag}
           onDrop={handleDrop}
         >
-          <Upload className="mx-auto text-gray-400 mb-4" size={48} />
+          <Upload className="mx-auto text-gray-400 mb-3 sm:mb-4" size={40} />
           
           {selectedFile ? (
             <div className="space-y-2">
@@ -159,26 +159,26 @@ export function UploadModal({ isOpen, onClose, onUploadComplete }) {
           </div>
         )}
 
-        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-          <p className="text-sm text-blue-800">
-            <strong>🤖 AI-Powered Extraction!</strong> Upload your COI PDF and Claude will automatically extract all vendor data, check compliance, and create the vendor record for you.
+        <div className="mb-3 sm:mb-4 p-2.5 sm:p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <p className="text-xs sm:text-sm text-blue-800">
+            <strong>🤖 AI-Powered!</strong> Upload your COI PDF and Claude will automatically extract all data and check compliance.
           </p>
         </div>
 
-        <div className="flex space-x-3">
+        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
           <button
             onClick={handleUpload}
             disabled={!selectedFile || uploading}
-            className="flex-1 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed font-medium flex items-center justify-center space-x-2"
+            className="flex-1 px-4 py-2.5 sm:py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed font-medium flex items-center justify-center space-x-2 text-sm sm:text-base"
           >
             {uploading ? (
               <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                <span>{extractionStatus || 'Processing...'}</span>
+                <div className="animate-spin rounded-full h-3.5 w-3.5 sm:h-4 sm:w-4 border-b-2 border-white"></div>
+                <span className="truncate">{extractionStatus || 'Processing...'}</span>
               </>
             ) : (
               <>
-                <Upload size={16} />
+                <Upload size={14} />
                 <span>Upload & Extract</span>
               </>
             )}
@@ -186,7 +186,7 @@ export function UploadModal({ isOpen, onClose, onUploadComplete }) {
           <button
             onClick={handleClose}
             disabled={uploading}
-            className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50 font-medium"
+            className="flex-1 px-4 py-2.5 sm:py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50 font-medium text-sm sm:text-base"
           >
             Cancel
           </button>
