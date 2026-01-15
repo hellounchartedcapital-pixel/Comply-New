@@ -473,6 +473,28 @@ Return ONLY the JSON object, no other text.`
       });
     }
 
+    // Store additional insured and certificate holder info
+    vendorData.additionalInsured = extractedData.additionalInsured || '';
+    vendorData.certificateHolder = extractedData.certificateHolder || '';
+
+    // Check additional insured requirement
+    if (requirements.company_name && requirements.require_additional_insured) {
+      const additionalInsuredText = (vendorData.additionalInsured || '').toLowerCase();
+      const companyName = requirements.company_name.toLowerCase();
+
+      // Check if company name appears in additional insured field
+      if (!additionalInsuredText.includes(companyName)) {
+        vendorData.status = 'non-compliant';
+        vendorData.missingAdditionalInsured = true;
+        issues.push({
+          type: 'error',
+          message: `${requirements.company_name} not listed as Additional Insured`
+        });
+      } else {
+        vendorData.hasAdditionalInsured = true;
+      }
+    }
+
     // Check custom coverage requirements
     if (requirements.custom_coverages && requirements.custom_coverages.length > 0) {
       requirements.custom_coverages.forEach(requiredCoverage => {

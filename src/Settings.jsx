@@ -9,7 +9,9 @@ export function Settings({ onClose }) {
     autoLiability: 1000000,
     workersComp: 'Statutory',
     employersLiability: 500000,
-    additionalRequirements: []
+    additionalRequirements: [],
+    companyName: '',
+    requireAdditionalInsured: true
   });
 
   const [customCoverages, setCustomCoverages] = useState([]);
@@ -74,7 +76,9 @@ export function Settings({ onClose }) {
           autoLiability: data.auto_liability || 1000000,
           workersComp: data.workers_comp || 'Statutory',
           employersLiability: data.employers_liability || 500000,
-          additionalRequirements: textRequirements
+          additionalRequirements: textRequirements,
+          companyName: data.company_name || '',
+          requireAdditionalInsured: data.require_additional_insured !== false
         });
 
         // Load decoded custom coverages
