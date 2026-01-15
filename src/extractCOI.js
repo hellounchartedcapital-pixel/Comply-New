@@ -276,29 +276,37 @@ Extract the following information from this COI PDF and return it as a JSON obje
 }
 
 CRITICAL INSTRUCTIONS FOR EXPIRATION DATES:
-The COI document has multiple date sections. You MUST extract dates from the correct location:
+The COI document has a table with insurance policies that looks like this:
 
-✓ CORRECT: Look in the "POLICY EXP" column in the insurance coverage table
-  - This table lists: GENERAL LIABILITY, AUTOMOBILE LIABILITY, WORKERS COMPENSATION, etc.
-  - Each row has "POLICY EFF (MM/DD/YYYY)" and "POLICY EXP (MM/DD/YYYY)" columns
-  - Extract ONLY the dates from the "POLICY EXP" column
-  - Example: If "POLICY EXP" shows 01/01/2027, extract that date
+TYPE OF INSURANCE | POLICY NUMBER | POLICY EFF | POLICY EXP | LIMITS
+GENERAL LIABILITY | ABC123       | 01/01/2026 | 01/01/2027 | $2,000,000
+AUTOMOBILE       | XYZ456       | 01/01/2026 | 01/01/2027 | $2,000,000
+WORKERS COMP     | DEF789       | 01/01/2026 | 01/01/2027 | Statutory
+
+✓ CORRECT: Extract dates from the "POLICY EXP" column ONLY
+  - For the example above, the expiration date is "01/01/2027" (NOT 01/01/2026)
+  - POLICY EXP = when the policy expires (this is the furthest future date in each row)
+  - This is typically the rightmost date in each policy row
+  - Look for text "POLICY EXP" or "EXPIRATION" in the column header
 
 ✗ WRONG: Do NOT extract these dates:
-  - Certificate issue date (usually at top: "DATE (MM/DD/YYYY)")
-  - Certificate effective date
+  - Certificate date at the very top of the form (often labeled "DATE (MM/DD/YYYY)")
+  - POLICY EFF dates (these are policy START dates, not expiration dates)
   - "THIS CERTIFICATE IS ISSUED AS OF" date
-  - Description of operations dates
-  - Any dates in the certificate holder section
-  - Any dates outside the policy coverage table
+  - Revision date, description dates, certificate holder dates
+  - ANY date that appears before the insurance table or outside it
+  - The earlier date in a row is POLICY EFF (start), the later date is POLICY EXP (expiration)
 
-For each coverage type (generalLiability, autoLiability, workersComp, employersLiability):
-- Extract the "POLICY EXP" date from that specific policy row
-- Convert from MM/DD/YYYY to YYYY-MM-DD format
+Step-by-step extraction process:
+1. Locate the insurance coverage table (has TYPE OF INSURANCE, POLICY EFF, POLICY EXP columns)
+2. For GENERAL LIABILITY row: Find the date in the POLICY EXP column → extract that date
+3. For AUTOMOBILE LIABILITY row: Find the date in the POLICY EXP column → extract that date
+4. For WORKERS COMPENSATION row: Find the date in the POLICY EXP column → extract that date
+5. For EMPLOYERS LIABILITY row: Find the date in the POLICY EXP column → extract that date
+6. Convert all dates from MM/DD/YYYY to YYYY-MM-DD format
+7. For top-level expirationDate: Return the EARLIEST (soonest) of all POLICY EXP dates found
 
-For the top-level expirationDate field:
-- Find ALL "POLICY EXP" dates from all coverage rows
-- Return the EARLIEST (soonest) policy expiration date
+REMEMBER: In each policy row, there are TWO dates - the earlier one is the start date (POLICY EFF), the later one is the expiration date (POLICY EXP). Always choose the LATER date from each row.
 
 Other rules:
 - Extract amounts as pure numbers (e.g., 1000000 not "$1,000,000")
@@ -324,7 +332,14 @@ Return ONLY the JSON object, no other text.`
     }
     
     const extractedData = JSON.parse(jsonMatch[0]);
-    
+    console.log('Extracted expiration date:', extractedData.expirationDate);
+    console.log('All policy dates:', {
+      GL: extractedData.generalLiability?.expirationDate,
+      Auto: extractedData.autoLiability?.expirationDate,
+      WC: extractedData.workersComp?.expirationDate,
+      EL: extractedData.employersLiability?.expirationDate
+    });
+
     // Transform to vendor format with user's requirements
     const vendorData = {
       name: extractedData.companyName || 'Unknown Company',
