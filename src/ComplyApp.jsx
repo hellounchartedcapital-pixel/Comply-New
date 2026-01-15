@@ -141,7 +141,8 @@ function ComplyApp({ user, onSignOut }) {
           employers_liability: data.employers_liability || 500000,
           custom_coverages: customCoverages,
           company_name: data.company_name || '',
-          require_additional_insured: data.require_additional_insured !== false
+          require_additional_insured: data.require_additional_insured !== false,
+          require_waiver_of_subrogation: data.require_waiver_of_subrogation || false
         });
       }
     } catch (err) {
@@ -1006,6 +1007,50 @@ function ComplyApp({ user, onSignOut }) {
                         {selectedVendor.missingAdditionalInsured && (
                           <p className="text-xs text-red-700 mt-1">
                             ✗ Your company is NOT listed as Additional Insured
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Waiver of Subrogation Status */}
+              {selectedVendor.waiverOfSubrogation && (
+                <div>
+                  <h4 className="font-semibold mb-2">Waiver of Subrogation</h4>
+                  <div className={`p-4 rounded-lg border ${
+                    selectedVendor.hasWaiverOfSubrogation
+                      ? 'bg-green-50 border-green-200'
+                      : selectedVendor.missingWaiverOfSubrogation
+                      ? 'bg-red-50 border-red-200'
+                      : 'bg-gray-50 border-gray-200'
+                  }`}>
+                    <div className="flex items-start space-x-2">
+                      {selectedVendor.hasWaiverOfSubrogation && (
+                        <CheckCircle size={18} className="text-green-600 flex-shrink-0 mt-0.5" />
+                      )}
+                      {selectedVendor.missingWaiverOfSubrogation && (
+                        <AlertCircle size={18} className="text-red-600 flex-shrink-0 mt-0.5" />
+                      )}
+                      <div className="flex-1">
+                        <p className={`text-sm font-medium ${
+                          selectedVendor.hasWaiverOfSubrogation
+                            ? 'text-green-900'
+                            : selectedVendor.missingWaiverOfSubrogation
+                            ? 'text-red-900'
+                            : 'text-gray-900'
+                        }`}>
+                          {selectedVendor.waiverOfSubrogation}
+                        </p>
+                        {selectedVendor.hasWaiverOfSubrogation && (
+                          <p className="text-xs text-green-700 mt-1">
+                            ✓ Waiver of Subrogation is included
+                          </p>
+                        )}
+                        {selectedVendor.missingWaiverOfSubrogation && (
+                          <p className="text-xs text-red-700 mt-1">
+                            ✗ Waiver of Subrogation is NOT included
                           </p>
                         )}
                       </div>

@@ -52,7 +52,10 @@ export function useVendors() {
           additional_insured: vendorData.additionalInsured || '',
           certificate_holder: vendorData.certificateHolder || '',
           has_additional_insured: vendorData.hasAdditionalInsured || false,
-          missing_additional_insured: vendorData.missingAdditionalInsured || false
+          missing_additional_insured: vendorData.missingAdditionalInsured || false,
+          waiver_of_subrogation: vendorData.waiverOfSubrogation || '',
+          has_waiver_of_subrogation: vendorData.hasWaiverOfSubrogation || false,
+          missing_waiver_of_subrogation: vendorData.missingWaiverOfSubrogation || false
         }])
         .select()
         .single();

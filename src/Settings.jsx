@@ -11,7 +11,8 @@ export function Settings({ onClose }) {
     employersLiability: 500000,
     additionalRequirements: [],
     companyName: '',
-    requireAdditionalInsured: true
+    requireAdditionalInsured: true,
+    requireWaiverOfSubrogation: false
   });
 
   const [customCoverages, setCustomCoverages] = useState([]);
@@ -78,7 +79,8 @@ export function Settings({ onClose }) {
           employersLiability: data.employers_liability || 500000,
           additionalRequirements: textRequirements,
           companyName: data.company_name || '',
-          requireAdditionalInsured: data.require_additional_insured !== false
+          requireAdditionalInsured: data.require_additional_insured !== false,
+          requireWaiverOfSubrogation: data.require_waiver_of_subrogation || false
         });
 
         // Load decoded custom coverages
@@ -189,7 +191,8 @@ export function Settings({ onClose }) {
         employers_liability: settings.employersLiability,
         additional_requirements: encodedRequirements,
         company_name: settings.companyName,
-        require_additional_insured: settings.requireAdditionalInsured
+        require_additional_insured: settings.requireAdditionalInsured,
+        require_waiver_of_subrogation: settings.requireWaiverOfSubrogation
       };
 
       const { error } = await supabase
@@ -475,6 +478,24 @@ export function Settings({ onClose }) {
                   </label>
                   <p className="text-sm text-gray-600 mt-1">
                     When enabled, vendors will be marked as non-compliant if your company is not listed as an Additional Insured on their COI
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start space-x-3 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                <input
+                  type="checkbox"
+                  id="requireWaiverOfSubrogation"
+                  checked={settings.requireWaiverOfSubrogation}
+                  onChange={(e) => setSettings({...settings, requireWaiverOfSubrogation: e.target.checked})}
+                  className="mt-1 w-4 h-4 text-green-600 rounded focus:ring-green-500"
+                />
+                <div className="flex-1">
+                  <label htmlFor="requireWaiverOfSubrogation" className="font-medium text-gray-900 cursor-pointer">
+                    Require Waiver of Subrogation
+                  </label>
+                  <p className="text-sm text-gray-600 mt-1">
+                    When enabled, vendors will be marked as non-compliant if their COI does not include a Waiver of Subrogation in your favor
                   </p>
                 </div>
               </div>
