@@ -1,13 +1,11 @@
 import React, { useState } from 'react';
-import { Upload, CheckCircle, XCircle, AlertCircle, FileText, Calendar, X, Search, Download, Settings as SettingsIcon, Eye, Bell, BarChart3, FileDown, Users, Phone, Mail, User } from 'lucide-react';
+import { Upload, CheckCircle, XCircle, AlertCircle, FileText, Calendar, X, Search, Download, Settings as SettingsIcon, Eye, Bell, BarChart3, FileDown, Phone, Mail, User } from 'lucide-react';
 import { useVendors } from './useVendors';
 import { UploadModal } from './UploadModal';
-import { BulkUploadModal } from './BulkUploadModal';
 import { Settings } from './Settings';
 import { NotificationSettings } from './NotificationSettings';
 import { Analytics } from './Analytics';
 import { OnboardingTutorial } from './OnboardingTutorial';
-import { TeamManagement } from './TeamManagement';
 import { supabase } from './supabaseClient';
 import { extractCOIFromPDF } from './extractCOI';
 import { exportPDFReport } from './exportPDFReport';
@@ -49,11 +47,9 @@ function ComplyApp({ user, onSignOut }) {
   const [editingVendor, setEditingVendor] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [showUploadModal, setShowUploadModal] = useState(false);
-  const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
-  const [showTeam, setShowTeam] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboardingChecked, setOnboardingChecked] = useState(false);
   const [userRequirements, setUserRequirements] = useState(null);
@@ -479,32 +475,13 @@ function ComplyApp({ user, onSignOut }) {
                 <span className="hidden sm:inline">Notifications</span>
               </button>
               <button
-                onClick={() => setShowTeam(true)}
-                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center space-x-2"
-                title="Team Management"
+                onClick={() => setShowUploadModal(true)}
+                className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 flex items-center space-x-2"
+                data-onboarding="upload-button"
               >
-                <Users size={16} />
-                <span className="hidden sm:inline">Team</span>
+                <Upload size={16} />
+                <span>Upload COI</span>
               </button>
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={() => setShowUploadModal(true)}
-                  className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 flex items-center space-x-2"
-                  data-onboarding="upload-button"
-                >
-                  <Upload size={16} />
-                  <span>Upload COI</span>
-                </button>
-                <button
-                  onClick={() => setShowBulkUploadModal(true)}
-                  className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 flex items-center space-x-2"
-                  title="Bulk Upload Multiple COIs"
-                >
-                  <Upload size={16} />
-                  <span className="hidden xl:inline">Bulk Upload</span>
-                  <span className="xl:hidden">Bulk</span>
-                </button>
-              </div>
               <button
                 onClick={onSignOut}
                 className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium"
@@ -1381,13 +1358,6 @@ function ComplyApp({ user, onSignOut }) {
         onUploadComplete={handleFileUpload}
       />
 
-      {/* Bulk Upload Modal */}
-      <BulkUploadModal
-        isOpen={showBulkUploadModal}
-        onClose={() => setShowBulkUploadModal(false)}
-        onUploadComplete={handleFileUpload}
-      />
-
       {/* Settings Modal */}
       {showSettings && (
         <Settings onClose={() => setShowSettings(false)} />
@@ -1409,11 +1379,6 @@ function ComplyApp({ user, onSignOut }) {
           onComplete={handleOnboardingComplete}
           onSkip={handleOnboardingSkip}
         />
-      )}
-
-      {/* Team Management Modal */}
-      {showTeam && (
-        <TeamManagement onClose={() => setShowTeam(false)} />
       )}
     </div>
   );
