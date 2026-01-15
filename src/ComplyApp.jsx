@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Upload, CheckCircle, XCircle, AlertCircle, FileText, Calendar, X, Search, Download, Settings as SettingsIcon, Eye } from 'lucide-react';
+import { Upload, CheckCircle, XCircle, AlertCircle, FileText, Calendar, X, Search, Download, Settings as SettingsIcon, Eye, Bell } from 'lucide-react';
 import { useVendors } from './useVendors';
 import { UploadModal } from './UploadModal';
 import { Settings } from './Settings';
+import { NotificationSettings } from './NotificationSettings';
 import { supabase } from './supabaseClient';
 import { extractCOIFromPDF } from './extractCOI';
 import { Logo } from './Logo';
@@ -87,6 +88,7 @@ function ComplyApp({ user, onSignOut }) {
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
   const [userRequirements, setUserRequirements] = useState(null);
 
   // Load user requirements on mount
@@ -418,7 +420,15 @@ function ComplyApp({ user, onSignOut }) {
                 <SettingsIcon size={16} />
                 <span className="hidden sm:inline">Settings</span>
               </button>
-              <button 
+              <button
+                onClick={() => setShowNotifications(true)}
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center space-x-2"
+                title="Notifications"
+              >
+                <Bell size={16} />
+                <span className="hidden sm:inline">Notifications</span>
+              </button>
+              <button
                 onClick={() => setShowUploadModal(true)}
                 className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 flex items-center space-x-2"
               >
@@ -999,6 +1009,11 @@ function ComplyApp({ user, onSignOut }) {
       {/* Settings Modal */}
       {showSettings && (
         <Settings onClose={() => setShowSettings(false)} />
+      )}
+
+      {/* Notification Settings Modal */}
+      {showNotifications && (
+        <NotificationSettings onClose={() => setShowNotifications(false)} />
       )}
     </div>
   );
