@@ -144,22 +144,23 @@ export function TeamManagement({ onClose }) {
     }
   };
 
-  const handleUpdateMemberRole = async (memberId, newRole) => {
-    try {
-      const { error } = await supabase
-        .from('team_members')
-        .update({ role: newRole })
-        .eq('id', memberId);
-
-      if (error) throw error;
-
-      setSuccess('Member role updated');
-      await loadTeamData();
-    } catch (err) {
-      console.error('Error updating member role:', err);
-      setError('Failed to update member role');
-    }
-  };
+  // Role update functionality - reserved for future use
+  // const handleUpdateMemberRole = async (memberId, newRole) => {
+  //   try {
+  //     const { error } = await supabase
+  //       .from('team_members')
+  //       .update({ role: newRole })
+  //       .eq('id', memberId);
+  //
+  //     if (error) throw error;
+  //
+  //     setSuccess('Member role updated');
+  //     await loadTeamData();
+  //   } catch (err) {
+  //     console.error('Error updating member role:', err);
+  //     setError('Failed to update member role');
+  //   }
+  // };
 
   const handleRemoveMember = async (memberId) => {
     if (!window.confirm('Are you sure you want to remove this team member?')) return;

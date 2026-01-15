@@ -13,60 +13,6 @@ import { extractCOIFromPDF } from './extractCOI';
 import { exportPDFReport } from './exportPDFReport';
 import { Logo } from './Logo';
 
-// Initial vendor data
-const initialVendors = [
-  {
-    id: 1,
-    name: "American Direct Procurement, LLC",
-    dba: "Avalon Communications Services",
-    status: "expired",
-    expirationDate: "2025-06-13",
-    daysOverdue: 210,
-    issues: [
-      { type: "critical", message: "All policies expired 6/13/2025 (210 days overdue)" },
-      { type: "error", message: "Missing property physical address on COI" }
-    ],
-    coverage: {
-      generalLiability: { amount: 1000000, compliant: true },
-      autoLiability: { amount: 1000000, compliant: true },
-      workersComp: { amount: "Statutory", compliant: true },
-      employersLiability: { amount: 1000000, compliant: true }
-    }
-  },
-  {
-    id: 2,
-    name: "Faith Enterprises Incorporated",
-    status: "non-compliant",
-    expirationDate: "2026-10-01",
-    daysOverdue: 0,
-    issues: [
-      { type: "error", message: "General Liability below requirement: $500,000 (requires $1.0M)" }
-    ],
-    coverage: {
-      generalLiability: { amount: 500000, compliant: false },
-      autoLiability: { amount: 1000000, compliant: true },
-      workersComp: { amount: "Statutory", compliant: true },
-      employersLiability: { amount: 1000000, compliant: true }
-    }
-  },
-  {
-    id: 3,
-    name: "Captivate Holdings, LLC",
-    status: "expired",
-    expirationDate: "2025-09-25",
-    daysOverdue: 106,
-    issues: [
-      { type: "critical", message: "All policies expired 9/25/2025 (106 days overdue)" }
-    ],
-    coverage: {
-      generalLiability: { amount: 1000000, compliant: true },
-      autoLiability: { amount: 1000000, compliant: false },
-      workersComp: { amount: "Statutory", compliant: true },
-      employersLiability: { amount: 1000000, compliant: true }
-    }
-  }
-];
-
 function ComplyApp({ user, onSignOut }) {
   // Use database hook instead of local state
   const { vendors: dbVendors, loading, error, addVendor, updateVendor, deleteVendor, refreshVendors } = useVendors();
@@ -98,7 +44,6 @@ function ComplyApp({ user, onSignOut }) {
   
   const [selectedVendor, setSelectedVendor] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
   const [quickFilter, setQuickFilter] = useState('all'); // Quick filter for button interface
   const [sortBy, setSortBy] = useState('name');
   const [editingVendor, setEditingVendor] = useState(null);
@@ -806,16 +751,16 @@ function ComplyApp({ user, onSignOut }) {
               <div className="p-8 text-center">
                 <AlertCircle className="mx-auto text-gray-400 mb-4" size={48} />
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                  {searchQuery || statusFilter !== 'all' 
+                  {searchQuery || quickFilter !== 'all' 
                     ? 'No vendors found'
                     : 'Welcome to Comply!'}
                 </h3>
                 <p className="text-gray-600 mb-6">
-                  {searchQuery || statusFilter !== 'all' 
+                  {searchQuery || quickFilter !== 'all' 
                     ? 'Try adjusting your search or filters'
                     : 'Get started by adding your first vendor'}
                 </p>
-                {!searchQuery && statusFilter === 'all' && (
+                {!searchQuery && quickFilter === 'all' && (
                   <div className="max-w-md mx-auto text-left bg-blue-50 border border-blue-200 rounded-lg p-6">
                     <h4 className="font-semibold text-blue-900 mb-3">Quick Start:</h4>
                     <ol className="space-y-2 text-sm text-blue-800">

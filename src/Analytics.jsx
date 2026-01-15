@@ -1,9 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { X, TrendingUp, TrendingDown, Users, AlertCircle, CheckCircle, Calendar, DollarSign, BarChart3, XCircle } from 'lucide-react';
 
 export function Analytics({ vendors, onClose }) {
-  const [timeRange, setTimeRange] = useState('30'); // days
-
   // Calculate analytics metrics
   const analytics = useMemo(() => {
     const total = vendors.length;
