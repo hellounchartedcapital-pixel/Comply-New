@@ -275,17 +275,36 @@ Extract the following information from this COI PDF and return it as a JSON obje
   "insuranceCompany": "Insurance company/carrier name"
 }
 
-Important rules:
+CRITICAL INSTRUCTIONS FOR EXPIRATION DATES:
+The COI document has multiple date sections. You MUST extract dates from the correct location:
+
+✓ CORRECT: Look in the "POLICY EXP" column in the insurance coverage table
+  - This table lists: GENERAL LIABILITY, AUTOMOBILE LIABILITY, WORKERS COMPENSATION, etc.
+  - Each row has "POLICY EFF (MM/DD/YYYY)" and "POLICY EXP (MM/DD/YYYY)" columns
+  - Extract ONLY the dates from the "POLICY EXP" column
+  - Example: If "POLICY EXP" shows 01/01/2027, extract that date
+
+✗ WRONG: Do NOT extract these dates:
+  - Certificate issue date (usually at top: "DATE (MM/DD/YYYY)")
+  - Certificate effective date
+  - "THIS CERTIFICATE IS ISSUED AS OF" date
+  - Description of operations dates
+  - Any dates in the certificate holder section
+  - Any dates outside the policy coverage table
+
+For each coverage type (generalLiability, autoLiability, workersComp, employersLiability):
+- Extract the "POLICY EXP" date from that specific policy row
+- Convert from MM/DD/YYYY to YYYY-MM-DD format
+
+For the top-level expirationDate field:
+- Find ALL "POLICY EXP" dates from all coverage rows
+- Return the EARLIEST (soonest) policy expiration date
+
+Other rules:
 - Extract amounts as pure numbers (e.g., 1000000 not "$1,000,000")
 - Use YYYY-MM-DD format for all dates
 - If a field is not found, use null
 - For Workers Comp, if it says "Statutory" use that as a string, otherwise use the number
-- CRITICAL: For expiration dates, look for the actual POLICY EXPIRATION dates in the insurance section of the COI
-  * Do NOT use the certificate issue date, effective date, or certificate holder dates
-  * Look for dates in columns labeled "POLICY EXP" or "EXPIRATION DATE" in the policy listings
-  * Each policy (GL, Auto, WC, EL) will have its own expiration date - extract each one
-  * The top-level expirationDate should be the EARLIEST policy expiration date among ALL policies
-  * If you see dates like MM/DD/YYYY in the policy rows, those are the policy expiration dates
 - Look for ANY additional coverage types beyond the standard 4 (GL, Auto, WC, EL) and include them in additionalCoverages array
 - Common additional coverages: Cyber Liability, Professional Liability/E&O, Umbrella/Excess, Pollution, Products Liability
 
