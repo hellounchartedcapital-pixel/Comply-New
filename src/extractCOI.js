@@ -246,7 +246,7 @@ Extract the following information from this COI PDF and return it as a JSON obje
 {
   "companyName": "Full legal company name",
   "dba": "Doing Business As name (if any, otherwise null)",
-  "expirationDate": "Earliest expiration date in YYYY-MM-DD format",
+  "expirationDate": "The EARLIEST policy expiration date among all coverages in YYYY-MM-DD format",
   "generalLiability": {
     "amount": number (e.g., 1000000 for $1M),
     "expirationDate": "YYYY-MM-DD"
@@ -280,7 +280,12 @@ Important rules:
 - Use YYYY-MM-DD format for all dates
 - If a field is not found, use null
 - For Workers Comp, if it says "Statutory" use that as a string, otherwise use the number
-- The expirationDate at the top level should be the EARLIEST expiration date among all policies
+- CRITICAL: For expiration dates, look for the actual POLICY EXPIRATION dates in the insurance section of the COI
+  * Do NOT use the certificate issue date, effective date, or certificate holder dates
+  * Look for dates in columns labeled "POLICY EXP" or "EXPIRATION DATE" in the policy listings
+  * Each policy (GL, Auto, WC, EL) will have its own expiration date - extract each one
+  * The top-level expirationDate should be the EARLIEST policy expiration date among ALL policies
+  * If you see dates like MM/DD/YYYY in the policy rows, those are the policy expiration dates
 - Look for ANY additional coverage types beyond the standard 4 (GL, Auto, WC, EL) and include them in additionalCoverages array
 - Common additional coverages: Cyber Liability, Professional Liability/E&O, Umbrella/Excess, Pollution, Products Liability
 
