@@ -162,7 +162,7 @@ export function TeamManagement({ onClose }) {
   };
 
   const handleRemoveMember = async (memberId) => {
-    if (!confirm('Are you sure you want to remove this team member?')) return;
+    if (!window.confirm('Are you sure you want to remove this team member?')) return;
 
     try {
       const { error } = await supabase
