@@ -79,12 +79,19 @@ function ComplyApp({ user, onSignOut }) {
     coverage: v.coverage,
     issues: v.issues,
     additionalCoverages: v.additional_coverages || [],
+    additionalInsured: v.additional_insured,
+    hasAdditionalInsured: v.has_additional_insured,
+    missingAdditionalInsured: v.missing_additional_insured,
+    waiverOfSubrogation: v.waiver_of_subrogation,
+    hasWaiverOfSubrogation: v.has_waiver_of_subrogation,
+    missingWaiverOfSubrogation: v.missing_waiver_of_subrogation,
     rawData: v.raw_data
   }));
   
   const [selectedVendor, setSelectedVendor] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [quickFilter, setQuickFilter] = useState('all'); // Quick filter for button interface
   const [sortBy, setSortBy] = useState('name');
   const [editingVendor, setEditingVendor] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
@@ -260,9 +267,21 @@ function ComplyApp({ user, onSignOut }) {
       );
     }
 
-    // Status filter
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter(v => v.status === statusFilter);
+    // Quick filter (replaces status filter dropdown)
+    if (quickFilter !== 'all') {
+      if (quickFilter === 'expired') {
+        filtered = filtered.filter(v => v.status === 'expired');
+      } else if (quickFilter === 'expiring') {
+        filtered = filtered.filter(v => v.status === 'expiring');
+      } else if (quickFilter === 'non-compliant') {
+        filtered = filtered.filter(v => v.status === 'non-compliant');
+      } else if (quickFilter === 'compliant') {
+        filtered = filtered.filter(v => v.status === 'compliant');
+      } else if (quickFilter === 'missing-additional-insured') {
+        filtered = filtered.filter(v => v.missingAdditionalInsured === true);
+      } else if (quickFilter === 'missing-waiver') {
+        filtered = filtered.filter(v => v.missingWaiverOfSubrogation === true);
+      }
     }
 
     // Sort
@@ -522,7 +541,89 @@ function ComplyApp({ user, onSignOut }) {
 
         {/* Filters */}
         <div className="bg-white rounded-lg shadow p-6 mb-6">
-          <div className="flex flex-wrap gap-4 items-center">
+          {/* Quick Filter Buttons */}
+          <div className="mb-6">
+            <h3 className="text-sm font-semibold text-gray-700 mb-3">Quick Filters</h3>
+            <div className="flex flex-wrap gap-3">
+              <button
+                onClick={() => setQuickFilter('all')}
+                className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                  quickFilter === 'all'
+                    ? 'bg-gray-800 text-white shadow-md'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                All Vendors ({vendors.length})
+              </button>
+              <button
+                onClick={() => setQuickFilter('expired')}
+                className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                  quickFilter === 'expired'
+                    ? 'bg-red-600 text-white shadow-md'
+                    : 'bg-red-50 text-red-700 hover:bg-red-100'
+                }`}
+              >
+                <XCircle size={16} className="inline mr-1 mb-0.5" />
+                Expired ({vendors.filter(v => v.status === 'expired').length})
+              </button>
+              <button
+                onClick={() => setQuickFilter('expiring')}
+                className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                  quickFilter === 'expiring'
+                    ? 'bg-yellow-600 text-white shadow-md'
+                    : 'bg-yellow-50 text-yellow-700 hover:bg-yellow-100'
+                }`}
+              >
+                <AlertCircle size={16} className="inline mr-1 mb-0.5" />
+                Expiring Soon ({vendors.filter(v => v.status === 'expiring').length})
+              </button>
+              <button
+                onClick={() => setQuickFilter('non-compliant')}
+                className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                  quickFilter === 'non-compliant'
+                    ? 'bg-orange-600 text-white shadow-md'
+                    : 'bg-orange-50 text-orange-700 hover:bg-orange-100'
+                }`}
+              >
+                <AlertCircle size={16} className="inline mr-1 mb-0.5" />
+                Non-Compliant ({vendors.filter(v => v.status === 'non-compliant').length})
+              </button>
+              <button
+                onClick={() => setQuickFilter('compliant')}
+                className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                  quickFilter === 'compliant'
+                    ? 'bg-green-600 text-white shadow-md'
+                    : 'bg-green-50 text-green-700 hover:bg-green-100'
+                }`}
+              >
+                <CheckCircle size={16} className="inline mr-1 mb-0.5" />
+                Compliant ({vendors.filter(v => v.status === 'compliant').length})
+              </button>
+              <button
+                onClick={() => setQuickFilter('missing-additional-insured')}
+                className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                  quickFilter === 'missing-additional-insured'
+                    ? 'bg-purple-600 text-white shadow-md'
+                    : 'bg-purple-50 text-purple-700 hover:bg-purple-100'
+                }`}
+              >
+                Missing Add'l Insured ({vendors.filter(v => v.missingAdditionalInsured).length})
+              </button>
+              <button
+                onClick={() => setQuickFilter('missing-waiver')}
+                className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                  quickFilter === 'missing-waiver'
+                    ? 'bg-pink-600 text-white shadow-md'
+                    : 'bg-pink-50 text-pink-700 hover:bg-pink-100'
+                }`}
+              >
+                Missing Waiver ({vendors.filter(v => v.missingWaiverOfSubrogation).length})
+              </button>
+            </div>
+          </div>
+
+          {/* Search and Sort Controls */}
+          <div className="flex flex-wrap gap-4 items-center pt-4 border-t border-gray-200">
             {/* Search */}
             <div className="flex-1 min-w-[200px]">
               <div className="relative">
@@ -536,19 +637,6 @@ function ComplyApp({ user, onSignOut }) {
                 />
               </div>
             </div>
-
-            {/* Status Filter */}
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white"
-            >
-              <option value="all">All Status</option>
-              <option value="expired">Expired</option>
-              <option value="non-compliant">Non-Compliant</option>
-              <option value="expiring">Expiring Soon</option>
-              <option value="compliant">Compliant</option>
-            </select>
 
             {/* Sort */}
             <select
@@ -571,11 +659,11 @@ function ComplyApp({ user, onSignOut }) {
             </button>
 
             {/* Clear */}
-            {(searchQuery || statusFilter !== 'all' || sortBy !== 'name') && (
+            {(searchQuery || quickFilter !== 'all' || sortBy !== 'name') && (
               <button
                 onClick={() => {
                   setSearchQuery('');
-                  setStatusFilter('all');
+                  setQuickFilter('all');
                   setSortBy('name');
                 }}
                 className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
@@ -584,7 +672,7 @@ function ComplyApp({ user, onSignOut }) {
               </button>
             )}
           </div>
-          
+
           {filteredVendors.length > 0 && (
             <p className="text-sm text-gray-500 mt-4">
               Showing {filteredVendors.length} of {vendors.length} vendors
