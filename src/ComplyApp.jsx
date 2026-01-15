@@ -783,23 +783,96 @@ function ComplyApp({ user, onSignOut }) {
               
               <div>
                 <h4 className="font-semibold mb-2">Standard Coverage</h4>
-                <div className="space-y-2">
-                  <p><strong>General Liability:</strong> {formatCurrency(selectedVendor.coverage.generalLiability.amount)}</p>
-                  <p><strong>Auto Liability:</strong> {formatCurrency(selectedVendor.coverage.autoLiability.amount)}</p>
-                  <p><strong>Workers Comp:</strong> {selectedVendor.coverage.workersComp.amount}</p>
-                  <p><strong>Employers Liability:</strong> {formatCurrency(selectedVendor.coverage.employersLiability.amount)}</p>
+                <div className="space-y-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center space-x-2">
+                      {(!selectedVendor.coverage.generalLiability.compliant || selectedVendor.coverage.generalLiability.expired) && (
+                        <AlertCircle size={16} className="text-red-600 flex-shrink-0" />
+                      )}
+                      <div>
+                        <p className="font-medium">General Liability:</p>
+                        <p className="text-sm text-gray-600">{formatCurrency(selectedVendor.coverage.generalLiability.amount)}</p>
+                        {selectedVendor.coverage.generalLiability.expirationDate && (
+                          <p className={`text-xs ${selectedVendor.coverage.generalLiability.expired ? 'text-red-600 font-semibold' : 'text-gray-500'}`}>
+                            Exp: {new Date(selectedVendor.coverage.generalLiability.expirationDate).toLocaleDateString()}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center space-x-2">
+                      {(!selectedVendor.coverage.autoLiability.compliant || selectedVendor.coverage.autoLiability.expired) && (
+                        <AlertCircle size={16} className="text-red-600 flex-shrink-0" />
+                      )}
+                      <div>
+                        <p className="font-medium">Auto Liability:</p>
+                        <p className="text-sm text-gray-600">{formatCurrency(selectedVendor.coverage.autoLiability.amount)}</p>
+                        {selectedVendor.coverage.autoLiability.expirationDate && (
+                          <p className={`text-xs ${selectedVendor.coverage.autoLiability.expired ? 'text-red-600 font-semibold' : 'text-gray-500'}`}>
+                            Exp: {new Date(selectedVendor.coverage.autoLiability.expirationDate).toLocaleDateString()}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center space-x-2">
+                      {(!selectedVendor.coverage.workersComp.compliant || selectedVendor.coverage.workersComp.expired) && (
+                        <AlertCircle size={16} className="text-red-600 flex-shrink-0" />
+                      )}
+                      <div>
+                        <p className="font-medium">Workers Comp:</p>
+                        <p className="text-sm text-gray-600">{selectedVendor.coverage.workersComp.amount}</p>
+                        {selectedVendor.coverage.workersComp.expirationDate && (
+                          <p className={`text-xs ${selectedVendor.coverage.workersComp.expired ? 'text-red-600 font-semibold' : 'text-gray-500'}`}>
+                            Exp: {new Date(selectedVendor.coverage.workersComp.expirationDate).toLocaleDateString()}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center space-x-2">
+                      {(!selectedVendor.coverage.employersLiability.compliant || selectedVendor.coverage.employersLiability.expired) && (
+                        <AlertCircle size={16} className="text-red-600 flex-shrink-0" />
+                      )}
+                      <div>
+                        <p className="font-medium">Employers Liability:</p>
+                        <p className="text-sm text-gray-600">{formatCurrency(selectedVendor.coverage.employersLiability.amount)}</p>
+                        {selectedVendor.coverage.employersLiability.expirationDate && (
+                          <p className={`text-xs ${selectedVendor.coverage.employersLiability.expired ? 'text-red-600 font-semibold' : 'text-gray-500'}`}>
+                            Exp: {new Date(selectedVendor.coverage.employersLiability.expirationDate).toLocaleDateString()}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
               {selectedVendor.additionalCoverages && selectedVendor.additionalCoverages.length > 0 && (
                 <div>
                   <h4 className="font-semibold mb-2">Additional Coverage</h4>
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     {selectedVendor.additionalCoverages.map((cov, idx) => (
-                      <p key={idx}>
-                        <strong>{cov.type}:</strong> {formatCurrency(cov.amount || 0)}
-                        {cov.expirationDate && ` (Expires: ${new Date(cov.expirationDate).toLocaleDateString()})`}
-                      </p>
+                      <div key={idx} className="flex items-start space-x-2">
+                        {cov.expired && (
+                          <AlertCircle size={16} className="text-red-600 flex-shrink-0 mt-1" />
+                        )}
+                        <div className="flex-1">
+                          <p className="font-medium">{cov.type}:</p>
+                          <p className="text-sm text-gray-600">{formatCurrency(cov.amount || 0)}</p>
+                          {cov.expirationDate && (
+                            <p className={`text-xs ${cov.expired ? 'text-red-600 font-semibold' : 'text-gray-500'}`}>
+                              Exp: {new Date(cov.expirationDate).toLocaleDateString()}
+                            </p>
+                          )}
+                        </div>
+                      </div>
                     ))}
                   </div>
                 </div>
