@@ -166,6 +166,15 @@ function ComplyApp({ user, onSignOut }) {
     );
   };
 
+  // Format date string (YYYY-MM-DD) to local date without timezone issues
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    // Parse as local date to avoid timezone shifting
+    const [year, month, day] = dateString.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
+    return date.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' });
+  };
+
   const formatCurrency = (amount) => {
     if (typeof amount === 'string') return amount;
     return new Intl.NumberFormat('en-US', {
@@ -629,7 +638,7 @@ function ComplyApp({ user, onSignOut }) {
                     <div className="ml-4 flex flex-col items-end space-y-2">
                       <div className="flex items-center text-sm text-gray-500">
                         <Calendar size={14} className="mr-1" />
-                        Exp: {new Date(vendor.expirationDate).toLocaleDateString()}
+                        Exp: {formatDate(vendor.expirationDate)}
                       </div>
                       <div className="flex items-center space-x-2">
                         <button
@@ -778,7 +787,7 @@ function ComplyApp({ user, onSignOut }) {
               
               <div>
                 <h4 className="font-semibold mb-2">Expiration</h4>
-                <p>{new Date(selectedVendor.expirationDate).toLocaleDateString()}</p>
+                <p>{formatDate(selectedVendor.expirationDate)}</p>
               </div>
               
               <div>
@@ -794,7 +803,7 @@ function ComplyApp({ user, onSignOut }) {
                         <p className="text-sm text-gray-600">{formatCurrency(selectedVendor.coverage.generalLiability.amount)}</p>
                         {selectedVendor.coverage.generalLiability.expirationDate && (
                           <p className={`text-xs ${selectedVendor.coverage.generalLiability.expired ? 'text-red-600 font-semibold' : 'text-gray-500'}`}>
-                            Exp: {new Date(selectedVendor.coverage.generalLiability.expirationDate).toLocaleDateString()}
+                            Exp: {formatDate(selectedVendor.coverage.generalLiability.expirationDate)}
                           </p>
                         )}
                       </div>
@@ -811,7 +820,7 @@ function ComplyApp({ user, onSignOut }) {
                         <p className="text-sm text-gray-600">{formatCurrency(selectedVendor.coverage.autoLiability.amount)}</p>
                         {selectedVendor.coverage.autoLiability.expirationDate && (
                           <p className={`text-xs ${selectedVendor.coverage.autoLiability.expired ? 'text-red-600 font-semibold' : 'text-gray-500'}`}>
-                            Exp: {new Date(selectedVendor.coverage.autoLiability.expirationDate).toLocaleDateString()}
+                            Exp: {formatDate(selectedVendor.coverage.autoLiability.expirationDate)}
                           </p>
                         )}
                       </div>
@@ -828,7 +837,7 @@ function ComplyApp({ user, onSignOut }) {
                         <p className="text-sm text-gray-600">{selectedVendor.coverage.workersComp.amount}</p>
                         {selectedVendor.coverage.workersComp.expirationDate && (
                           <p className={`text-xs ${selectedVendor.coverage.workersComp.expired ? 'text-red-600 font-semibold' : 'text-gray-500'}`}>
-                            Exp: {new Date(selectedVendor.coverage.workersComp.expirationDate).toLocaleDateString()}
+                            Exp: {formatDate(selectedVendor.coverage.workersComp.expirationDate)}
                           </p>
                         )}
                       </div>
@@ -845,7 +854,7 @@ function ComplyApp({ user, onSignOut }) {
                         <p className="text-sm text-gray-600">{formatCurrency(selectedVendor.coverage.employersLiability.amount)}</p>
                         {selectedVendor.coverage.employersLiability.expirationDate && (
                           <p className={`text-xs ${selectedVendor.coverage.employersLiability.expired ? 'text-red-600 font-semibold' : 'text-gray-500'}`}>
-                            Exp: {new Date(selectedVendor.coverage.employersLiability.expirationDate).toLocaleDateString()}
+                            Exp: {formatDate(selectedVendor.coverage.employersLiability.expirationDate)}
                           </p>
                         )}
                       </div>
@@ -868,7 +877,7 @@ function ComplyApp({ user, onSignOut }) {
                           <p className="text-sm text-gray-600">{formatCurrency(cov.amount || 0)}</p>
                           {cov.expirationDate && (
                             <p className={`text-xs ${cov.expired ? 'text-red-600 font-semibold' : 'text-gray-500'}`}>
-                              Exp: {new Date(cov.expirationDate).toLocaleDateString()}
+                              Exp: {formatDate(cov.expirationDate)}
                             </p>
                           )}
                         </div>
