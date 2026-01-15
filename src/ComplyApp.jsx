@@ -74,7 +74,8 @@ function ComplyApp({ user, onSignOut }) {
     expirationDate: v.expiration_date,
     daysOverdue: v.days_overdue,
     coverage: v.coverage,
-    issues: v.issues
+    issues: v.issues,
+    additionalCoverages: v.additional_coverages || []
   }));
   
   const [selectedVendor, setSelectedVendor] = useState(null);
@@ -85,6 +86,59 @@ function ComplyApp({ user, onSignOut }) {
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [userRequirements, setUserRequirements] = useState(null);
+
+  // Load user requirements on mount
+  React.useEffect(() => {
+    loadUserRequirements();
+  }, []);
+
+  const loadUserRequirements = async () => {
+    try {
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (!currentUser) return;
+
+      const { data, error } = await supabase
+        .from('settings')
+        .select('*')
+        .eq('user_id', currentUser.id)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error loading requirements:', error);
+        return;
+      }
+
+      if (data) {
+        // Decode custom coverages from additional_requirements array
+        const additionalReqs = data.additional_requirements || [];
+        const customCoverages = [];
+
+        if (Array.isArray(additionalReqs)) {
+          additionalReqs.forEach(item => {
+            if (typeof item === 'string' && item.startsWith('__COVERAGE__')) {
+              try {
+                const coverage = JSON.parse(item.substring(12));
+                customCoverages.push(coverage);
+              } catch (e) {
+                console.error('Failed to parse coverage:', e);
+              }
+            }
+          });
+        }
+
+        setUserRequirements({
+          general_liability: data.general_liability || 1000000,
+          auto_liability: data.auto_liability || 1000000,
+          workers_comp: data.workers_comp || 'Statutory',
+          employers_liability: data.employers_liability || 500000,
+          custom_coverages: customCoverages
+        });
+      }
+    } catch (err) {
+      console.error('Error loading user requirements:', err);
+    }
+  };
 
   // Helper functions
   const getStatusIcon = (status) => {
@@ -203,7 +257,7 @@ function ComplyApp({ user, onSignOut }) {
       // Step 1: Extract data using AI
       if (progressCallback) progressCallback('🤖 AI extracting data...');
       console.log('Extracting COI data with AI...');
-      const extractionResult = await extractCOIFromPDF(file);
+      const extractionResult = await extractCOIFromPDF(file, userRequirements);
       
       if (!extractionResult.success) {
         throw new Error(extractionResult.error);
@@ -672,7 +726,7 @@ function ComplyApp({ user, onSignOut }) {
               </div>
               
               <div>
-                <h4 className="font-semibold mb-2">Coverage</h4>
+                <h4 className="font-semibold mb-2">Standard Coverage</h4>
                 <div className="space-y-2">
                   <p><strong>General Liability:</strong> {formatCurrency(selectedVendor.coverage.generalLiability.amount)}</p>
                   <p><strong>Auto Liability:</strong> {formatCurrency(selectedVendor.coverage.autoLiability.amount)}</p>
@@ -680,6 +734,20 @@ function ComplyApp({ user, onSignOut }) {
                   <p><strong>Employers Liability:</strong> {formatCurrency(selectedVendor.coverage.employersLiability.amount)}</p>
                 </div>
               </div>
+
+              {selectedVendor.additionalCoverages && selectedVendor.additionalCoverages.length > 0 && (
+                <div>
+                  <h4 className="font-semibold mb-2">Additional Coverage</h4>
+                  <div className="space-y-2">
+                    {selectedVendor.additionalCoverages.map((cov, idx) => (
+                      <p key={idx}>
+                        <strong>{cov.type}:</strong> {formatCurrency(cov.amount || 0)}
+                        {cov.expirationDate && ` (Expires: ${new Date(cov.expirationDate).toLocaleDateString()})`}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              )}
               
               {selectedVendor.issues.length > 0 && (
                 <div>

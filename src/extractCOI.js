@@ -196,9 +196,18 @@ Return ONLY the JSON object, no other text.`
 /**
  * Extract COI data with file content as base64 (for actual PDF files)
  */
-export async function extractCOIFromPDF(file) {
+export async function extractCOIFromPDF(file, userRequirements = null) {
   try {
     console.log('Converting PDF to base64...');
+
+    // Set default requirements if not provided
+    const requirements = userRequirements || {
+      general_liability: 1000000,
+      auto_liability: 1000000,
+      workers_comp: 'Statutory',
+      employers_liability: 500000,
+      custom_coverages: []
+    };
     
     // Convert file to base64
     const base64Data = await new Promise((resolve, reject) => {
@@ -254,6 +263,13 @@ Extract the following information from this COI PDF and return it as a JSON obje
     "amount": number,
     "expirationDate": "YYYY-MM-DD"
   },
+  "additionalCoverages": [
+    {
+      "type": "Cyber Liability" | "Professional Liability" | "Umbrella" | etc,
+      "amount": number,
+      "expirationDate": "YYYY-MM-DD"
+    }
+  ],
   "additionalInsured": "Names listed as additional insured (if any)",
   "certificateHolder": "Certificate holder name",
   "insuranceCompany": "Insurance company/carrier name"
@@ -265,6 +281,8 @@ Important rules:
 - If a field is not found, use null
 - For Workers Comp, if it says "Statutory" use that as a string, otherwise use the number
 - The expirationDate at the top level should be the EARLIEST expiration date among all policies
+- Look for ANY additional coverage types beyond the standard 4 (GL, Auto, WC, EL) and include them in additionalCoverages array
+- Common additional coverages: Cyber Liability, Professional Liability/E&O, Umbrella/Excess, Pollution, Products Liability
 
 Return ONLY the JSON object, no other text.`
           }
@@ -283,7 +301,7 @@ Return ONLY the JSON object, no other text.`
     
     const extractedData = JSON.parse(jsonMatch[0]);
     
-    // Transform to vendor format (same as above)
+    // Transform to vendor format with user's requirements
     const vendorData = {
       name: extractedData.companyName || 'Unknown Company',
       dba: extractedData.dba,
@@ -291,22 +309,25 @@ Return ONLY the JSON object, no other text.`
       coverage: {
         generalLiability: {
           amount: extractedData.generalLiability?.amount || 0,
-          compliant: (extractedData.generalLiability?.amount || 0) >= 1000000
+          compliant: (extractedData.generalLiability?.amount || 0) >= requirements.general_liability
         },
         autoLiability: {
           amount: extractedData.autoLiability?.amount || 0,
-          compliant: (extractedData.autoLiability?.amount || 0) >= 1000000
+          compliant: (extractedData.autoLiability?.amount || 0) >= requirements.auto_liability
         },
         workersComp: {
           amount: extractedData.workersComp?.amount || 'Statutory',
-          compliant: true
+          compliant: true // Workers comp is typically statutory, so usually compliant
         },
         employersLiability: {
           amount: extractedData.employersLiability?.amount || 0,
-          compliant: (extractedData.employersLiability?.amount || 0) >= 500000
+          compliant: (extractedData.employersLiability?.amount || 0) >= requirements.employers_liability
         }
       },
-      rawData: extractedData
+      // Store additional coverages from extraction
+      additionalCoverages: extractedData.additionalCoverages || [],
+      rawData: extractedData,
+      requirements: requirements // Store requirements used for checking
     };
 
     // Calculate status and issues
@@ -334,12 +355,12 @@ Return ONLY the JSON object, no other text.`
       vendorData.daysOverdue = 0;
     }
 
-    // Check coverage compliance
+    // Check standard coverage compliance
     if (!vendorData.coverage.generalLiability.compliant) {
       vendorData.status = 'non-compliant';
       issues.push({
         type: 'error',
-        message: `General Liability below requirement: $${(vendorData.coverage.generalLiability.amount / 1000000).toFixed(1)}M (requires $1.0M)`
+        message: `General Liability below requirement: $${(vendorData.coverage.generalLiability.amount / 1000000).toFixed(1)}M (requires $${(requirements.general_liability / 1000000).toFixed(1)}M)`
       });
     }
 
@@ -347,7 +368,7 @@ Return ONLY the JSON object, no other text.`
       vendorData.status = 'non-compliant';
       issues.push({
         type: 'error',
-        message: `Auto Liability below requirement: $${(vendorData.coverage.autoLiability.amount / 1000000).toFixed(1)}M (requires $1.0M)`
+        message: `Auto Liability below requirement: $${(vendorData.coverage.autoLiability.amount / 1000000).toFixed(1)}M (requires $${(requirements.auto_liability / 1000000).toFixed(1)}M)`
       });
     }
 
@@ -355,7 +376,35 @@ Return ONLY the JSON object, no other text.`
       vendorData.status = 'non-compliant';
       issues.push({
         type: 'error',
-        message: `Employers Liability below requirement: $${(vendorData.coverage.employersLiability.amount / 1000).toFixed(1)}K (requires $500K)`
+        message: `Employers Liability below requirement: $${(vendorData.coverage.employersLiability.amount / 1000).toFixed(1)}K (requires $${(requirements.employers_liability / 1000).toFixed(1)}K)`
+      });
+    }
+
+    // Check custom coverage requirements
+    if (requirements.custom_coverages && requirements.custom_coverages.length > 0) {
+      requirements.custom_coverages.forEach(requiredCoverage => {
+        if (!requiredCoverage.required) return; // Skip if not required
+
+        // Find matching coverage in extracted data
+        const foundCoverage = vendorData.additionalCoverages.find(
+          cov => cov.type && cov.type.toLowerCase().includes(requiredCoverage.type.toLowerCase())
+        );
+
+        if (!foundCoverage) {
+          // Required coverage not found
+          vendorData.status = 'non-compliant';
+          issues.push({
+            type: 'error',
+            message: `Missing required coverage: ${requiredCoverage.type}`
+          });
+        } else if (foundCoverage.amount < requiredCoverage.amount) {
+          // Coverage found but amount is insufficient
+          vendorData.status = 'non-compliant';
+          issues.push({
+            type: 'error',
+            message: `${requiredCoverage.type} below requirement: $${(foundCoverage.amount / 1000000).toFixed(1)}M (requires $${(requiredCoverage.amount / 1000000).toFixed(1)}M)`
+          });
+        }
       });
     }
 

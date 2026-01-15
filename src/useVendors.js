@@ -47,7 +47,8 @@ export function useVendors() {
           coverage: vendorData.coverage,
           issues: vendorData.issues,
           raw_data: vendorData.rawData || null,
-          requirements: vendorData.requirements || null
+          requirements: vendorData.requirements || null,
+          additional_coverages: vendorData.additionalCoverages || []
         }])
         .select()
         .single();
