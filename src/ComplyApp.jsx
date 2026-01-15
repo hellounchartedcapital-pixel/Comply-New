@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Upload, CheckCircle, XCircle, AlertCircle, FileText, Calendar, X, Search, Download, Settings as SettingsIcon, Eye, Bell, BarChart3 } from 'lucide-react';
+import { Upload, CheckCircle, XCircle, AlertCircle, FileText, Calendar, X, Search, Download, Settings as SettingsIcon, Eye, Bell, BarChart3, FileDown } from 'lucide-react';
 import { useVendors } from './useVendors';
 import { UploadModal } from './UploadModal';
 import { BulkUploadModal } from './BulkUploadModal';
@@ -9,6 +9,7 @@ import { Analytics } from './Analytics';
 import { OnboardingTutorial } from './OnboardingTutorial';
 import { supabase } from './supabaseClient';
 import { extractCOIFromPDF } from './extractCOI';
+import { exportPDFReport } from './exportPDFReport';
 import { Logo } from './Logo';
 
 // Initial vendor data
@@ -465,7 +466,7 @@ function ComplyApp({ user, onSignOut }) {
   // Export to CSV
   const exportToCSV = () => {
     const headers = ['Company Name', 'DBA', 'Status', 'Expiration Date', 'Days Overdue', 'General Liability', 'Auto Liability', 'Workers Comp', 'Employers Liability', 'Issues'];
-    
+
     const rows = filteredVendors.map(v => [
       v.name,
       v.dba || '',
@@ -486,6 +487,11 @@ function ComplyApp({ user, onSignOut }) {
     a.href = url;
     a.download = `comply-vendor-report-${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
+  };
+
+  // Export to PDF
+  const exportToPDF = () => {
+    exportPDFReport(filteredVendors, { email: user?.email });
   };
 
   return (
@@ -723,13 +729,25 @@ function ComplyApp({ user, onSignOut }) {
               <option value="status">Sort: Status</option>
             </select>
 
-            {/* Export */}
+            {/* Export Buttons */}
+            <button
+              onClick={exportToPDF}
+              className="px-3 sm:px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center space-x-2 text-xs sm:text-sm"
+              title="Export PDF Report"
+            >
+              <FileDown size={14} />
+              <span className="hidden sm:inline">Export PDF</span>
+              <span className="sm:hidden">PDF</span>
+            </button>
+
             <button
               onClick={exportToCSV}
-              className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 flex items-center space-x-2"
+              className="px-3 sm:px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 flex items-center space-x-2 text-xs sm:text-sm"
+              title="Export CSV"
             >
-              <Download size={16} />
-              <span>Export CSV</span>
+              <Download size={14} />
+              <span className="hidden sm:inline">Export CSV</span>
+              <span className="sm:hidden">CSV</span>
             </button>
 
             {/* Clear */}
