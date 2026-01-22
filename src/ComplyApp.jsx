@@ -13,7 +13,7 @@ import { Logo } from './Logo';
 
 function ComplyApp({ user, onSignOut }) {
   // Use database hook instead of local state
-  const { vendors: dbVendors, loading, error, addVendor, updateVendor, deleteVendor, refreshVendors } = useVendors();
+  const { vendors: dbVendors, loading, loadingMore, error, hasMore, totalCount, addVendor, updateVendor, deleteVendor, loadMore, refreshVendors } = useVendors();
   
   // Convert database format (snake_case) to app format (camelCase)
   const vendors = dbVendors.map(v => ({
@@ -824,6 +824,26 @@ function ComplyApp({ user, onSignOut }) {
                   </div>
                 </div>
               ))
+            )}
+
+            {/* Load More Button */}
+            {hasMore && filteredVendors.length > 0 && (
+              <div className="p-4 border-t border-gray-200 text-center">
+                <button
+                  onClick={loadMore}
+                  disabled={loadingMore}
+                  className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium disabled:opacity-50"
+                >
+                  {loadingMore ? (
+                    <span className="flex items-center justify-center space-x-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-700"></div>
+                      <span>Loading...</span>
+                    </span>
+                  ) : (
+                    `Load More (${vendors.length} of ${totalCount})`
+                  )}
+                </button>
+              </div>
             )}
           </div>
           )}

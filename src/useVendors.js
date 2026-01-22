@@ -1,32 +1,70 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from './supabaseClient';
+
+const PAGE_SIZE = 50;
 
 export function useVendors() {
   const [vendors, setVendors] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState(null);
+  const [hasMore, setHasMore] = useState(true);
+  const [totalCount, setTotalCount] = useState(0);
 
-  // Fetch all vendors for the current user
-  const fetchVendors = async () => {
+  // Fetch vendors with pagination
+  const fetchVendors = useCallback(async (reset = true) => {
     try {
-      setLoading(true);
+      if (reset) {
+        setLoading(true);
+        setVendors([]);
+      } else {
+        setLoadingMore(true);
+      }
       setError(null);
+
+      const startIndex = reset ? 0 : vendors.length;
+      const endIndex = startIndex + PAGE_SIZE - 1;
+
+      // Get total count first (only on initial load)
+      if (reset) {
+        const { count } = await supabase
+          .from('vendors')
+          .select('*', { count: 'exact', head: true });
+        setTotalCount(count || 0);
+      }
 
       const { data, error } = await supabase
         .from('vendors')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .range(startIndex, endIndex);
 
       if (error) throw error;
 
-      setVendors(data || []);
+      const newVendors = data || [];
+
+      if (reset) {
+        setVendors(newVendors);
+      } else {
+        setVendors(prev => [...prev, ...newVendors]);
+      }
+
+      setHasMore(newVendors.length === PAGE_SIZE);
     } catch (err) {
       console.error('Error fetching vendors:', err);
       setError(err.message);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
-  };
+  }, [vendors.length]);
+
+  // Load more vendors
+  const loadMore = useCallback(() => {
+    if (!loadingMore && hasMore) {
+      fetchVendors(false);
+    }
+  }, [fetchVendors, loadingMore, hasMore]);
 
   // Add a new vendor
   const addVendor = async (vendorData) => {
@@ -66,8 +104,9 @@ export function useVendors() {
 
       if (error) throw error;
 
-      // Add to local state
+      // Add to local state at the beginning
       setVendors(prev => [data, ...prev]);
+      setTotalCount(prev => prev + 1);
       return { success: true, data };
     } catch (err) {
       console.error('Error adding vendor:', err);
@@ -125,6 +164,7 @@ export function useVendors() {
 
       // Remove from local state
       setVendors(prev => prev.filter(v => v.id !== id));
+      setTotalCount(prev => prev - 1);
       return { success: true };
     } catch (err) {
       console.error('Error deleting vendor:', err);
@@ -134,16 +174,21 @@ export function useVendors() {
 
   // Fetch vendors on mount
   useEffect(() => {
-    fetchVendors();
+    fetchVendors(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return {
     vendors,
     loading,
+    loadingMore,
     error,
+    hasMore,
+    totalCount,
     addVendor,
     updateVendor,
     deleteVendor,
-    refreshVendors: fetchVendors
+    loadMore,
+    refreshVendors: () => fetchVendors(true)
   };
 }

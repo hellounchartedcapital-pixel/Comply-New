@@ -161,7 +161,7 @@ export function UploadModal({ isOpen, onClose, onUploadComplete }) {
 
         <div className="mb-3 sm:mb-4 p-2.5 sm:p-3 bg-blue-50 border border-blue-200 rounded-lg">
           <p className="text-xs sm:text-sm text-blue-800">
-            <strong>🤖 AI-Powered!</strong> Upload your COI PDF and Claude will automatically extract all data and check compliance.
+            <strong>AI-Powered!</strong> Upload your COI PDF and our AI will automatically extract all data and check compliance.
           </p>
         </div>
 
