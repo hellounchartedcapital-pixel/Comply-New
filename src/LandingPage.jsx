@@ -2,7 +2,7 @@ import React from 'react';
 import { Logo } from './Logo';
 import { CheckCircle, Sparkles, Upload, Bell, FileText, ArrowRight, Zap, Shield, Clock } from 'lucide-react';
 
-export function LandingPage({ onLogin, onSignUp }) {
+export function LandingPage({ onLogin, onSignUp, onPrivacy, onTerms }) {
   return (
     <div className="min-h-screen bg-white">
       {/* Navigation */}
@@ -334,7 +334,21 @@ export function LandingPage({ onLogin, onSignUp }) {
             <div className="flex items-center space-x-4">
               <Logo size="small" className="opacity-80" />
             </div>
-            <p className="text-sm">&copy; 2026 SmartCOI. AI-powered compliance tracking.</p>
+            <div className="flex items-center space-x-6">
+              <button
+                onClick={onPrivacy}
+                className="text-sm hover:text-white transition-colors"
+              >
+                Privacy Policy
+              </button>
+              <button
+                onClick={onTerms}
+                className="text-sm hover:text-white transition-colors"
+              >
+                Terms of Service
+              </button>
+            </div>
+            <p className="text-sm">&copy; 2026 SmartCOI. All rights reserved.</p>
           </div>
         </div>
       </footer>

@@ -7,12 +7,16 @@ import { LandingPage } from './LandingPage'
 import Login from './Login'
 import Signup from './Signup'
 import ComplyApp from './ComplyApp'
+import { PrivacyPolicy } from './PrivacyPolicy'
+import { TermsOfService } from './TermsOfService'
 import { Loader2 } from 'lucide-react'
 
 function AppContent() {
   const { user, loading, signOut } = useAuth()
   const [showSignup, setShowSignup] = useState(false)
   const [showAuth, setShowAuth] = useState(false)
+  const [showPrivacy, setShowPrivacy] = useState(false)
+  const [showTerms, setShowTerms] = useState(false)
 
   // Show loading spinner while checking auth state
   if (loading) {
@@ -26,6 +30,16 @@ function AppContent() {
     )
   }
 
+  // Show Privacy Policy page
+  if (showPrivacy) {
+    return <PrivacyPolicy onBack={() => setShowPrivacy(false)} />
+  }
+
+  // Show Terms of Service page
+  if (showTerms) {
+    return <TermsOfService onBack={() => setShowTerms(false)} />
+  }
+
   // If not logged in, show Landing Page or Auth screens
   if (!user) {
     // Show landing page unless user clicked Login or Sign Up
@@ -34,6 +48,8 @@ function AppContent() {
         <LandingPage
           onLogin={() => { setShowSignup(false); setShowAuth(true); }}
           onSignUp={() => { setShowSignup(true); setShowAuth(true); }}
+          onPrivacy={() => setShowPrivacy(true)}
+          onTerms={() => setShowTerms(true)}
         />
       )
     }
