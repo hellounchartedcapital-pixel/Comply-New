@@ -386,29 +386,22 @@ function ComplyApp({ user, onSignOut }) {
       const companyName = userRequirements?.company_name || 'Our Company';
       const issues = requestCOIVendor.issues.map(i => i.message);
 
-      const response = await fetch(
-        `${process.env.REACT_APP_SUPABASE_URL}/functions/v1/send-coi-request`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${process.env.REACT_APP_SUPABASE_ANON_KEY}`,
-            'apikey': process.env.REACT_APP_SUPABASE_ANON_KEY,
-          },
-          body: JSON.stringify({
-            to: requestCOIEmail,
-            vendorName: requestCOIVendor.name,
-            vendorStatus: requestCOIVendor.status,
-            issues: issues,
-            companyName: companyName,
-            replyTo: user?.email,
-          }),
-        }
-      );
+      const { data: result, error: fnError } = await supabase.functions.invoke('send-coi-request', {
+        body: {
+          to: requestCOIEmail,
+          vendorName: requestCOIVendor.name,
+          vendorStatus: requestCOIVendor.status,
+          issues: issues,
+          companyName: companyName,
+          replyTo: user?.email,
+        },
+      });
 
-      const result = await response.json();
+      if (fnError) {
+        throw new Error(fnError.message || 'Failed to send email');
+      }
 
-      if (!result.success) {
+      if (result && !result.success) {
         throw new Error(result.error || 'Failed to send email');
       }
 
