@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Upload, CheckCircle, XCircle, AlertCircle, FileText, Calendar, X, Search, Download, Settings as SettingsIcon, Eye, Bell, BarChart3, FileDown, Phone, Mail, User } from 'lucide-react';
+import { Upload, CheckCircle, XCircle, AlertCircle, FileText, Calendar, X, Search, Download, Settings as SettingsIcon, Eye, Bell, BarChart3, FileDown, Phone, Mail, User, Send } from 'lucide-react';
 import { useVendors } from './useVendors';
 import { UploadModal } from './UploadModal';
 import { Settings } from './Settings';
@@ -53,6 +53,8 @@ function ComplyApp({ user, onSignOut }) {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboardingChecked, setOnboardingChecked] = useState(false);
   const [userRequirements, setUserRequirements] = useState(null);
+  const [requestCOIVendor, setRequestCOIVendor] = useState(null);
+  const [requestCOIEmail, setRequestCOIEmail] = useState('');
 
   // Load user requirements and check onboarding status on mount
   React.useEffect(() => {
@@ -290,10 +292,6 @@ function ComplyApp({ user, onSignOut }) {
         filtered = filtered.filter(v => v.status === 'non-compliant');
       } else if (quickFilter === 'compliant') {
         filtered = filtered.filter(v => v.status === 'compliant');
-      } else if (quickFilter === 'missing-additional-insured') {
-        filtered = filtered.filter(v => v.missingAdditionalInsured === true);
-      } else if (quickFilter === 'missing-waiver') {
-        filtered = filtered.filter(v => v.missingWaiverOfSubrogation === true);
       }
     }
 
@@ -352,6 +350,68 @@ function ComplyApp({ user, onSignOut }) {
     } else {
       alert('Error deleting vendor: ' + result.error);
     }
+  };
+
+  // Handle Request New COI
+  const handleRequestCOI = (vendor) => {
+    setRequestCOIVendor(vendor);
+    setRequestCOIEmail(vendor.contactEmail || '');
+  };
+
+  const sendCOIRequest = async () => {
+    if (!requestCOIEmail) {
+      alert('Please enter an email address');
+      return;
+    }
+
+    // Save the email to the vendor if it's new or updated
+    if (requestCOIEmail !== requestCOIVendor.contactEmail) {
+      const result = await updateVendor(requestCOIVendor.id, {
+        ...requestCOIVendor,
+        contactEmail: requestCOIEmail
+      });
+      if (!result.success) {
+        alert('Error saving contact email: ' + result.error);
+        return;
+      }
+    }
+
+    // Build the email
+    const companyName = userRequirements?.company_name || 'Our Company';
+    const issues = requestCOIVendor.issues.map(i => `- ${i.message}`).join('\n');
+
+    const subject = encodeURIComponent(`Updated Certificate of Insurance Required - ${requestCOIVendor.name}`);
+    const body = encodeURIComponent(
+`Hello,
+
+We are reaching out regarding the Certificate of Insurance (COI) on file for ${requestCOIVendor.name}.
+
+Current Status: ${requestCOIVendor.status.toUpperCase().replace('-', ' ')}
+
+Issues identified:
+${issues || '- COI needs to be updated'}
+
+Please provide an updated COI that meets our insurance requirements at your earliest convenience.
+
+If you have any questions about our requirements, please don't hesitate to reach out.
+
+Thank you,
+${companyName}`
+    );
+
+    // Open mailto link
+    window.location.href = `mailto:${requestCOIEmail}?subject=${subject}&body=${body}`;
+
+    // Update last contacted timestamp
+    await updateVendor(requestCOIVendor.id, {
+      ...requestCOIVendor,
+      contactEmail: requestCOIEmail,
+      lastContactedAt: new Date().toISOString()
+    });
+
+    setRequestCOIVendor(null);
+    setRequestCOIEmail('');
+    refreshVendors();
   };
 
   // Handle file upload with AI extraction
@@ -612,30 +672,6 @@ function ComplyApp({ user, onSignOut }) {
                 <CheckCircle size={14} className="inline mr-1 mb-0.5" />
                 Compliant ({vendors.filter(v => v.status === 'compliant').length})
               </button>
-              <button
-                onClick={() => setQuickFilter('missing-additional-insured')}
-                className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all ${
-                  quickFilter === 'missing-additional-insured'
-                    ? 'bg-purple-600 text-white shadow-md'
-                    : 'bg-purple-50 text-purple-700 hover:bg-purple-100'
-                }`}
-              >
-                <span className="hidden sm:inline">Missing Add'l Insured</span>
-                <span className="sm:hidden">No AI</span>
-                ({vendors.filter(v => v.missingAdditionalInsured).length})
-              </button>
-              <button
-                onClick={() => setQuickFilter('missing-waiver')}
-                className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all ${
-                  quickFilter === 'missing-waiver'
-                    ? 'bg-pink-600 text-white shadow-md'
-                    : 'bg-pink-50 text-pink-700 hover:bg-pink-100'
-                }`}
-              >
-                <span className="hidden sm:inline">Missing Waiver</span>
-                <span className="sm:hidden">No Waiver</span>
-                ({vendors.filter(v => v.missingWaiverOfSubrogation).length})
-              </button>
             </div>
           </div>
 
@@ -820,6 +856,16 @@ function ComplyApp({ user, onSignOut }) {
                       >
                         View Details
                       </button>
+                      {(vendor.status === 'expired' || vendor.status === 'non-compliant' || vendor.status === 'expiring') && (
+                        <button
+                          onClick={() => handleRequestCOI(vendor)}
+                          className="text-xs sm:text-sm bg-orange-500 text-white px-2 py-1 rounded hover:bg-orange-600 font-medium whitespace-nowrap flex items-center space-x-1"
+                        >
+                          <Send size={12} />
+                          <span className="hidden sm:inline">Request COI</span>
+                          <span className="sm:hidden">Request</span>
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -990,6 +1036,87 @@ function ComplyApp({ user, onSignOut }) {
                 Cancel
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Request COI Modal */}
+      {requestCOIVendor && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+          <div className="bg-white rounded-lg max-w-md w-full p-4 sm:p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold flex items-center space-x-2">
+                <Send size={20} className="text-orange-500" />
+                <span>Request New COI</span>
+              </h3>
+              <button onClick={() => { setRequestCOIVendor(null); setRequestCOIEmail(''); }} className="text-gray-400 hover:text-gray-600">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+              <p className="text-sm text-gray-600">Vendor</p>
+              <p className="font-semibold text-gray-900">{requestCOIVendor.name}</p>
+              <div className="mt-2">
+                {getStatusBadge(requestCOIVendor.status, requestCOIVendor.daysOverdue)}
+              </div>
+            </div>
+
+            {requestCOIVendor.issues.length > 0 && (
+              <div className="mb-4 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                <p className="text-sm font-medium text-orange-800 mb-2">Issues to address:</p>
+                <ul className="space-y-1">
+                  {requestCOIVendor.issues.map((issue, idx) => (
+                    <li key={idx} className="text-xs text-orange-700 flex items-start space-x-1">
+                      <AlertCircle size={12} className="mt-0.5 flex-shrink-0" />
+                      <span>{issue.message}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Vendor Contact Email
+                {!requestCOIVendor.contactEmail && (
+                  <span className="text-orange-500 ml-1">(required)</span>
+                )}
+              </label>
+              <input
+                type="email"
+                value={requestCOIEmail}
+                onChange={(e) => setRequestCOIEmail(e.target.value)}
+                placeholder="vendor@example.com"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+              />
+              {!requestCOIVendor.contactEmail && (
+                <p className="text-xs text-gray-500 mt-1">
+                  This email will be saved to the vendor's contact info
+                </p>
+              )}
+            </div>
+
+            <div className="flex space-x-3">
+              <button
+                onClick={sendCOIRequest}
+                disabled={!requestCOIEmail}
+                className="flex-1 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 font-medium flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Mail size={16} />
+                <span>Send Request</span>
+              </button>
+              <button
+                onClick={() => { setRequestCOIVendor(null); setRequestCOIEmail(''); }}
+                className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium"
+              >
+                Cancel
+              </button>
+            </div>
+
+            <p className="text-xs text-gray-500 mt-4 text-center">
+              This will open your email client with a pre-written request
+            </p>
           </div>
         </div>
       )}
@@ -1361,12 +1488,26 @@ function ComplyApp({ user, onSignOut }) {
               </div>
             </div>
             
-            <button
-              onClick={() => setSelectedVendor(null)}
-              className="w-full mt-6 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium"
-            >
-              Close
-            </button>
+            <div className="flex flex-col sm:flex-row gap-3 mt-6">
+              {(selectedVendor.status === 'expired' || selectedVendor.status === 'non-compliant' || selectedVendor.status === 'expiring') && (
+                <button
+                  onClick={() => {
+                    setSelectedVendor(null);
+                    handleRequestCOI(selectedVendor);
+                  }}
+                  className="flex-1 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 font-medium flex items-center justify-center space-x-2"
+                >
+                  <Send size={16} />
+                  <span>Request New COI</span>
+                </button>
+              )}
+              <button
+                onClick={() => setSelectedVendor(null)}
+                className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}
