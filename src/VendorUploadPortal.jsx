@@ -95,10 +95,22 @@ export function VendorUploadPortal({ token, onBack }) {
       if (uploadError) throw uploadError;
 
       // Update vendor with new document path and reset status
+      // First get current raw_data
+      const { data: currentVendor } = await supabase
+        .from('vendors')
+        .select('raw_data')
+        .eq('id', vendor.id)
+        .single();
+
+      const updatedRawData = {
+        ...(currentVendor?.raw_data || {}),
+        documentPath: fileName
+      };
+
       const { error: updateError } = await supabase
         .from('vendors')
         .update({
-          raw_data: supabase.sql`COALESCE(raw_data, '{}'::jsonb) || jsonb_build_object('documentPath', ${fileName})`,
+          raw_data: updatedRawData,
           status: 'pending_review',
           updated_at: new Date().toISOString()
         })
