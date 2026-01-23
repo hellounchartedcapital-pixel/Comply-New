@@ -44,6 +44,7 @@ export function VendorUploadPortal({ token, onBack }) {
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [uploadStatus, setUploadStatus] = useState('');
+  const [uploadResult, setUploadResult] = useState(null); // { status, issues, coverage }
 
   useEffect(() => {
     loadVendorFromToken();
@@ -229,6 +230,12 @@ export function VendorUploadPortal({ token, onBack }) {
         metadata: { fileName, fileSize: file.size, status: vendorStatus }
       });
 
+      // Save result for display
+      setUploadResult({
+        status: vendorStatus,
+        issues: extractedData.issues || [],
+        coverage: extractedData.coverage || {}
+      });
       setUploadSuccess(true);
     } catch (err) {
       console.error('Upload error:', err);
@@ -272,17 +279,96 @@ export function VendorUploadPortal({ token, onBack }) {
   }
 
   if (uploadSuccess) {
+    const isCompliant = uploadResult?.status === 'compliant';
+    const isExpired = uploadResult?.status === 'expired';
+    const isExpiring = uploadResult?.status === 'expiring';
+    const issues = uploadResult?.issues || [];
+
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
-          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <CheckCircle className="w-8 h-8 text-green-600" />
+        <div className="max-w-lg w-full bg-white rounded-lg shadow-lg p-8">
+          {/* Status Icon */}
+          <div className="text-center mb-6">
+            <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${
+              isCompliant ? 'bg-green-100' : 'bg-yellow-100'
+            }`}>
+              {isCompliant ? (
+                <CheckCircle className="w-8 h-8 text-green-600" />
+              ) : (
+                <AlertCircle className="w-8 h-8 text-yellow-600" />
+              )}
+            </div>
+            <h1 className="text-xl font-semibold text-gray-900 mb-2">
+              COI Uploaded Successfully!
+            </h1>
           </div>
-          <h1 className="text-xl font-semibold text-gray-900 mb-2">COI Uploaded Successfully!</h1>
-          <p className="text-gray-600 mb-6">
-            Thank you for uploading your Certificate of Insurance. The requesting company will review it shortly.
-          </p>
-          <p className="text-sm text-gray-500">You can close this window.</p>
+
+          {/* Compliance Status */}
+          <div className={`rounded-lg p-4 mb-6 ${
+            isCompliant
+              ? 'bg-green-50 border border-green-200'
+              : isExpired
+                ? 'bg-red-50 border border-red-200'
+                : 'bg-yellow-50 border border-yellow-200'
+          }`}>
+            <p className={`font-medium ${
+              isCompliant
+                ? 'text-green-800'
+                : isExpired
+                  ? 'text-red-800'
+                  : 'text-yellow-800'
+            }`}>
+              {isCompliant && '✓ Your COI meets all requirements!'}
+              {isExpired && '⚠ Your COI has expired coverage'}
+              {isExpiring && '⚠ Your COI has coverage expiring soon'}
+              {!isCompliant && !isExpired && !isExpiring && '⚠ Your COI has compliance issues'}
+            </p>
+          </div>
+
+          {/* Issues List */}
+          {!isCompliant && (issues.length > 0 || isExpired || isExpiring) && (
+            <div className="mb-6">
+              <h2 className="font-medium text-gray-900 mb-3">
+                {isExpired || isExpiring ? 'Action Required:' : 'Issues to Address:'}
+              </h2>
+              <ul className="space-y-2">
+                {isExpired && (
+                  <li className="flex items-start space-x-2 text-red-700">
+                    <span className="text-red-500 mt-0.5">•</span>
+                    <span>One or more coverage types have expired. Please provide a COI with current coverage dates.</span>
+                  </li>
+                )}
+                {isExpiring && !isExpired && (
+                  <li className="flex items-start space-x-2 text-yellow-700">
+                    <span className="text-yellow-500 mt-0.5">•</span>
+                    <span>One or more coverage types will expire within 30 days. Please provide an updated COI when renewed.</span>
+                  </li>
+                )}
+                {issues.map((issue, index) => (
+                  <li key={index} className="flex items-start space-x-2 text-gray-700">
+                    <span className="text-red-500 mt-0.5">•</span>
+                    <span>{issue}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Next Steps */}
+          <div className="bg-gray-50 rounded-lg p-4 mb-6">
+            <h2 className="font-medium text-gray-900 mb-2">What happens next?</h2>
+            {isCompliant ? (
+              <p className="text-sm text-gray-600">
+                The requesting company has been notified and your COI is now on file. No further action is needed.
+              </p>
+            ) : (
+              <p className="text-sm text-gray-600">
+                The requesting company has been notified of your upload. Please work with your insurance provider to address the issues above and upload an updated COI using the same link.
+              </p>
+            )}
+          </div>
+
+          <p className="text-center text-sm text-gray-500">You can close this window.</p>
         </div>
       </div>
     );
