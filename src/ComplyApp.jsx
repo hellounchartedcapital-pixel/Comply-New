@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Upload, CheckCircle, XCircle, AlertCircle, FileText, Calendar, X, Search, Download, Settings as SettingsIcon, Eye, Bell, BarChart3, FileDown, Phone, Mail, User, Send } from 'lucide-react';
+import { Upload, CheckCircle, XCircle, AlertCircle, FileText, Calendar, X, Search, Download, Settings as SettingsIcon, Eye, Bell, BarChart3, FileDown, Phone, Mail, User, Send, Clock, History } from 'lucide-react';
 import { useVendors } from './useVendors';
 import { UploadModal } from './UploadModal';
 import { Settings } from './Settings';
@@ -55,6 +55,9 @@ function ComplyApp({ user, onSignOut }) {
   const [userRequirements, setUserRequirements] = useState(null);
   const [requestCOIVendor, setRequestCOIVendor] = useState(null);
   const [requestCOIEmail, setRequestCOIEmail] = useState('');
+  const [vendorDetailsTab, setVendorDetailsTab] = useState('details');
+  const [vendorActivity, setVendorActivity] = useState([]);
+  const [loadingActivity, setLoadingActivity] = useState(false);
 
   // Load user requirements and check onboarding status on mount
   React.useEffect(() => {
@@ -352,6 +355,34 @@ function ComplyApp({ user, onSignOut }) {
     }
   };
 
+  // Load vendor activity history
+  const loadVendorActivity = async (vendorId) => {
+    setLoadingActivity(true);
+    try {
+      const { data, error } = await supabase
+        .from('vendor_activity')
+        .select('*')
+        .eq('vendor_id', vendorId)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (error) throw error;
+      setVendorActivity(data || []);
+    } catch (err) {
+      console.error('Error loading activity:', err);
+      setVendorActivity([]);
+    } finally {
+      setLoadingActivity(false);
+    }
+  };
+
+  // Handle selecting a vendor (load details and activity)
+  const handleSelectVendor = (vendor) => {
+    setSelectedVendor(vendor);
+    setVendorDetailsTab('details');
+    loadVendorActivity(vendor.id);
+  };
+
   // Handle Request New COI
   const handleRequestCOI = (vendor) => {
     setRequestCOIVendor(vendor);
@@ -386,6 +417,20 @@ function ComplyApp({ user, onSignOut }) {
       const companyName = userRequirements?.company_name || 'Our Company';
       const issues = requestCOIVendor.issues.map(i => i.message);
 
+      // Generate upload token if vendor doesn't have one
+      let uploadToken = requestCOIVendor.rawData?.uploadToken;
+      if (!uploadToken) {
+        uploadToken = crypto.randomUUID();
+        // Save the upload token to the vendor
+        await supabase
+          .from('vendors')
+          .update({ upload_token: uploadToken })
+          .eq('id', requestCOIVendor.id);
+      }
+
+      // Get the app URL (current origin)
+      const appUrl = window.location.origin;
+
       const { data: result, error: fnError } = await supabase.functions.invoke('send-coi-request', {
         body: {
           to: requestCOIEmail,
@@ -394,7 +439,18 @@ function ComplyApp({ user, onSignOut }) {
           issues: issues,
           companyName: companyName,
           replyTo: user?.email,
+          uploadToken: uploadToken,
+          appUrl: appUrl,
         },
+      });
+
+      // Log the activity
+      await supabase.from('vendor_activity').insert({
+        vendor_id: requestCOIVendor.id,
+        user_id: user?.id,
+        activity_type: 'email_sent',
+        description: `COI request email sent to ${requestCOIEmail}`,
+        metadata: { email: requestCOIEmail }
       });
 
       if (fnError) {
@@ -865,7 +921,7 @@ function ComplyApp({ user, onSignOut }) {
                         </button>
                       </div>
                       <button
-                        onClick={() => setSelectedVendor(vendor)}
+                        onClick={() => handleSelectVendor(vendor)}
                         className="text-xs sm:text-sm text-green-600 hover:text-green-700 font-medium whitespace-nowrap"
                       >
                         View Details
@@ -1149,7 +1205,7 @@ function ComplyApp({ user, onSignOut }) {
       {selectedVendor && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
           <div className="bg-white rounded-lg max-w-2xl w-full p-4 sm:p-6 max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="text-xl font-semibold">{selectedVendor.name}</h3>
                 {selectedVendor.dba && <p className="text-gray-500">DBA: {selectedVendor.dba}</p>}
@@ -1158,7 +1214,35 @@ function ComplyApp({ user, onSignOut }) {
                 <X size={24} />
               </button>
             </div>
-            
+
+            {/* Tabs */}
+            <div className="flex space-x-1 mb-6 border-b border-gray-200">
+              <button
+                onClick={() => setVendorDetailsTab('details')}
+                className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
+                  vendorDetailsTab === 'details'
+                    ? 'bg-green-50 text-green-700 border-b-2 border-green-500'
+                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                <FileText size={16} className="inline mr-2 mb-0.5" />
+                Details
+              </button>
+              <button
+                onClick={() => setVendorDetailsTab('history')}
+                className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
+                  vendorDetailsTab === 'history'
+                    ? 'bg-green-50 text-green-700 border-b-2 border-green-500'
+                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                <History size={16} className="inline mr-2 mb-0.5" />
+                History
+              </button>
+            </div>
+
+            {/* Details Tab Content */}
+            {vendorDetailsTab === 'details' && (
             <div className="space-y-6">
               <div>
                 <h4 className="font-semibold mb-2">Status</h4>
@@ -1511,7 +1595,80 @@ function ComplyApp({ user, onSignOut }) {
                 )}
               </div>
             </div>
-            
+            )}
+
+            {/* History Tab Content */}
+            {vendorDetailsTab === 'history' && (
+              <div className="space-y-4">
+                <h4 className="font-semibold text-gray-900">Activity History</h4>
+
+                {loadingActivity ? (
+                  <div className="text-center py-8">
+                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-green-500"></div>
+                    <p className="text-gray-500 mt-2">Loading history...</p>
+                  </div>
+                ) : vendorActivity.length === 0 ? (
+                  <div className="text-center py-8 bg-gray-50 rounded-lg border border-gray-200">
+                    <Clock size={40} className="mx-auto text-gray-300 mb-3" />
+                    <p className="text-gray-500">No activity recorded yet</p>
+                    <p className="text-sm text-gray-400 mt-1">Activity will appear here when emails are sent or COIs are uploaded</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {vendorActivity.map((activity) => (
+                      <div
+                        key={activity.id}
+                        className={`p-4 rounded-lg border ${
+                          activity.activity_type === 'coi_uploaded'
+                            ? 'bg-green-50 border-green-200'
+                            : activity.activity_type === 'email_sent'
+                            ? 'bg-blue-50 border-blue-200'
+                            : 'bg-gray-50 border-gray-200'
+                        }`}
+                      >
+                        <div className="flex items-start space-x-3">
+                          <div className={`p-2 rounded-full ${
+                            activity.activity_type === 'coi_uploaded'
+                              ? 'bg-green-100'
+                              : activity.activity_type === 'email_sent'
+                              ? 'bg-blue-100'
+                              : 'bg-gray-100'
+                          }`}>
+                            {activity.activity_type === 'coi_uploaded' ? (
+                              <Upload size={16} className="text-green-600" />
+                            ) : activity.activity_type === 'email_sent' ? (
+                              <Mail size={16} className="text-blue-600" />
+                            ) : (
+                              <Clock size={16} className="text-gray-600" />
+                            )}
+                          </div>
+                          <div className="flex-1">
+                            <p className={`font-medium ${
+                              activity.activity_type === 'coi_uploaded'
+                                ? 'text-green-900'
+                                : activity.activity_type === 'email_sent'
+                                ? 'text-blue-900'
+                                : 'text-gray-900'
+                            }`}>
+                              {activity.activity_type === 'coi_uploaded'
+                                ? 'COI Uploaded'
+                                : activity.activity_type === 'email_sent'
+                                ? 'Request Email Sent'
+                                : activity.activity_type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                            </p>
+                            <p className="text-sm text-gray-600 mt-1">{activity.description}</p>
+                            <p className="text-xs text-gray-400 mt-2">
+                              {new Date(activity.created_at).toLocaleString()}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="flex flex-col sm:flex-row gap-3 mt-6">
               {(selectedVendor.status === 'expired' || selectedVendor.status === 'non-compliant' || selectedVendor.status === 'expiring') && (
                 <button

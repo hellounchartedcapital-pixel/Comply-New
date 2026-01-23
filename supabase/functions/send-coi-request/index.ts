@@ -51,6 +51,8 @@ interface EmailRequest {
   companyName: string;
   fromEmail?: string;
   replyTo?: string;
+  uploadToken?: string;
+  appUrl?: string;
 }
 
 serve(async (req) => {
@@ -91,7 +93,7 @@ serve(async (req) => {
 
     const FROM_EMAIL = Deno.env.get('FROM_EMAIL') || 'SmartCOI <noreply@resend.dev>';
 
-    const { to, vendorName, vendorStatus, issues, companyName, replyTo }: EmailRequest = await req.json();
+    const { to, vendorName, vendorStatus, issues, companyName, replyTo, uploadToken, appUrl }: EmailRequest = await req.json();
 
     if (!to || !vendorName) {
       throw new Error('Missing required fields: to, vendorName');
@@ -103,6 +105,10 @@ serve(async (req) => {
       : '• COI needs to be updated';
 
     const subject = `Updated Certificate of Insurance Required - ${vendorName}`;
+
+    // Build upload link if token is provided
+    const baseUrl = appUrl || 'https://smartcoi.io';
+    const uploadLink = uploadToken ? `${baseUrl}?upload=${uploadToken}` : null;
 
     const htmlContent = `
 <!DOCTYPE html>
@@ -132,6 +138,17 @@ serve(async (req) => {
 
     <p>Please provide an updated COI that meets our insurance requirements at your earliest convenience.</p>
 
+    ${uploadLink ? `
+    <div style="text-align: center; margin: 30px 0;">
+      <a href="${uploadLink}" style="display: inline-block; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 15px 30px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px;">
+        Upload Your COI Now
+      </a>
+    </div>
+    <p style="text-align: center; font-size: 12px; color: #6b7280;">
+      Or copy this link: <a href="${uploadLink}" style="color: #10b981;">${uploadLink}</a>
+    </p>
+    ` : '<p>Please reply to this email with your updated COI attached.</p>'}
+
     <p>If you have any questions about our requirements, please don't hesitate to reach out.</p>
 
     <p style="margin-bottom: 0;">Thank you,<br><strong>${companyName || 'The Team'}</strong></p>
@@ -153,6 +170,8 @@ Issues identified:
 ${issuesList}
 
 Please provide an updated COI that meets our insurance requirements at your earliest convenience.
+
+${uploadLink ? `Upload your COI here: ${uploadLink}` : 'Please reply to this email with your updated COI attached.'}
 
 If you have any questions about our requirements, please don't hesitate to reach out.
 

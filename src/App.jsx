@@ -1,7 +1,7 @@
 // App.jsx
 // Main app component with authentication routing
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { AuthProvider, useAuth } from './AuthContext'
 import { LandingPage } from './LandingPage'
 import Login from './Login'
@@ -9,6 +9,7 @@ import Signup from './Signup'
 import ComplyApp from './ComplyApp'
 import { PrivacyPolicy } from './PrivacyPolicy'
 import { TermsOfService } from './TermsOfService'
+import { VendorUploadPortal } from './VendorUploadPortal'
 import { Loader2 } from 'lucide-react'
 
 function AppContent() {
@@ -17,6 +18,16 @@ function AppContent() {
   const [showAuth, setShowAuth] = useState(false)
   const [showPrivacy, setShowPrivacy] = useState(false)
   const [showTerms, setShowTerms] = useState(false)
+  const [uploadToken, setUploadToken] = useState(null)
+
+  // Check URL for upload token on mount
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const token = params.get('upload')
+    if (token) {
+      setUploadToken(token)
+    }
+  }, [])
 
   // Show loading spinner while checking auth state
   if (loading) {
@@ -27,6 +38,19 @@ function AppContent() {
           <p className="text-gray-600">Loading...</p>
         </div>
       </div>
+    )
+  }
+
+  // Show Vendor Upload Portal if upload token is present
+  if (uploadToken) {
+    return (
+      <VendorUploadPortal
+        token={uploadToken}
+        onBack={() => {
+          setUploadToken(null)
+          window.history.pushState({}, '', window.location.pathname)
+        }}
+      />
     )
   }
 
