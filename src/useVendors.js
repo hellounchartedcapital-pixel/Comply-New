@@ -47,17 +47,36 @@ function recalculateVendorStatus(vendor) {
     vendor.additional_coverages.forEach(cov => checkCoverage(cov));
   }
 
+  // Normalize issues to expected format {type, message}
+  let normalizedIssues = [];
+  if (vendor.issues && Array.isArray(vendor.issues)) {
+    normalizedIssues = vendor.issues.map(issue => {
+      if (typeof issue === 'string') {
+        // Convert string to object format
+        const isCritical = issue.toLowerCase().includes('expired') ||
+                          issue.toLowerCase().includes('missing') ||
+                          issue.toLowerCase().includes('below');
+        return { type: isCritical ? 'critical' : 'warning', message: issue };
+      }
+      // Already an object, ensure it has required properties
+      return {
+        type: issue.type || 'warning',
+        message: issue.message || String(issue)
+      };
+    });
+  }
+
   // Determine new status
   let newStatus = vendor.status;
   if (hasExpired) {
     newStatus = 'expired';
   } else if (hasExpiringSoon && vendor.status === 'compliant') {
     newStatus = 'expiring';
-  } else if (vendor.issues && vendor.issues.length > 0 && vendor.status === 'compliant') {
+  } else if (normalizedIssues.length > 0 && vendor.status === 'compliant') {
     newStatus = 'non-compliant';
   }
 
-  return { ...vendor, status: newStatus };
+  return { ...vendor, status: newStatus, issues: normalizedIssues };
 }
 
 export function useVendors() {
