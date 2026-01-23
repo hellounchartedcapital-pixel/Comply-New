@@ -358,60 +358,80 @@ function ComplyApp({ user, onSignOut }) {
     setRequestCOIEmail(vendor.contactEmail || '');
   };
 
+  const [sendingEmail, setSendingEmail] = useState(false);
+
   const sendCOIRequest = async () => {
     if (!requestCOIEmail) {
       alert('Please enter an email address');
       return;
     }
 
-    // Save the email to the vendor if it's new or updated
-    if (requestCOIEmail !== requestCOIVendor.contactEmail) {
-      const result = await updateVendor(requestCOIVendor.id, {
-        ...requestCOIVendor,
-        contactEmail: requestCOIEmail
-      });
-      if (!result.success) {
-        alert('Error saving contact email: ' + result.error);
-        return;
+    setSendingEmail(true);
+
+    try {
+      // Save the email to the vendor if it's new or updated
+      if (requestCOIEmail !== requestCOIVendor.contactEmail) {
+        const result = await updateVendor(requestCOIVendor.id, {
+          ...requestCOIVendor,
+          contactEmail: requestCOIEmail
+        });
+        if (!result.success) {
+          alert('Error saving contact email: ' + result.error);
+          setSendingEmail(false);
+          return;
+        }
       }
+
+      // Send email via Edge Function
+      const companyName = userRequirements?.company_name || 'Our Company';
+      const issues = requestCOIVendor.issues.map(i => i.message);
+
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData?.session?.access_token;
+
+      const response = await fetch(
+        `${process.env.REACT_APP_SUPABASE_URL}/functions/v1/send-coi-request`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            to: requestCOIEmail,
+            vendorName: requestCOIVendor.name,
+            vendorStatus: requestCOIVendor.status,
+            issues: issues,
+            companyName: companyName,
+            replyTo: user?.email,
+          }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to send email');
+      }
+
+      // Update last contacted timestamp
+      await updateVendor(requestCOIVendor.id, {
+        ...requestCOIVendor,
+        contactEmail: requestCOIEmail,
+        lastContactedAt: new Date().toISOString()
+      });
+
+      alert('Email sent successfully to ' + requestCOIEmail);
+
+      setRequestCOIVendor(null);
+      setRequestCOIEmail('');
+      refreshVendors();
+    } catch (error) {
+      console.error('Failed to send email:', error);
+      alert('Failed to send email: ' + error.message);
+    } finally {
+      setSendingEmail(false);
     }
-
-    // Build the email
-    const companyName = userRequirements?.company_name || 'Our Company';
-    const issues = requestCOIVendor.issues.map(i => `- ${i.message}`).join('\n');
-
-    const subject = encodeURIComponent(`Updated Certificate of Insurance Required - ${requestCOIVendor.name}`);
-    const body = encodeURIComponent(
-`Hello,
-
-We are reaching out regarding the Certificate of Insurance (COI) on file for ${requestCOIVendor.name}.
-
-Current Status: ${requestCOIVendor.status.toUpperCase().replace('-', ' ')}
-
-Issues identified:
-${issues || '- COI needs to be updated'}
-
-Please provide an updated COI that meets our insurance requirements at your earliest convenience.
-
-If you have any questions about our requirements, please don't hesitate to reach out.
-
-Thank you,
-${companyName}`
-    );
-
-    // Open mailto link
-    window.location.href = `mailto:${requestCOIEmail}?subject=${subject}&body=${body}`;
-
-    // Update last contacted timestamp
-    await updateVendor(requestCOIVendor.id, {
-      ...requestCOIVendor,
-      contactEmail: requestCOIEmail,
-      lastContactedAt: new Date().toISOString()
-    });
-
-    setRequestCOIVendor(null);
-    setRequestCOIEmail('');
-    refreshVendors();
   };
 
   // Handle file upload with AI extraction
@@ -1100,22 +1120,32 @@ ${companyName}`
             <div className="flex space-x-3">
               <button
                 onClick={sendCOIRequest}
-                disabled={!requestCOIEmail}
+                disabled={!requestCOIEmail || sendingEmail}
                 className="flex-1 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 font-medium flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Mail size={16} />
-                <span>Send Request</span>
+                {sendingEmail ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    <span>Sending...</span>
+                  </>
+                ) : (
+                  <>
+                    <Send size={16} />
+                    <span>Send Email</span>
+                  </>
+                )}
               </button>
               <button
                 onClick={() => { setRequestCOIVendor(null); setRequestCOIEmail(''); }}
-                className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium"
+                disabled={sendingEmail}
+                className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium disabled:opacity-50"
               >
                 Cancel
               </button>
             </div>
 
             <p className="text-xs text-gray-500 mt-4 text-center">
-              This will open your email client with a pre-written request
+              Email will be sent directly from SmartCOI
             </p>
           </div>
         </div>
