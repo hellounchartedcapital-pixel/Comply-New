@@ -290,10 +290,6 @@ function ComplyApp({ user, onSignOut }) {
         filtered = filtered.filter(v => v.status === 'non-compliant');
       } else if (quickFilter === 'compliant') {
         filtered = filtered.filter(v => v.status === 'compliant');
-      } else if (quickFilter === 'missing-additional-insured') {
-        filtered = filtered.filter(v => v.missingAdditionalInsured === true);
-      } else if (quickFilter === 'missing-waiver') {
-        filtered = filtered.filter(v => v.missingWaiverOfSubrogation === true);
       }
     }
 
@@ -611,30 +607,6 @@ function ComplyApp({ user, onSignOut }) {
               >
                 <CheckCircle size={14} className="inline mr-1 mb-0.5" />
                 Compliant ({vendors.filter(v => v.status === 'compliant').length})
-              </button>
-              <button
-                onClick={() => setQuickFilter('missing-additional-insured')}
-                className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all ${
-                  quickFilter === 'missing-additional-insured'
-                    ? 'bg-purple-600 text-white shadow-md'
-                    : 'bg-purple-50 text-purple-700 hover:bg-purple-100'
-                }`}
-              >
-                <span className="hidden sm:inline">Missing Add'l Insured</span>
-                <span className="sm:hidden">No AI</span>
-                ({vendors.filter(v => v.missingAdditionalInsured).length})
-              </button>
-              <button
-                onClick={() => setQuickFilter('missing-waiver')}
-                className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all ${
-                  quickFilter === 'missing-waiver'
-                    ? 'bg-pink-600 text-white shadow-md'
-                    : 'bg-pink-50 text-pink-700 hover:bg-pink-100'
-                }`}
-              >
-                <span className="hidden sm:inline">Missing Waiver</span>
-                <span className="sm:hidden">No Waiver</span>
-                ({vendors.filter(v => v.missingWaiverOfSubrogation).length})
               </button>
             </div>
           </div>
