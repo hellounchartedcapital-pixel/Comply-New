@@ -111,7 +111,6 @@ export function VendorUploadPortal({ token, onBack }) {
         .from('vendors')
         .update({
           raw_data: updatedRawData,
-          status: 'pending_review',
           updated_at: new Date().toISOString()
         })
         .eq('id', vendor.id);
