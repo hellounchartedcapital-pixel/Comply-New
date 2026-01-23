@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { X, TrendingUp, TrendingDown, Users, AlertCircle, CheckCircle, Calendar, DollarSign, BarChart3, XCircle } from 'lucide-react';
+import { X, TrendingUp, TrendingDown, Users, AlertCircle, CheckCircle, BarChart3 } from 'lucide-react';
 
 export function Analytics({ vendors, onClose }) {
   // Calculate analytics metrics
@@ -11,15 +11,6 @@ export function Analytics({ vendors, onClose }) {
     const nonCompliant = vendors.filter(v => v.status === 'non-compliant').length;
 
     const complianceRate = total > 0 ? Math.round((compliant / total) * 100) : 0;
-
-    // Calculate average coverage amounts
-    const avgGL = vendors.length > 0
-      ? Math.round(vendors.reduce((sum, v) => sum + (v.coverage?.generalLiability?.amount || 0), 0) / vendors.length)
-      : 0;
-
-    const avgAuto = vendors.length > 0
-      ? Math.round(vendors.reduce((sum, v) => sum + (v.coverage?.autoLiability?.amount || 0), 0) / vendors.length)
-      : 0;
 
     // Calculate expiration timeline (next 90 days)
     const today = new Date();
@@ -51,21 +42,10 @@ export function Analytics({ vendors, onClose }) {
       expiring,
       nonCompliant,
       complianceRate,
-      avgGL,
-      avgAuto,
       expirationTimeline,
       riskScore
     };
   }, [vendors]);
-
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    }).format(amount);
-  };
 
   // Status distribution for pie chart
   const statusData = [
@@ -283,95 +263,6 @@ export function Analytics({ vendors, onClose }) {
                   </div>
                 );
               })}
-            </div>
-          </div>
-        </div>
-
-        {/* Average Coverage Amounts */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <h3 className="text-lg font-semibold mb-4 flex items-center">
-              <DollarSign size={20} className="mr-2 text-green-600" />
-              Average Coverage Amounts
-            </h3>
-            <div className="space-y-4">
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-gray-700">General Liability</span>
-                  <span className="text-lg font-bold text-gray-900">{formatCurrency(analytics.avgGL)}</span>
-                </div>
-                <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-green-600 rounded-full"
-                    style={{ width: `${Math.min((analytics.avgGL / 2000000) * 100, 100)}%` }}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-gray-700">Auto Liability</span>
-                  <span className="text-lg font-bold text-gray-900">{formatCurrency(analytics.avgAuto)}</span>
-                </div>
-                <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-blue-600 rounded-full"
-                    style={{ width: `${Math.min((analytics.avgAuto / 2000000) * 100, 100)}%` }}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Quick Actions */}
-          <div className="bg-gradient-to-br from-gray-50 to-slate-50 rounded-lg border border-gray-200 p-6">
-            <h3 className="text-lg font-semibold mb-4">Recommended Actions</h3>
-            <div className="space-y-3">
-              {analytics.expired > 0 && (
-                <div className="flex items-start space-x-3 p-3 bg-red-50 rounded-lg border border-red-200">
-                  <AlertCircle className="text-red-600 flex-shrink-0 mt-0.5" size={18} />
-                  <div>
-                    <p className="text-sm font-medium text-red-900">
-                      {analytics.expired} expired {analytics.expired === 1 ? 'policy' : 'policies'}
-                    </p>
-                    <p className="text-xs text-red-700 mt-1">Contact vendors immediately for updated COIs</p>
-                  </div>
-                </div>
-              )}
-
-              {analytics.expiring > 0 && (
-                <div className="flex items-start space-x-3 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
-                  <Calendar className="text-yellow-600 flex-shrink-0 mt-0.5" size={18} />
-                  <div>
-                    <p className="text-sm font-medium text-yellow-900">
-                      {analytics.expiring} {analytics.expiring === 1 ? 'policy' : 'policies'} expiring soon
-                    </p>
-                    <p className="text-xs text-yellow-700 mt-1">Send renewal reminders to vendors</p>
-                  </div>
-                </div>
-              )}
-
-              {analytics.nonCompliant > 0 && (
-                <div className="flex items-start space-x-3 p-3 bg-orange-50 rounded-lg border border-orange-200">
-                  <XCircle className="text-orange-600 flex-shrink-0 mt-0.5" size={18} />
-                  <div>
-                    <p className="text-sm font-medium text-orange-900">
-                      {analytics.nonCompliant} non-compliant {analytics.nonCompliant === 1 ? 'vendor' : 'vendors'}
-                    </p>
-                    <p className="text-xs text-orange-700 mt-1">Review coverage requirements with vendors</p>
-                  </div>
-                </div>
-              )}
-
-              {analytics.expired === 0 && analytics.expiring === 0 && analytics.nonCompliant === 0 && (
-                <div className="flex items-start space-x-3 p-3 bg-green-50 rounded-lg border border-green-200">
-                  <CheckCircle className="text-green-600 flex-shrink-0 mt-0.5" size={18} />
-                  <div>
-                    <p className="text-sm font-medium text-green-900">All vendors compliant!</p>
-                    <p className="text-xs text-green-700 mt-1">No action required at this time</p>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         </div>
