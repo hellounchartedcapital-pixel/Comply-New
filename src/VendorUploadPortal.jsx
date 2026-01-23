@@ -201,24 +201,36 @@ export function VendorUploadPortal({ token, onBack }) {
       // Step 3: Update vendor with extracted data
       setUploadStatus('Saving results...');
 
-      // Build update object, only including expiration_date if we have a value
+      // Build update object, only including fields if we have valid values
       const updateData = {
         status: vendorStatus,
-        coverage: extractedData.coverage || null,
-        issues: extractedData.issues || [],
-        additional_coverages: extractedData.additionalCoverages || [],
-        has_additional_insured: extractedData.hasAdditionalInsured || false,
-        has_waiver_of_subrogation: extractedData.hasWaiverOfSubrogation || false,
-        raw_data: {
-          ...extractedData.rawData,
-          documentPath: fileName
-        },
         updated_at: new Date().toISOString()
       };
 
-      // Only update expiration_date if we have a valid value
+      // Only include fields that have values (avoid null constraint violations)
+      if (extractedData.coverage) {
+        updateData.coverage = extractedData.coverage;
+      }
+      if (extractedData.issues && extractedData.issues.length > 0) {
+        updateData.issues = extractedData.issues;
+      }
       if (extractedData.expirationDate) {
         updateData.expiration_date = extractedData.expirationDate;
+      }
+      if (extractedData.additionalCoverages && extractedData.additionalCoverages.length > 0) {
+        updateData.additional_coverages = extractedData.additionalCoverages;
+      }
+      if (extractedData.hasAdditionalInsured !== undefined) {
+        updateData.has_additional_insured = extractedData.hasAdditionalInsured;
+      }
+      if (extractedData.hasWaiverOfSubrogation !== undefined) {
+        updateData.has_waiver_of_subrogation = extractedData.hasWaiverOfSubrogation;
+      }
+      if (extractedData.rawData || fileName) {
+        updateData.raw_data = {
+          ...(extractedData.rawData || {}),
+          documentPath: fileName
+        };
       }
 
       const { error: updateError } = await supabase
