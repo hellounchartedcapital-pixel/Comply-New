@@ -201,22 +201,29 @@ export function VendorUploadPortal({ token, onBack }) {
       // Step 3: Update vendor with extracted data
       setUploadStatus('Saving results...');
 
+      // Build update object, only including expiration_date if we have a value
+      const updateData = {
+        status: vendorStatus,
+        coverage: extractedData.coverage || null,
+        issues: extractedData.issues || [],
+        additional_coverages: extractedData.additionalCoverages || [],
+        has_additional_insured: extractedData.hasAdditionalInsured || false,
+        has_waiver_of_subrogation: extractedData.hasWaiverOfSubrogation || false,
+        raw_data: {
+          ...extractedData.rawData,
+          documentPath: fileName
+        },
+        updated_at: new Date().toISOString()
+      };
+
+      // Only update expiration_date if we have a valid value
+      if (extractedData.expirationDate) {
+        updateData.expiration_date = extractedData.expirationDate;
+      }
+
       const { error: updateError } = await supabase
         .from('vendors')
-        .update({
-          status: vendorStatus,
-          coverage: extractedData.coverage || null,
-          issues: extractedData.issues || [],
-          expiration_date: extractedData.expirationDate || null,
-          additional_coverages: extractedData.additionalCoverages || [],
-          has_additional_insured: extractedData.hasAdditionalInsured || false,
-          has_waiver_of_subrogation: extractedData.hasWaiverOfSubrogation || false,
-          raw_data: {
-            ...extractedData.rawData,
-            documentPath: fileName
-          },
-          updated_at: new Date().toISOString()
-        })
+        .update(updateData)
         .eq('id', vendor.id);
 
       if (updateError) throw updateError;
