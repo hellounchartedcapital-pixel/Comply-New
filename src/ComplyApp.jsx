@@ -386,16 +386,13 @@ function ComplyApp({ user, onSignOut }) {
       const companyName = userRequirements?.company_name || 'Our Company';
       const issues = requestCOIVendor.issues.map(i => i.message);
 
-      const { data: sessionData } = await supabase.auth.getSession();
-      const accessToken = sessionData?.session?.access_token;
-
       const response = await fetch(
         `${process.env.REACT_APP_SUPABASE_URL}/functions/v1/send-coi-request`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${accessToken}`,
+            'Authorization': `Bearer ${process.env.REACT_APP_SUPABASE_ANON_KEY}`,
             'apikey': process.env.REACT_APP_SUPABASE_ANON_KEY,
           },
           body: JSON.stringify({
