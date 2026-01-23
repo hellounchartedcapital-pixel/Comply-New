@@ -190,14 +190,9 @@ export function VendorUploadPortal({ token, onBack }) {
       let vendorStatus = 'compliant';
       let extractedData = {};
 
-      console.log('Extraction result:', extractionResult);
-      console.log('Extraction error:', extractionError);
-
       if (extractionError) {
-        console.warn('Extraction warning:', extractionError);
         // Continue without extraction - user will need to manually review
       } else if (extractionResult?.success && extractionResult?.data) {
-        console.log('Extracted data:', extractionResult.data);
         extractedData = extractionResult.data;
 
         // Add expiration checks
@@ -245,10 +240,7 @@ export function VendorUploadPortal({ token, onBack }) {
           }
         }
 
-        console.log('Coverage after expiration check:', extractedData.coverage);
-        console.log('Issues:', extractedData.issues);
         vendorStatus = determineVendorStatus(extractedData);
-        console.log('Determined status:', vendorStatus);
       }
 
       // Step 3: Update vendor with extracted data
