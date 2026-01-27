@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Upload, CheckCircle, XCircle, AlertCircle, FileText, Calendar, X, Search, Download, Settings as SettingsIcon, Eye, Bell, BarChart3, FileDown, Phone, Mail, User, Send, Clock, History } from 'lucide-react';
+import { Upload, CheckCircle, XCircle, AlertCircle, FileText, Calendar, X, Search, Download, Settings as SettingsIcon, Eye, Bell, BarChart3, FileDown, Phone, Mail, User, Send, Clock, History, FileCheck } from 'lucide-react';
 import { useVendors } from './useVendors';
 import { UploadModal } from './UploadModal';
 import { Settings } from './Settings';
@@ -14,7 +14,7 @@ import { Logo } from './Logo';
 function ComplyApp({ user, onSignOut }) {
   // Use database hook instead of local state
   const { vendors: dbVendors, loading, loadingMore, error, hasMore, totalCount, addVendor, updateVendor, deleteVendor, loadMore, refreshVendors } = useVendors();
-  
+
   // Convert database format (snake_case) to app format (camelCase)
   const vendors = dbVendors.map(v => ({
     id: v.id,
@@ -39,7 +39,7 @@ function ComplyApp({ user, onSignOut }) {
     lastContactedAt: v.last_contacted_at,
     rawData: v.raw_data
   }));
-  
+
   const [selectedVendor, setSelectedVendor] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [quickFilter, setQuickFilter] = useState('all'); // Quick filter for button interface
@@ -180,21 +180,21 @@ function ComplyApp({ user, onSignOut }) {
     if (status === 'expired') return <XCircle className="text-red-500" size={20} />;
     if (status === 'non-compliant') return <AlertCircle className="text-orange-500" size={20} />;
     if (status === 'expiring') return <AlertCircle className="text-yellow-500" size={20} />;
-    return <CheckCircle className="text-green-500" size={20} />;
+    return <CheckCircle className="text-emerald-500" size={20} />;
   };
 
   const getStatusBadge = (status, daysOverdue) => {
     const styles = {
-      expired: 'bg-red-100 text-red-800',
-      'non-compliant': 'bg-orange-100 text-orange-800',
-      expiring: 'bg-yellow-100 text-yellow-800',
-      compliant: 'bg-green-100 text-green-800'
+      expired: 'bg-red-100 text-red-700 border border-red-200',
+      'non-compliant': 'bg-orange-100 text-orange-700 border border-orange-200',
+      expiring: 'bg-amber-100 text-amber-700 border border-amber-200',
+      compliant: 'bg-emerald-100 text-emerald-700 border border-emerald-200'
     };
-    
+
     return (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium ${styles[status]}`}>
-        {status === 'expired' && daysOverdue > 0 
-          ? `Expired (${daysOverdue} days)` 
+      <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${styles[status]}`}>
+        {status === 'expired' && daysOverdue > 0
+          ? `Expired (${daysOverdue} days)`
           : status.replace('-', ' ').toUpperCase()}
       </span>
     );
@@ -491,10 +491,10 @@ function ComplyApp({ user, onSignOut }) {
       if (!user) throw new Error('Not authenticated');
 
       // Step 1: Extract data using AI
-      if (progressCallback) progressCallback('🤖 AI extracting data...');
+      if (progressCallback) progressCallback('AI extracting data...');
       console.log('Extracting COI data with AI...');
       const extractionResult = await extractCOIFromPDF(file, userRequirements);
-      
+
       if (!extractionResult.success) {
         throw new Error(extractionResult.error);
       }
@@ -503,7 +503,7 @@ function ComplyApp({ user, onSignOut }) {
       console.log('Extracted vendor data:', vendorData);
 
       // Step 2: Upload file to Storage
-      if (progressCallback) progressCallback('☁️ Uploading to cloud...');
+      if (progressCallback) progressCallback('Uploading to cloud...');
       const fileExt = file.name.split('.').pop();
       const fileName = `${user.id}/${Date.now()}.${fileExt}`;
 
@@ -514,7 +514,7 @@ function ComplyApp({ user, onSignOut }) {
       if (storageError) throw storageError;
 
       // Step 3: Create vendor in database
-      if (progressCallback) progressCallback('💾 Saving vendor...');
+      if (progressCallback) progressCallback('Saving vendor...');
       const result = await addVendor({
         ...vendorData,
         rawData: {
@@ -529,12 +529,12 @@ function ComplyApp({ user, onSignOut }) {
       }
 
       // Step 4: Refresh vendor list
-      if (progressCallback) progressCallback('✅ Complete!');
+      if (progressCallback) progressCallback('Complete!');
       await refreshVendors();
 
       // Success!
-      alert(`✅ Success! Created vendor: ${vendorData.name}\n\nStatus: ${vendorData.status.toUpperCase()}\nExpires: ${vendorData.expirationDate}\n\nThe vendor has been added to your dashboard.`);
-      
+      alert(`Success! Created vendor: ${vendorData.name}\n\nStatus: ${vendorData.status.toUpperCase()}\nExpires: ${vendorData.expirationDate}\n\nThe vendor has been added to your dashboard.`);
+
     } catch (error) {
       console.error('Upload error:', error);
       throw new Error(error.message || 'Failed to upload and process COI');
@@ -563,7 +563,7 @@ function ComplyApp({ user, onSignOut }) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `comply-vendor-report-${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `smartcoi-vendor-report-${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
   };
 
@@ -574,47 +574,49 @@ function ComplyApp({ user, onSignOut }) {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Background gradients - subtle */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-gradient-to-bl from-emerald-500/5 to-transparent rounded-full blur-3xl" />
+        <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-gradient-to-tr from-teal-500/5 to-transparent rounded-full blur-3xl" />
+      </div>
+
       {/* Header */}
-      <header className="bg-white border-b border-gray-200">
+      <header className="relative bg-white/95 backdrop-blur-md border-b border-gray-200 shadow-sm sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
+            <Logo size="default" />
             <div className="flex items-center space-x-3">
-              <Logo size="default" showTagline={true} />
-            </div>
-            <div className="flex items-center space-x-4">
               <div className="text-right hidden sm:block">
                 <p className="text-sm font-medium text-gray-900">{user?.email}</p>
                 <p className="text-xs text-gray-500">Signed in</p>
               </div>
               <button
                 onClick={() => setShowSettings(true)}
-                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center space-x-2"
+                className="p-2.5 bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 hover:text-gray-900 transition-all"
                 title="Settings"
                 data-onboarding="settings-button"
               >
-                <SettingsIcon size={16} />
-                <span className="hidden sm:inline">Settings</span>
+                <SettingsIcon size={18} />
               </button>
               <button
                 onClick={() => setShowNotifications(true)}
-                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center space-x-2"
+                className="p-2.5 bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 hover:text-gray-900 transition-all"
                 title="Notifications"
                 data-onboarding="notifications-button"
               >
-                <Bell size={16} />
-                <span className="hidden sm:inline">Notifications</span>
+                <Bell size={18} />
               </button>
               <button
                 onClick={() => setShowUploadModal(true)}
-                className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 flex items-center space-x-2"
+                className="px-4 py-2.5 bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 text-white rounded-xl hover:shadow-lg hover:shadow-emerald-500/25 hover:-translate-y-0.5 transition-all duration-200 flex items-center space-x-2 font-semibold"
                 data-onboarding="upload-button"
               >
-                <Upload size={16} />
+                <Upload size={18} />
                 <span>Upload COI</span>
               </button>
               <button
                 onClick={onSignOut}
-                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium"
+                className="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 text-sm font-medium transition-all"
               >
                 Sign Out
               </button>
@@ -624,73 +626,80 @@ function ComplyApp({ user, onSignOut }) {
       </header>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Stats */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-4 sm:mb-8">
-          <div className="bg-white rounded-lg shadow p-4 sm:p-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5 hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs sm:text-sm text-gray-500">Total Vendors</p>
-                <p className="text-2xl sm:text-3xl font-bold text-gray-900">{stats.total}</p>
+                <p className="text-sm text-gray-500 font-medium">Total Vendors</p>
+                <p className="text-3xl font-bold text-gray-900 mt-1">{stats.total}</p>
               </div>
-              <FileText className="text-gray-400" size={24} />
+              <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center">
+                <FileText className="text-gray-500" size={24} />
+              </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow p-4 sm:p-6">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5 hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs sm:text-sm text-gray-500">Expired</p>
-                <p className="text-2xl sm:text-3xl font-bold text-red-600">{stats.expired}</p>
+                <p className="text-sm text-gray-500 font-medium">Expired</p>
+                <p className="text-3xl font-bold text-red-600 mt-1">{stats.expired}</p>
               </div>
-              <XCircle className="text-red-400" size={24} />
+              <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center">
+                <XCircle className="text-red-500" size={24} />
+              </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow p-4 sm:p-6">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5 hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs sm:text-sm text-gray-500">Non-Compliant</p>
-                <p className="text-2xl sm:text-3xl font-bold text-orange-600">{stats.nonCompliant}</p>
+                <p className="text-sm text-gray-500 font-medium">Non-Compliant</p>
+                <p className="text-3xl font-bold text-orange-600 mt-1">{stats.nonCompliant}</p>
               </div>
-              <AlertCircle className="text-orange-400" size={24} />
+              <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center">
+                <AlertCircle className="text-orange-500" size={24} />
+              </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow p-4 sm:p-6">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5 hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs sm:text-sm text-gray-500">Compliant</p>
-                <p className="text-2xl sm:text-3xl font-bold text-green-600">{stats.compliant}</p>
+                <p className="text-sm text-gray-500 font-medium">Compliant</p>
+                <p className="text-3xl font-bold text-emerald-600 mt-1">{stats.compliant}</p>
               </div>
-              <CheckCircle className="text-green-400" size={24} />
+              <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center">
+                <CheckCircle className="text-emerald-500" size={24} />
+              </div>
             </div>
           </div>
         </div>
 
         {/* Analytics Button */}
-        <div className="mb-4 sm:mb-6" data-onboarding="analytics-button">
+        <div className="mb-6" data-onboarding="analytics-button">
           <button
             onClick={() => setShowAnalytics(true)}
-            className="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg p-3 sm:p-4 hover:from-green-600 hover:to-emerald-700 transition-all duration-200 flex items-center justify-center space-x-2 sm:space-x-3 shadow-lg hover:shadow-xl"
+            className="w-full bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 text-white rounded-2xl p-4 hover:shadow-lg hover:shadow-emerald-500/25 transition-all duration-200 flex items-center justify-center space-x-3 font-semibold"
           >
-            <BarChart3 size={20} className="sm:hidden" />
-            <BarChart3 size={24} className="hidden sm:block" />
-            <span className="text-base sm:text-lg font-semibold">View Detailed Analytics & Insights</span>
+            <BarChart3 size={22} />
+            <span className="text-lg">View Detailed Analytics & Insights</span>
           </button>
         </div>
 
         {/* Filters */}
-        <div className="bg-white rounded-lg shadow p-4 sm:p-6 mb-4 sm:mb-6">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5 mb-6">
           {/* Quick Filter Buttons */}
-          <div className="mb-4 sm:mb-6" data-onboarding="quick-filters">
-            <h3 className="text-xs sm:text-sm font-semibold text-gray-700 mb-2 sm:mb-3">Quick Filters</h3>
-            <div className="flex flex-wrap gap-2 sm:gap-3">
+          <div className="mb-5" data-onboarding="quick-filters">
+            <h3 className="text-sm font-semibold text-gray-700 mb-3">Quick Filters</h3>
+            <div className="flex flex-wrap gap-2">
               <button
                 onClick={() => setQuickFilter('all')}
-                className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all ${
+                className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
                   quickFilter === 'all'
-                    ? 'bg-gray-800 text-white shadow-md'
+                    ? 'bg-gray-900 text-white shadow-md'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
               >
@@ -698,65 +707,65 @@ function ComplyApp({ user, onSignOut }) {
               </button>
               <button
                 onClick={() => setQuickFilter('expired')}
-                className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all ${
+                className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all flex items-center gap-1.5 ${
                   quickFilter === 'expired'
                     ? 'bg-red-600 text-white shadow-md'
                     : 'bg-red-50 text-red-700 hover:bg-red-100'
                 }`}
               >
-                <XCircle size={14} className="inline mr-1 mb-0.5" />
+                <XCircle size={14} />
                 Expired ({vendors.filter(v => v.status === 'expired').length})
               </button>
               <button
                 onClick={() => setQuickFilter('expiring')}
-                className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all ${
+                className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all flex items-center gap-1.5 ${
                   quickFilter === 'expiring'
-                    ? 'bg-yellow-600 text-white shadow-md'
-                    : 'bg-yellow-50 text-yellow-700 hover:bg-yellow-100'
+                    ? 'bg-amber-500 text-white shadow-md'
+                    : 'bg-amber-50 text-amber-700 hover:bg-amber-100'
                 }`}
               >
-                <AlertCircle size={14} className="inline mr-1 mb-0.5" />
+                <AlertCircle size={14} />
                 <span className="hidden sm:inline">Expiring Soon</span>
                 <span className="sm:hidden">Expiring</span>
                 ({vendors.filter(v => v.status === 'expiring').length})
               </button>
               <button
                 onClick={() => setQuickFilter('non-compliant')}
-                className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all ${
+                className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all flex items-center gap-1.5 ${
                   quickFilter === 'non-compliant'
                     ? 'bg-orange-600 text-white shadow-md'
                     : 'bg-orange-50 text-orange-700 hover:bg-orange-100'
                 }`}
               >
-                <AlertCircle size={14} className="inline mr-1 mb-0.5" />
+                <AlertCircle size={14} />
                 Non-Compliant ({vendors.filter(v => v.status === 'non-compliant').length})
               </button>
               <button
                 onClick={() => setQuickFilter('compliant')}
-                className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all ${
+                className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all flex items-center gap-1.5 ${
                   quickFilter === 'compliant'
-                    ? 'bg-green-600 text-white shadow-md'
-                    : 'bg-green-50 text-green-700 hover:bg-green-100'
+                    ? 'bg-emerald-600 text-white shadow-md'
+                    : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
                 }`}
               >
-                <CheckCircle size={14} className="inline mr-1 mb-0.5" />
+                <CheckCircle size={14} />
                 Compliant ({vendors.filter(v => v.status === 'compliant').length})
               </button>
             </div>
           </div>
 
           {/* Search and Sort Controls */}
-          <div className="flex flex-wrap gap-4 items-center pt-4 border-t border-gray-200">
+          <div className="flex flex-wrap gap-3 items-center pt-4 border-t border-gray-100">
             {/* Search */}
             <div className="flex-1 min-w-[200px]">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
                 <input
                   type="text"
                   placeholder="Search vendors..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent bg-gray-50 transition-all"
                 />
               </div>
             </div>
@@ -765,7 +774,7 @@ function ComplyApp({ user, onSignOut }) {
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white"
+              className="px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent bg-gray-50 font-medium text-gray-700"
             >
               <option value="name">Sort: Name (A-Z)</option>
               <option value="expiration">Sort: Expiration Date</option>
@@ -775,22 +784,20 @@ function ComplyApp({ user, onSignOut }) {
             {/* Export Buttons */}
             <button
               onClick={exportToPDF}
-              className="px-3 sm:px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center space-x-2 text-xs sm:text-sm"
+              className="px-4 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 flex items-center space-x-2 text-sm font-semibold transition-all"
               title="Export PDF Report"
             >
-              <FileDown size={14} />
+              <FileDown size={16} />
               <span className="hidden sm:inline">Export PDF</span>
-              <span className="sm:hidden">PDF</span>
             </button>
 
             <button
               onClick={exportToCSV}
-              className="px-3 sm:px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 flex items-center space-x-2 text-xs sm:text-sm"
+              className="px-4 py-2.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 flex items-center space-x-2 text-sm font-semibold transition-all"
               title="Export CSV"
             >
-              <Download size={14} />
+              <Download size={16} />
               <span className="hidden sm:inline">Export CSV</span>
-              <span className="sm:hidden">CSV</span>
             </button>
 
             {/* Clear */}
@@ -801,7 +808,7 @@ function ComplyApp({ user, onSignOut }) {
                   setQuickFilter('all');
                   setSortBy('name');
                 }}
-                className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
+                className="px-4 py-2.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-xl font-medium transition-all"
               >
                 Clear Filters
               </button>
@@ -816,10 +823,10 @@ function ComplyApp({ user, onSignOut }) {
         </div>
 
         {/* Vendors List */}
-        <div className="bg-white rounded-lg shadow">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
           {loading ? (
             <div className="p-12 text-center">
-              <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-green-500 mb-4"></div>
+              <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500 mb-4"></div>
               <p className="text-gray-600">Loading vendors...</p>
             </div>
           ) : error ? (
@@ -829,53 +836,54 @@ function ComplyApp({ user, onSignOut }) {
               <p className="text-red-600">{error}</p>
             </div>
           ) : (
-            <div className="divide-y divide-gray-200">
+            <div className="divide-y divide-gray-100">
             {filteredVendors.length === 0 ? (
               <div className="p-8 text-center">
-                <AlertCircle className="mx-auto text-gray-400 mb-4" size={48} />
+                <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <FileCheck className="text-gray-400" size={32} />
+                </div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                  {searchQuery || quickFilter !== 'all' 
+                  {searchQuery || quickFilter !== 'all'
                     ? 'No vendors found'
                     : 'Welcome to SmartCOI!'}
                 </h3>
                 <p className="text-gray-600 mb-6">
-                  {searchQuery || quickFilter !== 'all' 
+                  {searchQuery || quickFilter !== 'all'
                     ? 'Try adjusting your search or filters'
                     : 'Get started by adding your first vendor'}
                 </p>
                 {!searchQuery && quickFilter === 'all' && (
-                  <div className="max-w-md mx-auto text-left bg-blue-50 border border-blue-200 rounded-lg p-6">
-                    <h4 className="font-semibold text-blue-900 mb-3">Quick Start:</h4>
-                    <ol className="space-y-2 text-sm text-blue-800">
+                  <div className="max-w-md mx-auto text-left bg-emerald-50 border border-emerald-200 rounded-2xl p-6">
+                    <h4 className="font-semibold text-emerald-900 mb-3">Quick Start:</h4>
+                    <ol className="space-y-2 text-sm text-emerald-800">
                       <li>1. Click <strong>"Settings"</strong> to customize your requirements</li>
-                      <li>2. Add vendors manually via Supabase Table Editor</li>
-                      <li>3. Click <strong>"Upload COI"</strong> to test file storage</li>
-                      <li>4. <strong>Phase 4</strong> will add AI extraction to auto-populate vendors from PDFs!</li>
+                      <li>2. Click <strong>"Upload COI"</strong> to add your first certificate</li>
+                      <li>3. Our AI will extract all the data automatically!</li>
                     </ol>
                   </div>
                 )}
               </div>
             ) : (
               filteredVendors.map((vendor) => (
-                <div key={vendor.id} className="p-4 sm:p-6 hover:bg-gray-50">
+                <div key={vendor.id} className="p-5 hover:bg-gray-50 transition-colors">
                   <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between space-y-3 sm:space-y-0">
-                    <div className="flex items-start space-x-3 sm:space-x-4 flex-1">
-                      <div className="flex-shrink-0">
+                    <div className="flex items-start space-x-4 flex-1">
+                      <div className="flex-shrink-0 mt-0.5">
                         {getStatusIcon(vendor.status)}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-col sm:flex-row sm:items-center space-y-1 sm:space-y-0 sm:space-x-3 mb-2">
-                          <h3 className="text-sm sm:text-base font-semibold text-gray-900 truncate">{vendor.name}</h3>
+                          <h3 className="text-base font-semibold text-gray-900 truncate">{vendor.name}</h3>
                           {getStatusBadge(vendor.status, vendor.daysOverdue)}
                         </div>
                         {vendor.dba && (
-                          <p className="text-xs sm:text-sm text-gray-500 mb-2 truncate">DBA: {vendor.dba}</p>
+                          <p className="text-sm text-gray-500 mb-2 truncate">DBA: {vendor.dba}</p>
                         )}
 
                         {vendor.issues.length > 0 && (
-                          <div className="space-y-2 mt-2 sm:mt-3">
+                          <div className="space-y-1.5 mt-2">
                             {vendor.issues.map((issue, idx) => (
-                              <div key={idx} className={`flex items-start space-x-2 text-xs sm:text-sm ${
+                              <div key={idx} className={`flex items-start space-x-2 text-sm ${
                                 issue.type === 'critical' ? 'text-red-700' : 'text-orange-700'
                               }`}>
                                 <AlertCircle size={14} className="mt-0.5 flex-shrink-0" />
@@ -885,51 +893,50 @@ function ComplyApp({ user, onSignOut }) {
                           </div>
                         )}
 
-                        <div className="mt-3 sm:mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-600">
-                          <div>
+                        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-600">
+                          <div className="bg-gray-100 px-2 py-1 rounded-lg">
                             <span className="font-medium">GL:</span> {formatCurrency(vendor.coverage.generalLiability.amount)}
                           </div>
-                          <div>
+                          <div className="bg-gray-100 px-2 py-1 rounded-lg">
                             <span className="font-medium">Auto:</span> {formatCurrency(vendor.coverage.autoLiability.amount)}
                           </div>
-                          <div>
+                          <div className="bg-gray-100 px-2 py-1 rounded-lg">
                             <span className="font-medium">WC:</span> {vendor.coverage.workersComp.amount}
                           </div>
                         </div>
                       </div>
                     </div>
 
-                    <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-start space-x-2 sm:space-x-0 sm:space-y-2 sm:ml-4 pt-2 sm:pt-0 border-t sm:border-t-0 border-gray-200">
-                      <div className="flex items-center text-xs sm:text-sm text-gray-500">
-                        <Calendar size={12} className="mr-1 sm:hidden" />
-                        <Calendar size={14} className="mr-1 hidden sm:inline" />
-                        <span className="hidden sm:inline">Exp: </span>{formatDate(vendor.expirationDate)}
+                    <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-start space-x-2 sm:space-x-0 sm:space-y-2 sm:ml-4 pt-2 sm:pt-0 border-t sm:border-t-0 border-gray-100">
+                      <div className="flex items-center text-sm text-gray-500 bg-gray-100 px-2.5 py-1 rounded-lg">
+                        <Calendar size={14} className="mr-1.5" />
+                        {formatDate(vendor.expirationDate)}
                       </div>
                       <div className="flex items-center space-x-2">
                         <button
                           onClick={() => handleEdit(vendor)}
-                          className="text-xs sm:text-sm text-blue-600 hover:text-blue-700 font-medium"
+                          className="text-sm text-blue-600 hover:text-blue-700 font-medium"
                         >
                           Edit
                         </button>
                         <span className="text-gray-300">|</span>
                         <button
                           onClick={() => handleDelete(vendor)}
-                          className="text-xs sm:text-sm text-red-600 hover:text-red-700 font-medium"
+                          className="text-sm text-red-600 hover:text-red-700 font-medium"
                         >
                           Delete
                         </button>
                       </div>
                       <button
                         onClick={() => handleSelectVendor(vendor)}
-                        className="text-xs sm:text-sm text-green-600 hover:text-green-700 font-medium whitespace-nowrap"
+                        className="text-sm text-emerald-600 hover:text-emerald-700 font-semibold whitespace-nowrap"
                       >
                         View Details
                       </button>
                       {(vendor.status === 'expired' || vendor.status === 'non-compliant' || vendor.status === 'expiring') && (
                         <button
                           onClick={() => handleRequestCOI(vendor)}
-                          className="text-xs sm:text-sm bg-orange-500 text-white px-2 py-1 rounded hover:bg-orange-600 font-medium whitespace-nowrap flex items-center space-x-1"
+                          className="text-xs bg-gradient-to-r from-orange-500 to-orange-600 text-white px-3 py-1.5 rounded-lg hover:shadow-md font-semibold whitespace-nowrap flex items-center space-x-1.5 transition-all"
                         >
                           <Send size={12} />
                           <span className="hidden sm:inline">Request COI</span>
@@ -944,11 +951,11 @@ function ComplyApp({ user, onSignOut }) {
 
             {/* Load More Button */}
             {hasMore && filteredVendors.length > 0 && (
-              <div className="p-4 border-t border-gray-200 text-center">
+              <div className="p-4 text-center bg-gray-50">
                 <button
                   onClick={loadMore}
                   disabled={loadingMore}
-                  className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium disabled:opacity-50"
+                  className="px-6 py-2.5 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 font-semibold disabled:opacity-50 transition-all"
                 >
                   {loadingMore ? (
                     <span className="flex items-center justify-center space-x-2">
@@ -968,89 +975,89 @@ function ComplyApp({ user, onSignOut }) {
 
       {/* Edit Modal */}
       {editingVendor && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
-          <div className="bg-white rounded-lg max-w-md w-full p-4 sm:p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold">Edit Vendor</h3>
-              <button onClick={() => setEditingVendor(null)} className="text-gray-400 hover:text-gray-600">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-xl font-bold text-gray-900">Edit Vendor</h3>
+              <button onClick={() => setEditingVendor(null)} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-all">
                 <X size={20} />
               </button>
             </div>
-            
+
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Company Name</label>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Company Name</label>
                 <input
                   type="text"
                   value={editingVendor.name}
                   onChange={(e) => setEditingVendor({...editingVendor, name: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent bg-gray-50"
                 />
               </div>
-              
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">DBA</label>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">DBA</label>
                 <input
                   type="text"
                   value={editingVendor.dba || ''}
                   onChange={(e) => setEditingVendor({...editingVendor, dba: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent bg-gray-50"
                 />
               </div>
-              
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Expiration Date</label>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Expiration Date</label>
                 <input
                   type="date"
                   value={editingVendor.expirationDate}
                   onChange={(e) => setEditingVendor({...editingVendor, expirationDate: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent bg-gray-50"
                 />
               </div>
 
-              <div className="pt-4 border-t border-gray-200">
-                <h4 className="text-sm font-semibold text-gray-900 mb-3">Contact Information (Optional)</h4>
+              <div className="pt-4 border-t border-gray-100">
+                <h4 className="text-sm font-bold text-gray-900 mb-3">Contact Information</h4>
 
                 <div className="space-y-3">
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Contact Name</label>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Contact Name</label>
                     <input
                       type="text"
                       value={editingVendor.contactName || ''}
                       onChange={(e) => setEditingVendor({...editingVendor, contactName: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-sm"
+                      className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent bg-gray-50 text-sm"
                       placeholder="John Doe"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Email</label>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Email</label>
                     <input
                       type="email"
                       value={editingVendor.contactEmail || ''}
                       onChange={(e) => setEditingVendor({...editingVendor, contactEmail: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-sm"
+                      className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent bg-gray-50 text-sm"
                       placeholder="contact@vendor.com"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Phone</label>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Phone</label>
                     <input
                       type="tel"
                       value={editingVendor.contactPhone || ''}
                       onChange={(e) => setEditingVendor({...editingVendor, contactPhone: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-sm"
+                      className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent bg-gray-50 text-sm"
                       placeholder="(555) 123-4567"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Notes</label>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Notes</label>
                     <textarea
                       value={editingVendor.contactNotes || ''}
                       onChange={(e) => setEditingVendor({...editingVendor, contactNotes: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-sm"
+                      className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent bg-gray-50 text-sm"
                       placeholder="Additional contact notes..."
                       rows="2"
                     />
@@ -1062,13 +1069,13 @@ function ComplyApp({ user, onSignOut }) {
             <div className="flex space-x-3 mt-6">
               <button
                 onClick={saveEdit}
-                className="flex-1 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 font-medium"
+                className="flex-1 px-4 py-3 bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 text-white rounded-xl hover:shadow-lg hover:shadow-emerald-500/25 font-semibold transition-all"
               >
                 Save Changes
               </button>
               <button
                 onClick={() => setEditingVendor(null)}
-                className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium"
+                className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 font-semibold transition-all"
               >
                 Cancel
               </button>
@@ -1079,29 +1086,29 @@ function ComplyApp({ user, onSignOut }) {
 
       {/* Delete Confirmation Modal */}
       {deleteConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
-          <div className="bg-white rounded-lg max-w-md w-full p-4 sm:p-6">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-red-600">Confirm Delete</h3>
-              <button onClick={() => setDeleteConfirm(null)} className="text-gray-400 hover:text-gray-600">
+              <h3 className="text-xl font-bold text-red-600">Confirm Delete</h3>
+              <button onClick={() => setDeleteConfirm(null)} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-all">
                 <X size={20} />
               </button>
             </div>
-            
+
             <p className="text-gray-600 mb-6">
               Are you sure you want to delete <strong>{deleteConfirm.name}</strong>? This action cannot be undone.
             </p>
-            
+
             <div className="flex space-x-3">
               <button
                 onClick={confirmDelete}
-                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium"
+                className="flex-1 px-4 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 font-semibold transition-all"
               >
                 Delete
               </button>
               <button
                 onClick={() => setDeleteConfirm(null)}
-                className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium"
+                className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 font-semibold transition-all"
               >
                 Cancel
               </button>
@@ -1112,20 +1119,22 @@ function ComplyApp({ user, onSignOut }) {
 
       {/* Request COI Modal */}
       {requestCOIVendor && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
-          <div className="bg-white rounded-lg max-w-md w-full p-4 sm:p-6">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold flex items-center space-x-2">
-                <Send size={20} className="text-orange-500" />
+              <h3 className="text-xl font-bold flex items-center space-x-2">
+                <div className="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center">
+                  <Send size={20} className="text-orange-600" />
+                </div>
                 <span>Request New COI</span>
               </h3>
-              <button onClick={() => { setRequestCOIVendor(null); setRequestCOIEmail(''); }} className="text-gray-400 hover:text-gray-600">
+              <button onClick={() => { setRequestCOIVendor(null); setRequestCOIEmail(''); }} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-all">
                 <X size={20} />
               </button>
             </div>
 
-            <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-              <p className="text-sm text-gray-600">Vendor</p>
+            <div className="mb-4 p-4 bg-gray-50 rounded-xl border border-gray-200">
+              <p className="text-sm text-gray-500">Vendor</p>
               <p className="font-semibold text-gray-900">{requestCOIVendor.name}</p>
               <div className="mt-2">
                 {getStatusBadge(requestCOIVendor.status, requestCOIVendor.daysOverdue)}
@@ -1133,8 +1142,8 @@ function ComplyApp({ user, onSignOut }) {
             </div>
 
             {requestCOIVendor.issues.length > 0 && (
-              <div className="mb-4 p-3 bg-orange-50 border border-orange-200 rounded-lg">
-                <p className="text-sm font-medium text-orange-800 mb-2">Issues to address:</p>
+              <div className="mb-4 p-4 bg-orange-50 border border-orange-200 rounded-xl">
+                <p className="text-sm font-semibold text-orange-800 mb-2">Issues to address:</p>
                 <ul className="space-y-1">
                   {requestCOIVendor.issues.map((issue, idx) => (
                     <li key={idx} className="text-xs text-orange-700 flex items-start space-x-1">
@@ -1147,7 +1156,7 @@ function ComplyApp({ user, onSignOut }) {
             )}
 
             <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
                 Vendor Contact Email
                 {!requestCOIVendor.contactEmail && (
                   <span className="text-orange-500 ml-1">(required)</span>
@@ -1158,10 +1167,10 @@ function ComplyApp({ user, onSignOut }) {
                 value={requestCOIEmail}
                 onChange={(e) => setRequestCOIEmail(e.target.value)}
                 placeholder="vendor@example.com"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-gray-50"
               />
               {!requestCOIVendor.contactEmail && (
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-gray-500 mt-1.5">
                   This email will be saved to the vendor's contact info
                 </p>
               )}
@@ -1171,7 +1180,7 @@ function ComplyApp({ user, onSignOut }) {
               <button
                 onClick={sendCOIRequest}
                 disabled={!requestCOIEmail || sendingEmail}
-                className="flex-1 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 font-medium flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 px-4 py-3 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-xl hover:shadow-lg font-semibold flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
               >
                 {sendingEmail ? (
                   <>
@@ -1188,7 +1197,7 @@ function ComplyApp({ user, onSignOut }) {
               <button
                 onClick={() => { setRequestCOIVendor(null); setRequestCOIEmail(''); }}
                 disabled={sendingEmail}
-                className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium disabled:opacity-50"
+                className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 font-semibold disabled:opacity-50 transition-all"
               >
                 Cancel
               </button>
@@ -1203,26 +1212,26 @@ function ComplyApp({ user, onSignOut }) {
 
       {/* Vendor Details Modal */}
       {selectedVendor && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
-          <div className="bg-white rounded-lg max-w-2xl w-full p-4 sm:p-6 max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
+          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 max-h-[95vh] sm:max-h-[90vh] overflow-y-auto shadow-2xl">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h3 className="text-xl font-semibold">{selectedVendor.name}</h3>
+                <h3 className="text-xl font-bold text-gray-900">{selectedVendor.name}</h3>
                 {selectedVendor.dba && <p className="text-gray-500">DBA: {selectedVendor.dba}</p>}
               </div>
-              <button onClick={() => setSelectedVendor(null)} className="text-gray-400 hover:text-gray-600">
+              <button onClick={() => setSelectedVendor(null)} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-all">
                 <X size={24} />
               </button>
             </div>
 
             {/* Tabs */}
-            <div className="flex space-x-1 mb-6 border-b border-gray-200">
+            <div className="flex space-x-1 mb-6 bg-gray-100 rounded-xl p-1">
               <button
                 onClick={() => setVendorDetailsTab('details')}
-                className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
+                className={`flex-1 px-4 py-2.5 text-sm font-semibold rounded-lg transition-all ${
                   vendorDetailsTab === 'details'
-                    ? 'bg-green-50 text-green-700 border-b-2 border-green-500'
-                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
                 }`}
               >
                 <FileText size={16} className="inline mr-2 mb-0.5" />
@@ -1230,10 +1239,10 @@ function ComplyApp({ user, onSignOut }) {
               </button>
               <button
                 onClick={() => setVendorDetailsTab('history')}
-                className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
+                className={`flex-1 px-4 py-2.5 text-sm font-semibold rounded-lg transition-all ${
                   vendorDetailsTab === 'history'
-                    ? 'bg-green-50 text-green-700 border-b-2 border-green-500'
-                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
                 }`}
               >
                 <History size={16} className="inline mr-2 mb-0.5" />
@@ -1244,256 +1253,78 @@ function ComplyApp({ user, onSignOut }) {
             {/* Details Tab Content */}
             {vendorDetailsTab === 'details' && (
             <div className="space-y-6">
-              <div>
-                <h4 className="font-semibold mb-2">Status</h4>
-                {getStatusBadge(selectedVendor.status, selectedVendor.daysOverdue)}
-              </div>
-              
-              <div>
-                <h4 className="font-semibold mb-2">Expiration</h4>
-                <p>{formatDate(selectedVendor.expirationDate)}</p>
-              </div>
-              
-              <div>
-                <h4 className="font-semibold mb-2">Standard Coverage</h4>
-                <div className="space-y-3">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center space-x-2">
-                      {(!selectedVendor.coverage.generalLiability.compliant || selectedVendor.coverage.generalLiability.expired) && (
-                        <AlertCircle size={16} className="text-red-600 flex-shrink-0" />
-                      )}
-                      {(!selectedVendor.coverage.generalLiability.expired && selectedVendor.coverage.generalLiability.expiringSoon) && (
-                        <AlertCircle size={16} className="text-yellow-600 flex-shrink-0" />
-                      )}
-                      <div>
-                        <p className="font-medium">General Liability:</p>
-                        <p className="text-sm text-gray-600">{formatCurrency(selectedVendor.coverage.generalLiability.amount)}</p>
-                        {selectedVendor.coverage.generalLiability.expirationDate && (
-                          <p className={`text-xs ${
-                            selectedVendor.coverage.generalLiability.expired
-                              ? 'text-red-600 font-semibold'
-                              : selectedVendor.coverage.generalLiability.expiringSoon
-                              ? 'text-yellow-600 font-semibold'
-                              : 'text-gray-500'
-                          }`}>
-                            Exp: {formatDate(selectedVendor.coverage.generalLiability.expirationDate)}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center space-x-2">
-                      {(!selectedVendor.coverage.autoLiability.compliant || selectedVendor.coverage.autoLiability.expired) && (
-                        <AlertCircle size={16} className="text-red-600 flex-shrink-0" />
-                      )}
-                      {(!selectedVendor.coverage.autoLiability.expired && selectedVendor.coverage.autoLiability.expiringSoon) && (
-                        <AlertCircle size={16} className="text-yellow-600 flex-shrink-0" />
-                      )}
-                      <div>
-                        <p className="font-medium">Auto Liability:</p>
-                        <p className="text-sm text-gray-600">{formatCurrency(selectedVendor.coverage.autoLiability.amount)}</p>
-                        {selectedVendor.coverage.autoLiability.expirationDate && (
-                          <p className={`text-xs ${
-                            selectedVendor.coverage.autoLiability.expired
-                              ? 'text-red-600 font-semibold'
-                              : selectedVendor.coverage.autoLiability.expiringSoon
-                              ? 'text-yellow-600 font-semibold'
-                              : 'text-gray-500'
-                          }`}>
-                            Exp: {formatDate(selectedVendor.coverage.autoLiability.expirationDate)}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center space-x-2">
-                      {(!selectedVendor.coverage.workersComp.compliant || selectedVendor.coverage.workersComp.expired) && (
-                        <AlertCircle size={16} className="text-red-600 flex-shrink-0" />
-                      )}
-                      {(!selectedVendor.coverage.workersComp.expired && selectedVendor.coverage.workersComp.expiringSoon) && (
-                        <AlertCircle size={16} className="text-yellow-600 flex-shrink-0" />
-                      )}
-                      <div>
-                        <p className="font-medium">Workers Comp:</p>
-                        <p className="text-sm text-gray-600">{selectedVendor.coverage.workersComp.amount}</p>
-                        {selectedVendor.coverage.workersComp.expirationDate && (
-                          <p className={`text-xs ${
-                            selectedVendor.coverage.workersComp.expired
-                              ? 'text-red-600 font-semibold'
-                              : selectedVendor.coverage.workersComp.expiringSoon
-                              ? 'text-yellow-600 font-semibold'
-                              : 'text-gray-500'
-                          }`}>
-                            Exp: {formatDate(selectedVendor.coverage.workersComp.expirationDate)}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center space-x-2">
-                      {(!selectedVendor.coverage.employersLiability.compliant || selectedVendor.coverage.employersLiability.expired) && (
-                        <AlertCircle size={16} className="text-red-600 flex-shrink-0" />
-                      )}
-                      {(!selectedVendor.coverage.employersLiability.expired && selectedVendor.coverage.employersLiability.expiringSoon) && (
-                        <AlertCircle size={16} className="text-yellow-600 flex-shrink-0" />
-                      )}
-                      <div>
-                        <p className="font-medium">Employers Liability:</p>
-                        <p className="text-sm text-gray-600">{formatCurrency(selectedVendor.coverage.employersLiability.amount)}</p>
-                        {selectedVendor.coverage.employersLiability.expirationDate && (
-                          <p className={`text-xs ${
-                            selectedVendor.coverage.employersLiability.expired
-                              ? 'text-red-600 font-semibold'
-                              : selectedVendor.coverage.employersLiability.expiringSoon
-                              ? 'text-yellow-600 font-semibold'
-                              : 'text-gray-500'
-                          }`}>
-                            Exp: {formatDate(selectedVendor.coverage.employersLiability.expirationDate)}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {selectedVendor.additionalCoverages && selectedVendor.additionalCoverages.length > 0 && (
+              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
                 <div>
-                  <h4 className="font-semibold mb-2">Additional Coverage</h4>
-                  <div className="space-y-3">
-                    {selectedVendor.additionalCoverages.map((cov, idx) => (
-                      <div key={idx} className="flex items-start space-x-2">
-                        {cov.expired && (
-                          <AlertCircle size={16} className="text-red-600 flex-shrink-0 mt-1" />
-                        )}
-                        {(!cov.expired && cov.expiringSoon) && (
-                          <AlertCircle size={16} className="text-yellow-600 flex-shrink-0 mt-1" />
-                        )}
-                        <div className="flex-1">
-                          <p className="font-medium">{cov.type}:</p>
-                          <p className="text-sm text-gray-600">{formatCurrency(cov.amount || 0)}</p>
-                          {cov.expirationDate && (
-                            <p className={`text-xs ${
-                              cov.expired
-                                ? 'text-red-600 font-semibold'
-                                : cov.expiringSoon
-                                ? 'text-yellow-600 font-semibold'
-                                : 'text-gray-500'
-                            }`}>
-                              Exp: {formatDate(cov.expirationDate)}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    ))}
+                  <p className="text-sm text-gray-500 font-medium">Status</p>
+                  <div className="mt-1">{getStatusBadge(selectedVendor.status, selectedVendor.daysOverdue)}</div>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm text-gray-500 font-medium">Expiration</p>
+                  <p className="font-semibold text-gray-900 mt-1">{formatDate(selectedVendor.expirationDate)}</p>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="font-bold text-gray-900 mb-3">Standard Coverage</h4>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-3 bg-gray-50 rounded-xl">
+                    <p className="text-xs text-gray-500 font-medium">General Liability</p>
+                    <p className="font-semibold text-gray-900">{formatCurrency(selectedVendor.coverage.generalLiability.amount)}</p>
+                  </div>
+                  <div className="p-3 bg-gray-50 rounded-xl">
+                    <p className="text-xs text-gray-500 font-medium">Auto Liability</p>
+                    <p className="font-semibold text-gray-900">{formatCurrency(selectedVendor.coverage.autoLiability.amount)}</p>
+                  </div>
+                  <div className="p-3 bg-gray-50 rounded-xl">
+                    <p className="text-xs text-gray-500 font-medium">Workers Comp</p>
+                    <p className="font-semibold text-gray-900">{selectedVendor.coverage.workersComp.amount}</p>
+                  </div>
+                  <div className="p-3 bg-gray-50 rounded-xl">
+                    <p className="text-xs text-gray-500 font-medium">Employers Liability</p>
+                    <p className="font-semibold text-gray-900">{formatCurrency(selectedVendor.coverage.employersLiability.amount)}</p>
                   </div>
                 </div>
-              )}
+              </div>
 
               {/* Additional Insured Status */}
               {selectedVendor.additionalInsured && (
-                <div>
-                  <h4 className="font-semibold mb-2">Additional Insured</h4>
-                  <div className={`p-4 rounded-lg border ${
-                    selectedVendor.hasAdditionalInsured
-                      ? 'bg-green-50 border-green-200'
-                      : selectedVendor.missingAdditionalInsured
-                      ? 'bg-red-50 border-red-200'
-                      : 'bg-gray-50 border-gray-200'
-                  }`}>
-                    <div className="flex items-start space-x-2">
-                      {selectedVendor.hasAdditionalInsured && (
-                        <CheckCircle size={18} className="text-green-600 flex-shrink-0 mt-0.5" />
-                      )}
-                      {selectedVendor.missingAdditionalInsured && (
-                        <AlertCircle size={18} className="text-red-600 flex-shrink-0 mt-0.5" />
-                      )}
-                      <div className="flex-1">
-                        <p className={`text-sm font-medium ${
-                          selectedVendor.hasAdditionalInsured
-                            ? 'text-green-900'
-                            : selectedVendor.missingAdditionalInsured
-                            ? 'text-red-900'
-                            : 'text-gray-900'
-                        }`}>
-                          {selectedVendor.additionalInsured}
-                        </p>
-                        {selectedVendor.hasAdditionalInsured && (
-                          <p className="text-xs text-green-700 mt-1">
-                            ✓ Your company is properly listed as Additional Insured
-                          </p>
-                        )}
-                        {selectedVendor.missingAdditionalInsured && (
-                          <p className="text-xs text-red-700 mt-1">
-                            ✗ Your company is NOT listed as Additional Insured
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Waiver of Subrogation Status */}
-              {selectedVendor.waiverOfSubrogation && (
-                <div>
-                  <h4 className="font-semibold mb-2">Waiver of Subrogation</h4>
-                  <div className={`p-4 rounded-lg border ${
-                    selectedVendor.hasWaiverOfSubrogation
-                      ? 'bg-green-50 border-green-200'
-                      : selectedVendor.missingWaiverOfSubrogation
-                      ? 'bg-red-50 border-red-200'
-                      : 'bg-gray-50 border-gray-200'
-                  }`}>
-                    <div className="flex items-start space-x-2">
-                      {selectedVendor.hasWaiverOfSubrogation && (
-                        <CheckCircle size={18} className="text-green-600 flex-shrink-0 mt-0.5" />
-                      )}
-                      {selectedVendor.missingWaiverOfSubrogation && (
-                        <AlertCircle size={18} className="text-red-600 flex-shrink-0 mt-0.5" />
-                      )}
-                      <div className="flex-1">
-                        <p className={`text-sm font-medium ${
-                          selectedVendor.hasWaiverOfSubrogation
-                            ? 'text-green-900'
-                            : selectedVendor.missingWaiverOfSubrogation
-                            ? 'text-red-900'
-                            : 'text-gray-900'
-                        }`}>
-                          {selectedVendor.waiverOfSubrogation}
-                        </p>
-                        {selectedVendor.hasWaiverOfSubrogation && (
-                          <p className="text-xs text-green-700 mt-1">
-                            ✓ Waiver of Subrogation is included
-                          </p>
-                        )}
-                        {selectedVendor.missingWaiverOfSubrogation && (
-                          <p className="text-xs text-red-700 mt-1">
-                            ✗ Waiver of Subrogation is NOT included
-                          </p>
-                        )}
-                      </div>
+                <div className={`p-4 rounded-xl border ${
+                  selectedVendor.hasAdditionalInsured
+                    ? 'bg-emerald-50 border-emerald-200'
+                    : selectedVendor.missingAdditionalInsured
+                    ? 'bg-red-50 border-red-200'
+                    : 'bg-gray-50 border-gray-200'
+                }`}>
+                  <div className="flex items-start space-x-2">
+                    {selectedVendor.hasAdditionalInsured && (
+                      <CheckCircle size={18} className="text-emerald-600 flex-shrink-0 mt-0.5" />
+                    )}
+                    {selectedVendor.missingAdditionalInsured && (
+                      <AlertCircle size={18} className="text-red-600 flex-shrink-0 mt-0.5" />
+                    )}
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-gray-900">Additional Insured</p>
+                      <p className={`text-sm mt-1 ${
+                        selectedVendor.hasAdditionalInsured ? 'text-emerald-700' :
+                        selectedVendor.missingAdditionalInsured ? 'text-red-700' : 'text-gray-600'
+                      }`}>
+                        {selectedVendor.additionalInsured}
+                      </p>
                     </div>
                   </div>
                 </div>
               )}
 
               {selectedVendor.issues.length > 0 && (
-                <div>
-                  <h4 className="font-semibold mb-2">Issues</h4>
+                <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
+                  <h4 className="font-bold text-red-900 mb-2">Issues</h4>
                   <div className="space-y-2">
                     {selectedVendor.issues.map((issue, idx) => (
-                      <div key={idx} className={`flex items-start space-x-2 ${
+                      <div key={idx} className={`flex items-start space-x-2 text-sm ${
                         issue.type === 'critical' ? 'text-red-700' : 'text-orange-700'
                       }`}>
-                        <AlertCircle size={16} className="mt-0.5 flex-shrink-0" />
-                        <span className="text-sm">{issue.message}</span>
+                        <AlertCircle size={14} className="mt-0.5 flex-shrink-0" />
+                        <span>{issue.message}</span>
                       </div>
                     ))}
                   </div>
@@ -1502,63 +1333,25 @@ function ComplyApp({ user, onSignOut }) {
 
               {/* Contact Information */}
               {(selectedVendor.contactName || selectedVendor.contactEmail || selectedVendor.contactPhone) && (
-                <div>
-                  <h4 className="font-semibold mb-3">Contact Information</h4>
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl">
+                  <h4 className="font-bold text-blue-900 mb-3">Contact Information</h4>
+                  <div className="space-y-2">
                     {selectedVendor.contactName && (
-                      <div className="flex items-center space-x-3">
-                        <User size={18} className="text-blue-600 flex-shrink-0" />
-                        <div>
-                          <p className="text-xs text-gray-600">Contact Person</p>
-                          <p className="font-medium text-gray-900">{selectedVendor.contactName}</p>
-                        </div>
+                      <div className="flex items-center space-x-2 text-sm">
+                        <User size={14} className="text-blue-600" />
+                        <span className="text-gray-700">{selectedVendor.contactName}</span>
                       </div>
                     )}
-
                     {selectedVendor.contactEmail && (
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-3">
-                          <Mail size={18} className="text-blue-600 flex-shrink-0" />
-                          <div>
-                            <p className="text-xs text-gray-600">Email</p>
-                            <p className="font-medium text-gray-900">{selectedVendor.contactEmail}</p>
-                          </div>
-                        </div>
-                        <a
-                          href={`mailto:${selectedVendor.contactEmail}`}
-                          className="px-3 py-1.5 bg-blue-500 text-white rounded text-xs font-medium hover:bg-blue-600 flex items-center space-x-1"
-                          title="Send email"
-                        >
-                          <Mail size={14} />
-                          <span>Email</span>
-                        </a>
+                      <div className="flex items-center space-x-2 text-sm">
+                        <Mail size={14} className="text-blue-600" />
+                        <span className="text-gray-700">{selectedVendor.contactEmail}</span>
                       </div>
                     )}
-
                     {selectedVendor.contactPhone && (
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-3">
-                          <Phone size={18} className="text-blue-600 flex-shrink-0" />
-                          <div>
-                            <p className="text-xs text-gray-600">Phone</p>
-                            <p className="font-medium text-gray-900">{selectedVendor.contactPhone}</p>
-                          </div>
-                        </div>
-                        <a
-                          href={`tel:${selectedVendor.contactPhone}`}
-                          className="px-3 py-1.5 bg-green-500 text-white rounded text-xs font-medium hover:bg-green-600 flex items-center space-x-1"
-                          title="Call"
-                        >
-                          <Phone size={14} />
-                          <span>Call</span>
-                        </a>
-                      </div>
-                    )}
-
-                    {selectedVendor.contactNotes && (
-                      <div className="pt-3 border-t border-blue-200">
-                        <p className="text-xs text-gray-600 mb-1">Notes</p>
-                        <p className="text-sm text-gray-700">{selectedVendor.contactNotes}</p>
+                      <div className="flex items-center space-x-2 text-sm">
+                        <Phone size={14} className="text-blue-600" />
+                        <span className="text-gray-700">{selectedVendor.contactPhone}</span>
                       </div>
                     )}
                   </div>
@@ -1567,28 +1360,28 @@ function ComplyApp({ user, onSignOut }) {
 
               {/* COI Document Actions */}
               <div>
-                <h4 className="font-semibold mb-2">Certificate of Insurance</h4>
+                <h4 className="font-bold text-gray-900 mb-3">Certificate of Insurance</h4>
                 {selectedVendor.rawData?.documentPath ? (
                   <div className="flex flex-col sm:flex-row gap-3">
                     <button
                       onClick={() => handleViewCOI(selectedVendor)}
-                      className="flex-1 px-4 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-medium flex items-center justify-center space-x-2 transition-colors"
+                      className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-semibold flex items-center justify-center space-x-2 transition-all"
                     >
-                      <Eye size={20} />
+                      <Eye size={18} />
                       <span>View COI</span>
                     </button>
                     <button
                       onClick={() => handleDownloadCOI(selectedVendor)}
-                      className="flex-1 px-4 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 font-medium flex items-center justify-center space-x-2 transition-colors"
+                      className="flex-1 px-4 py-3 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 font-semibold flex items-center justify-center space-x-2 transition-all"
                     >
-                      <Download size={20} />
+                      <Download size={18} />
                       <span>Download COI</span>
                     </button>
                   </div>
                 ) : (
-                  <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
-                    <p className="text-sm text-gray-600">
-                      <FileText className="inline mr-2" size={16} />
+                  <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl">
+                    <p className="text-sm text-gray-600 flex items-center">
+                      <FileText className="mr-2" size={16} />
                       No document uploaded for this vendor
                     </p>
                   </div>
@@ -1600,17 +1393,15 @@ function ComplyApp({ user, onSignOut }) {
             {/* History Tab Content */}
             {vendorDetailsTab === 'history' && (
               <div className="space-y-4">
-                <h4 className="font-semibold text-gray-900">Activity History</h4>
-
                 {loadingActivity ? (
                   <div className="text-center py-8">
-                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-green-500"></div>
+                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
                     <p className="text-gray-500 mt-2">Loading history...</p>
                   </div>
                 ) : vendorActivity.length === 0 ? (
-                  <div className="text-center py-8 bg-gray-50 rounded-lg border border-gray-200">
+                  <div className="text-center py-8 bg-gray-50 rounded-xl border border-gray-200">
                     <Clock size={40} className="mx-auto text-gray-300 mb-3" />
-                    <p className="text-gray-500">No activity recorded yet</p>
+                    <p className="text-gray-500 font-medium">No activity recorded yet</p>
                     <p className="text-sm text-gray-400 mt-1">Activity will appear here when emails are sent or COIs are uploaded</p>
                   </div>
                 ) : (
@@ -1618,24 +1409,24 @@ function ComplyApp({ user, onSignOut }) {
                     {vendorActivity.map((activity) => (
                       <div
                         key={activity.id}
-                        className={`p-4 rounded-lg border ${
+                        className={`p-4 rounded-xl border ${
                           activity.activity_type === 'coi_uploaded'
-                            ? 'bg-green-50 border-green-200'
+                            ? 'bg-emerald-50 border-emerald-200'
                             : activity.activity_type === 'email_sent'
                             ? 'bg-blue-50 border-blue-200'
                             : 'bg-gray-50 border-gray-200'
                         }`}
                       >
                         <div className="flex items-start space-x-3">
-                          <div className={`p-2 rounded-full ${
+                          <div className={`p-2 rounded-xl ${
                             activity.activity_type === 'coi_uploaded'
-                              ? 'bg-green-100'
+                              ? 'bg-emerald-100'
                               : activity.activity_type === 'email_sent'
                               ? 'bg-blue-100'
                               : 'bg-gray-100'
                           }`}>
                             {activity.activity_type === 'coi_uploaded' ? (
-                              <Upload size={16} className="text-green-600" />
+                              <Upload size={16} className="text-emerald-600" />
                             ) : activity.activity_type === 'email_sent' ? (
                               <Mail size={16} className="text-blue-600" />
                             ) : (
@@ -1643,13 +1434,7 @@ function ComplyApp({ user, onSignOut }) {
                             )}
                           </div>
                           <div className="flex-1">
-                            <p className={`font-medium ${
-                              activity.activity_type === 'coi_uploaded'
-                                ? 'text-green-900'
-                                : activity.activity_type === 'email_sent'
-                                ? 'text-blue-900'
-                                : 'text-gray-900'
-                            }`}>
+                            <p className="font-semibold text-gray-900">
                               {activity.activity_type === 'coi_uploaded'
                                 ? 'COI Uploaded'
                                 : activity.activity_type === 'email_sent'
@@ -1676,7 +1461,7 @@ function ComplyApp({ user, onSignOut }) {
                     setSelectedVendor(null);
                     handleRequestCOI(selectedVendor);
                   }}
-                  className="flex-1 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 font-medium flex items-center justify-center space-x-2"
+                  className="flex-1 px-4 py-3 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-xl hover:shadow-lg font-semibold flex items-center justify-center space-x-2 transition-all"
                 >
                   <Send size={16} />
                   <span>Request New COI</span>
@@ -1684,7 +1469,7 @@ function ComplyApp({ user, onSignOut }) {
               )}
               <button
                 onClick={() => setSelectedVendor(null)}
-                className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium"
+                className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 font-semibold transition-all"
               >
                 Close
               </button>

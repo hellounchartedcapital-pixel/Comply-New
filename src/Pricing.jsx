@@ -1,9 +1,9 @@
 // Pricing.jsx
-// Pricing page with subscription tiers
+// Pricing page with subscription tiers - matches new landing page style
 
 import React, { useState } from 'react';
 import { Logo } from './Logo';
-import { Check, X, Loader2, ArrowLeft, Sparkles } from 'lucide-react';
+import { Check, X, Loader2, ArrowLeft, Zap, FileCheck } from 'lucide-react';
 
 const plans = [
   {
@@ -33,7 +33,7 @@ const plans = [
     description: 'For growing property management companies',
     vendors: 100,
     popular: true,
-    gradient: 'from-emerald-500 to-teal-500',
+    gradient: 'from-emerald-600 via-emerald-500 to-teal-500',
     shadowColor: 'shadow-emerald-500/25',
     features: [
       { text: 'Up to 100 vendors', included: true },
@@ -102,16 +102,15 @@ export function Pricing({ onBack, onSelectPlan, currentPlan, user }) {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 font-sans overflow-hidden">
-      {/* Animated background */}
+    <div className="min-h-screen bg-white">
+      {/* Background gradients - same as landing page */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 left-1/4 w-[600px] h-[600px] bg-emerald-500/5 rounded-full blur-3xl" />
-        <div className="absolute bottom-0 right-1/4 w-[500px] h-[500px] bg-teal-500/5 rounded-full blur-3xl" />
-        <div className="absolute inset-0 bg-[linear-gradient(rgba(16,185,129,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(16,185,129,0.02)_1px,transparent_1px)] bg-[size:60px_60px]" />
+        <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-gradient-to-bl from-emerald-500/10 to-transparent rounded-full blur-3xl -translate-y-1/2 translate-x-1/4" />
+        <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-gradient-to-tr from-teal-500/10 to-transparent rounded-full blur-3xl translate-y-1/2 -translate-x-1/4" />
       </div>
 
       {/* Header */}
-      <header className="relative bg-white/80 backdrop-blur-xl border-b border-gray-100 sticky top-0 z-50">
+      <header className="relative bg-white/95 backdrop-blur-md border-b border-gray-200 shadow-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-4">
@@ -133,30 +132,32 @@ export function Pricing({ onBack, onSelectPlan, currentPlan, user }) {
       <main className="relative max-w-7xl mx-auto px-6 py-20">
         {/* Header */}
         <div className="text-center mb-16">
-          <div className="inline-flex items-center gap-2 bg-white border border-emerald-200 px-4 py-2 rounded-full text-sm font-medium text-gray-600 mb-6 shadow-sm">
-            <Sparkles className="w-4 h-4 text-emerald-500" />
-            <span>Simple, transparent pricing</span>
+          <div className="inline-flex items-center gap-2 bg-white border border-gray-200 rounded-full px-4 py-2 mb-6 shadow-sm">
+            <Zap className="w-4 h-4 text-emerald-500" />
+            <span className="text-sm text-gray-600">
+              <span className="bg-gradient-to-r from-emerald-600 to-teal-500 bg-clip-text text-transparent font-semibold">Simple</span>, transparent pricing
+            </span>
           </div>
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold text-gray-900 mb-6 tracking-tight">
+          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-gray-900 mb-6 leading-tight">
             Choose your{' '}
             <span className="bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 bg-clip-text text-transparent">
               perfect plan
             </span>
           </h1>
-          <p className="text-xl text-gray-500 max-w-2xl mx-auto">
+          <p className="text-lg sm:text-xl text-gray-600 max-w-2xl mx-auto">
             Start your 14-day free trial. No credit card required. Cancel anytime.
           </p>
         </div>
 
         {/* Billing Toggle */}
         <div className="flex items-center justify-center mb-16">
-          <div className="relative bg-white rounded-2xl p-1.5 shadow-lg border border-gray-200">
+          <div className="relative bg-gray-100 rounded-2xl p-1.5">
             <div className="flex items-center gap-1">
               <button
                 onClick={() => setBillingCycle('monthly')}
                 className={`relative px-6 py-3 rounded-xl font-semibold text-sm transition-all duration-300 ${
                   billingCycle === 'monthly'
-                    ? 'bg-gray-900 text-white shadow-lg'
+                    ? 'bg-white text-gray-900 shadow-lg'
                     : 'text-gray-600 hover:text-gray-900'
                 }`}
               >
@@ -166,7 +167,7 @@ export function Pricing({ onBack, onSelectPlan, currentPlan, user }) {
                 onClick={() => setBillingCycle('annual')}
                 className={`relative px-6 py-3 rounded-xl font-semibold text-sm transition-all duration-300 flex items-center gap-2 ${
                   billingCycle === 'annual'
-                    ? 'bg-gray-900 text-white shadow-lg'
+                    ? 'bg-white text-gray-900 shadow-lg'
                     : 'text-gray-600 hover:text-gray-900'
                 }`}
               >
@@ -196,7 +197,7 @@ export function Pricing({ onBack, onSelectPlan, currentPlan, user }) {
               >
                 {/* Glow effect for popular */}
                 {isProfessional && (
-                  <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-3xl blur-lg opacity-30 group-hover:opacity-40 transition-opacity" />
+                  <div className="absolute -inset-1 bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 rounded-3xl blur-lg opacity-30 group-hover:opacity-40 transition-opacity" />
                 )}
 
                 <div className={`relative h-full bg-white rounded-3xl border transition-all duration-300 ${
@@ -207,7 +208,7 @@ export function Pricing({ onBack, onSelectPlan, currentPlan, user }) {
                   {/* Popular Badge */}
                   {isProfessional && (
                     <div className="absolute -top-4 left-1/2 -translate-x-1/2">
-                      <span className="bg-gradient-to-r from-emerald-600 to-teal-500 text-white text-sm font-bold px-6 py-2 rounded-full shadow-lg">
+                      <span className="bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 text-white text-sm font-bold px-6 py-2 rounded-full shadow-lg shadow-emerald-500/25">
                         Most Popular
                       </span>
                     </div>
@@ -223,9 +224,7 @@ export function Pricing({ onBack, onSelectPlan, currentPlan, user }) {
                           </svg>
                         )}
                         {plan.name === 'Professional' && (
-                          <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                          </svg>
+                          <FileCheck className="w-7 h-7 text-white" />
                         )}
                         {plan.name === 'Business' && (
                           <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -242,7 +241,7 @@ export function Pricing({ onBack, onSelectPlan, currentPlan, user }) {
                       <div className="flex items-baseline gap-2">
                         <span className={`text-5xl font-extrabold ${
                           isProfessional
-                            ? 'bg-gradient-to-r from-emerald-600 to-teal-500 bg-clip-text text-transparent'
+                            ? 'bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 bg-clip-text text-transparent'
                             : 'text-gray-900'
                         }`}>
                           ${getDisplayPrice(plan)}
@@ -264,7 +263,7 @@ export function Pricing({ onBack, onSelectPlan, currentPlan, user }) {
                         isCurrentPlan
                           ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                           : isProfessional
-                            ? 'bg-gradient-to-r from-emerald-600 to-teal-500 text-white shadow-lg shadow-emerald-500/25 hover:shadow-xl hover:shadow-emerald-500/30 hover:-translate-y-0.5'
+                            ? 'bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/25 hover:shadow-xl hover:shadow-emerald-500/30 hover:-translate-y-0.5'
                             : 'bg-gray-900 text-white hover:bg-gray-800 hover:-translate-y-0.5'
                       }`}
                     >
@@ -288,9 +287,7 @@ export function Pricing({ onBack, onSelectPlan, currentPlan, user }) {
 
                   {/* Features */}
                   <div className="border-t border-gray-100 p-8">
-                    <p className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                      <span>What's included</span>
-                    </p>
+                    <p className="text-sm font-semibold text-gray-900 mb-4">What's included</p>
                     <ul className="space-y-3">
                       {plan.features.map((feature, idx) => (
                         <li key={idx} className="flex items-start gap-3">
@@ -324,9 +321,8 @@ export function Pricing({ onBack, onSelectPlan, currentPlan, user }) {
 
         {/* Enterprise CTA */}
         <div className="mt-20 max-w-4xl mx-auto">
-          <div className="relative">
-            <div className="absolute inset-0 bg-gradient-to-r from-gray-900 to-gray-800 rounded-3xl" />
-            <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:40px_40px] rounded-3xl" />
+          <div className="relative bg-gray-900 rounded-3xl overflow-hidden">
+            <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:40px_40px]" />
             <div className="relative p-12 text-center">
               <h2 className="text-3xl font-bold text-white mb-4">
                 Need more than 500 vendors?
@@ -362,19 +358,20 @@ export function Pricing({ onBack, onSelectPlan, currentPlan, user }) {
       </main>
 
       {/* Footer */}
-      <footer className="relative border-t border-gray-200 bg-white">
-        <div className="max-w-7xl mx-auto px-6 py-8">
-          <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+      <footer className="relative py-16 px-6 bg-gray-900">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+            {/* Logo */}
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-lg flex items-center justify-center">
-                <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 9h-2v2H9v-2H7v-2h2V7h2v2h2v2z"/>
-                </svg>
+              <div className="w-9 h-9 bg-gradient-to-r from-emerald-600 to-teal-500 rounded-lg flex items-center justify-center">
+                <FileCheck className="w-5 h-5 text-white" />
               </div>
-              <span className="font-bold text-gray-900">
-                Smart<span className="bg-gradient-to-r from-emerald-600 to-teal-500 bg-clip-text text-transparent">COI</span>
+              <span className="text-xl font-bold text-white">
+                Smart<span className="bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">COI</span>
               </span>
             </div>
+
+            {/* Copyright */}
             <p className="text-sm text-gray-500">
               &copy; 2025 SmartCOI. All rights reserved.
             </p>
