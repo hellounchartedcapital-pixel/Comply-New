@@ -1,26 +1,30 @@
 import React from 'react';
+import { FileCheck } from 'lucide-react';
 
 export function Logo({ size = 'default', className = '' }) {
   // Size configurations
   const sizes = {
     small: {
       iconSize: 32,
-      iconRadius: 8,
-      svgSize: 20,
-      fontSize: 'text-xl',
+      iconPadding: 'p-1.5',
+      iconRadius: 'rounded-lg',
+      iconClass: 'w-4 h-4',
+      fontSize: 'text-lg',
       gap: 'gap-2'
     },
     default: {
       iconSize: 40,
-      iconRadius: 10,
-      svgSize: 24,
+      iconPadding: 'p-2',
+      iconRadius: 'rounded-xl',
+      iconClass: 'w-5 h-5',
       fontSize: 'text-2xl',
       gap: 'gap-3'
     },
     large: {
       iconSize: 56,
-      iconRadius: 12,
-      svgSize: 32,
+      iconPadding: 'p-3',
+      iconRadius: 'rounded-xl',
+      iconClass: 'w-7 h-7',
       fontSize: 'text-3xl',
       gap: 'gap-4'
     }
@@ -31,36 +35,14 @@ export function Logo({ size = 'default', className = '' }) {
   return (
     <div className={`flex items-center ${config.gap} ${className}`}>
       {/* Gradient Icon Box */}
-      <div
-        className="flex items-center justify-center"
-        style={{
-          width: config.iconSize,
-          height: config.iconSize,
-          borderRadius: config.iconRadius,
-          background: 'linear-gradient(135deg, #059669 0%, #10B981 50%, #14B8A6 100%)'
-        }}
-      >
-        <svg
-          width={config.svgSize}
-          height={config.svgSize}
-          viewBox="0 0 24 24"
-          fill="white"
-        >
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 9h-2v2H9v-2H7v-2h2V7h2v2h2v2z"/>
-        </svg>
+      <div className={`${config.iconPadding} ${config.iconRadius} bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 shadow-lg shadow-emerald-500/25 flex items-center justify-center`}>
+        <FileCheck className={`${config.iconClass} text-white`} />
       </div>
 
       {/* Logo Text */}
-      <span className={`font-bold ${config.fontSize}`} style={{ color: '#1a1a1a' }}>
+      <span className={`font-bold ${config.fontSize} text-gray-900`}>
         Smart
-        <span
-          style={{
-            background: 'linear-gradient(135deg, #059669 0%, #10B981 50%, #14B8A6 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            backgroundClip: 'text'
-          }}
-        >
+        <span className="bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 bg-clip-text text-transparent">
           COI
         </span>
       </span>
@@ -70,24 +52,21 @@ export function Logo({ size = 'default', className = '' }) {
 
 // Export icon-only version for favicon and app icons
 export function LogoIcon({ size = 32, className = '' }) {
+  const iconSize = Math.round(size * 0.5);
+
   return (
     <div
-      className={`flex items-center justify-center ${className}`}
+      className={`flex items-center justify-center bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 ${className}`}
       style={{
         width: size,
         height: size,
         borderRadius: size * 0.2,
-        background: 'linear-gradient(135deg, #059669 0%, #10B981 50%, #14B8A6 100%)'
       }}
     >
-      <svg
-        width={size * 0.6}
-        height={size * 0.6}
-        viewBox="0 0 24 24"
-        fill="white"
-      >
-        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 9h-2v2H9v-2H7v-2h2V7h2v2h2v2z"/>
-      </svg>
+      <FileCheck
+        style={{ width: iconSize, height: iconSize }}
+        className="text-white"
+      />
     </div>
   );
 }

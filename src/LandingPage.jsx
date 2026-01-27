@@ -1,366 +1,546 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Logo } from './Logo';
-import { CheckCircle, Sparkles, Upload, Bell, FileText, ArrowRight, Zap, Shield, Clock } from 'lucide-react';
+import {
+  CheckCircle, Zap, Bell, Play, Menu, X,
+  FileCheck, FolderOpen, Cloud, Users, Check
+} from 'lucide-react';
+
+// Dashboard Mockup Component
+function DashboardMockup() {
+  const vendors = [
+    { name: "ABC Cleaning Services", status: "Compliant", statusType: "compliant" },
+    { name: "Pro Electric LLC", status: "Expiring in 14 days", statusType: "expiring" },
+    { name: "Metro HVAC Inc.", status: "Expired", statusType: "expired" },
+  ];
+
+  const statusColors = {
+    compliant: "bg-emerald-500/10 text-emerald-500",
+    expiring: "bg-amber-500/10 text-amber-500",
+    expired: "bg-red-500/10 text-red-500",
+  };
+
+  return (
+    <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden">
+      {/* Browser chrome */}
+      <div className="bg-gray-100 p-4">
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded-full bg-red-500" />
+          <div className="w-3 h-3 rounded-full bg-amber-500" />
+          <div className="w-3 h-3 rounded-full bg-emerald-500" />
+        </div>
+      </div>
+
+      {/* Dashboard content */}
+      <div className="p-6">
+        <h3 className="text-lg font-bold text-gray-900 mb-5">
+          Compliance Dashboard
+        </h3>
+
+        {/* Stats cards */}
+        <div className="grid grid-cols-3 gap-3 mb-5">
+          <div className="bg-gray-50 rounded-lg p-4 text-center">
+            <div className="text-2xl font-bold text-emerald-500">47</div>
+            <div className="text-xs text-gray-500">Compliant</div>
+          </div>
+          <div className="bg-gray-50 rounded-lg p-4 text-center">
+            <div className="text-2xl font-bold text-amber-500">8</div>
+            <div className="text-xs text-gray-500">Expiring Soon</div>
+          </div>
+          <div className="bg-gray-50 rounded-lg p-4 text-center">
+            <div className="text-2xl font-bold text-red-500">3</div>
+            <div className="text-xs text-gray-500">Expired</div>
+          </div>
+        </div>
+
+        {/* Vendor list */}
+        <div className="space-y-0">
+          {vendors.map((vendor, index) => (
+            <div
+              key={index}
+              className="flex items-center justify-between py-3 border-b border-gray-100 last:border-b-0"
+            >
+              <span className="text-sm font-medium text-gray-900">
+                {vendor.name}
+              </span>
+              <span className={`text-xs font-semibold px-3 py-1 rounded-full ${statusColors[vendor.statusType]}`}>
+                {vendor.status}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function LandingPage({ onLogin, onSignUp, onPrivacy, onTerms, onPricing }) {
+  const [isScrolled, setIsScrolled] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 10);
+    };
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  const navLinks = [
+    { href: "#features", label: "Features" },
+    { href: "#how-it-works", label: "How It Works" },
+    { label: "Pricing", onClick: onPricing },
+  ];
+
+  const stats = [
+    { value: "5 sec", label: "Average extraction time" },
+    { value: "99%", label: "Accuracy rate" },
+    { value: "10+ hrs", label: "Saved per week" },
+  ];
+
+  const features = [
+    {
+      icon: Zap,
+      title: "Instant AI Extraction",
+      description: "Upload a COI and our AI extracts all policy details, limits, and expiration dates in under 5 seconds.",
+    },
+    {
+      icon: Bell,
+      title: "Expiration Alerts",
+      description: "Never miss a renewal. Get automatic alerts 30, 14, and 7 days before any certificate expires.",
+    },
+    {
+      icon: CheckCircle,
+      title: "Compliance Tracking",
+      description: "See at a glance which vendors are compliant, expiring soon, or need immediate attention.",
+    },
+    {
+      icon: FolderOpen,
+      title: "Vendor Management",
+      description: "Organize all your vendors and their insurance documents in one central, searchable database.",
+    },
+    {
+      icon: Cloud,
+      title: "Cloud Storage",
+      description: "All certificates securely stored in the cloud. Access from anywhere, share with your team instantly.",
+    },
+    {
+      icon: Users,
+      title: "Team Collaboration",
+      description: "Invite team members, assign properties, and work together to keep compliance on track.",
+    },
+  ];
+
+  const steps = [
+    {
+      number: 1,
+      title: "Upload Your COI",
+      description: "Drag and drop any COI document. We support PDF, JPG, and PNG formats.",
+    },
+    {
+      number: 2,
+      title: "AI Extracts Data",
+      description: "Our AI reads the certificate and extracts all relevant policy information automatically.",
+    },
+    {
+      number: 3,
+      title: "Track & Monitor",
+      description: "View your compliance dashboard and receive alerts before certificates expire.",
+    },
+  ];
+
+  const pricingFeatures = [
+    "Unlimited COI uploads",
+    "AI-powered data extraction",
+    "Expiration alerts & reminders",
+    "Vendor management portal",
+    "Cloud document storage",
+    "Team collaboration tools",
+    "Priority email support",
+  ];
+
   return (
     <div className="min-h-screen bg-white">
-      {/* Navigation */}
-      <nav className="fixed top-0 w-full bg-white/80 backdrop-blur-md border-b border-gray-100 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
+      {/* Navbar */}
+      <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+        isScrolled
+          ? "bg-white/95 backdrop-blur-md border-b border-gray-200 shadow-sm"
+          : "bg-transparent"
+      }`}>
+        <div className="max-w-7xl mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            {/* Logo */}
             <Logo size="default" />
-            <div className="flex items-center space-x-4">
-              <button
-                onClick={onPricing}
-                className="px-5 py-2.5 text-gray-700 hover:text-gray-900 font-medium transition-colors"
-              >
-                Pricing
-              </button>
+
+            {/* Desktop Navigation */}
+            <div className="hidden md:flex items-center gap-8">
+              {navLinks.map((link, index) => (
+                link.onClick ? (
+                  <button
+                    key={index}
+                    onClick={link.onClick}
+                    className="text-gray-600 font-medium hover:text-gray-900 transition-colors"
+                  >
+                    {link.label}
+                  </button>
+                ) : (
+                  <a
+                    key={link.href}
+                    href={link.href}
+                    className="text-gray-600 font-medium hover:text-gray-900 transition-colors"
+                  >
+                    {link.label}
+                  </a>
+                )
+              ))}
               <button
                 onClick={onLogin}
-                className="px-5 py-2.5 text-gray-700 hover:text-gray-900 font-medium transition-colors"
+                className="text-gray-600 font-medium hover:text-gray-900 transition-colors"
               >
                 Log In
               </button>
               <button
                 onClick={onSignUp}
-                className="px-6 py-2.5 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-lg hover:from-emerald-600 hover:to-emerald-700 font-medium transition-all shadow-sm hover:shadow-md"
+                className="h-11 px-6 bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 text-white rounded-lg font-semibold shadow-lg shadow-emerald-500/35 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-emerald-500/45 transition-all duration-200"
               >
-                Get Started Free
+                Start Free Trial
               </button>
             </div>
+
+            {/* Mobile Menu Button */}
+            <button
+              className="md:hidden p-2 text-gray-900"
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            >
+              {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+            </button>
           </div>
+
+          {/* Mobile Menu */}
+          {isMobileMenuOpen && (
+            <div className="md:hidden mt-4 pb-4 animate-fade-in">
+              <div className="flex flex-col gap-4">
+                {navLinks.map((link, index) => (
+                  link.onClick ? (
+                    <button
+                      key={index}
+                      onClick={() => { link.onClick(); setIsMobileMenuOpen(false); }}
+                      className="text-gray-600 font-medium hover:text-gray-900 transition-colors py-2 text-left"
+                    >
+                      {link.label}
+                    </button>
+                  ) : (
+                    <a
+                      key={link.href}
+                      href={link.href}
+                      className="text-gray-600 font-medium hover:text-gray-900 transition-colors py-2"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                    >
+                      {link.label}
+                    </a>
+                  )
+                ))}
+                <button
+                  onClick={() => { onLogin(); setIsMobileMenuOpen(false); }}
+                  className="text-gray-600 font-medium hover:text-gray-900 transition-colors py-2 text-left"
+                >
+                  Log In
+                </button>
+                <button
+                  onClick={() => { onSignUp(); setIsMobileMenuOpen(false); }}
+                  className="w-full h-11 px-6 bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 text-white rounded-lg font-semibold mt-2"
+                >
+                  Start Free Trial
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </nav>
 
       {/* Hero Section */}
-      <section className="pt-32 pb-20 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
-        {/* Background gradient */}
-        <div className="absolute inset-0 bg-gradient-to-br from-emerald-50 via-white to-white -z-10"></div>
-        <div className="absolute top-20 left-1/4 w-96 h-96 bg-emerald-100 rounded-full blur-3xl opacity-20 -z-10"></div>
-        <div className="absolute bottom-20 right-1/4 w-96 h-96 bg-green-100 rounded-full blur-3xl opacity-20 -z-10"></div>
+      <section className="relative pt-32 pb-20 px-6 overflow-hidden">
+        {/* Background gradients */}
+        <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-gradient-to-bl from-emerald-500/10 to-transparent rounded-full blur-3xl -translate-y-1/2 translate-x-1/4 pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-gradient-to-tr from-teal-500/10 to-transparent rounded-full blur-3xl translate-y-1/2 -translate-x-1/4 pointer-events-none" />
 
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center max-w-4xl mx-auto">
-            {/* Badge */}
-            <div className="inline-flex items-center space-x-2 bg-emerald-50 border border-emerald-200 rounded-full px-4 py-2 mb-8">
-              <Sparkles className="w-4 h-4 text-emerald-600" />
-              <span className="text-sm font-medium text-emerald-900">AI-Powered Certificate Tracking</span>
-            </div>
+        {/* Hero gradient background */}
+        <div className="absolute inset-0 bg-gradient-to-b from-white via-white to-gray-50 -z-10" />
 
-            {/* Headline */}
-            <h1 className="text-5xl md:text-7xl font-bold mb-6 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-600 bg-clip-text text-transparent leading-tight">
-              COI Compliance on<br />Autopilot
-            </h1>
-
-            <p className="text-xl md:text-2xl text-gray-600 mb-10 max-w-3xl mx-auto leading-relaxed">
-              Stop chasing expired certificates. SmartCOI uses AI to extract, verify, and track insurance compliance—so you can focus on what matters.
-            </p>
-
-            {/* CTA Buttons */}
-            <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
-              <button
-                onClick={onSignUp}
-                className="group px-8 py-4 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-xl hover:from-emerald-600 hover:to-emerald-700 font-semibold text-lg transition-all shadow-lg hover:shadow-xl flex items-center justify-center space-x-2"
-              >
-                <span>Start Free Trial</span>
-                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-              </button>
-              <button
-                onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}
-                className="px-8 py-4 bg-white text-gray-700 rounded-xl hover:bg-gray-50 font-semibold text-lg transition-all border-2 border-gray-200 hover:border-gray-300"
-              >
-                See How It Works
-              </button>
-            </div>
-
-            {/* Trust indicators */}
-            <div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-8 text-sm text-gray-500">
-              <div className="flex items-center space-x-2">
-                <CheckCircle className="w-5 h-5 text-emerald-500" />
-                <span>No credit card required</span>
+        <div className="max-w-7xl mx-auto relative z-10">
+          <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+            {/* Content */}
+            <div className="text-center lg:text-left">
+              {/* Badge */}
+              <div className="inline-flex items-center gap-2 bg-white border border-gray-200 rounded-full px-4 py-2 mb-6 shadow-sm animate-fade-in-up">
+                <Zap className="w-4 h-4 text-emerald-500" />
+                <span className="text-sm text-gray-600">
+                  <span className="bg-gradient-to-r from-emerald-600 to-teal-500 bg-clip-text text-transparent font-semibold">AI-Powered</span> COI Tracking
+                </span>
               </div>
-              <div className="flex items-center space-x-2">
-                <CheckCircle className="w-5 h-5 text-emerald-500" />
-                <span>5-second setup</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <CheckCircle className="w-5 h-5 text-emerald-500" />
-                <span>Free forever plan</span>
-              </div>
-            </div>
-          </div>
 
-          {/* Hero Image / Dashboard Preview */}
-          <div className="mt-16 max-w-5xl mx-auto">
-            <div className="relative">
-              <div className="absolute inset-0 bg-gradient-to-r from-emerald-500 to-green-500 rounded-2xl blur-2xl opacity-20"></div>
-              <div className="relative bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl p-8 shadow-2xl border border-gray-700">
-                <div className="bg-gray-800 rounded-lg p-6">
-                  {/* Mock dashboard */}
-                  <div className="space-y-4">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-12 h-12 bg-emerald-500 rounded-lg flex items-center justify-center">
-                        <FileText className="w-6 h-6 text-white" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="h-3 bg-gray-700 rounded w-1/3 mb-2"></div>
-                        <div className="h-2 bg-gray-700 rounded w-1/4"></div>
-                      </div>
-                      <div className="px-4 py-2 bg-emerald-500 bg-opacity-20 text-emerald-400 rounded-lg text-sm font-medium">
-                        Compliant
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <div className="w-12 h-12 bg-orange-500 rounded-lg flex items-center justify-center">
-                        <FileText className="w-6 h-6 text-white" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="h-3 bg-gray-700 rounded w-1/3 mb-2"></div>
-                        <div className="h-2 bg-gray-700 rounded w-1/4"></div>
-                      </div>
-                      <div className="px-4 py-2 bg-orange-500 bg-opacity-20 text-orange-400 rounded-lg text-sm font-medium">
-                        Expiring Soon
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <div className="w-12 h-12 bg-emerald-500 rounded-lg flex items-center justify-center">
-                        <FileText className="w-6 h-6 text-white" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="h-3 bg-gray-700 rounded w-1/3 mb-2"></div>
-                        <div className="h-2 bg-gray-700 rounded w-1/4"></div>
-                      </div>
-                      <div className="px-4 py-2 bg-emerald-500 bg-opacity-20 text-emerald-400 rounded-lg text-sm font-medium">
-                        Compliant
-                      </div>
-                    </div>
+              {/* Headline */}
+              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-tight mb-6 animate-fade-in-up animation-delay-100">
+                Stop wasting hours on{" "}
+                <span className="bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 bg-clip-text text-transparent">COI compliance</span>
+              </h1>
+
+              {/* Subheadline */}
+              <p className="text-lg sm:text-xl text-gray-600 leading-relaxed mb-8 animate-fade-in-up animation-delay-200">
+                SmartCOI uses artificial intelligence to extract insurance data from
+                certificates in seconds, not minutes. Save 10+ hours every week.
+              </p>
+
+              {/* CTA Buttons */}
+              <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start mb-12 animate-fade-in-up animation-delay-300">
+                <button
+                  onClick={onSignUp}
+                  className="h-12 px-8 bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 text-white rounded-lg font-semibold text-base shadow-lg shadow-emerald-500/35 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-emerald-500/45 transition-all duration-200"
+                >
+                  Start Free Trial
+                </button>
+                <button
+                  onClick={() => document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' })}
+                  className="h-12 px-8 bg-white text-gray-900 border-2 border-gray-200 rounded-lg font-semibold text-base hover:border-emerald-500 hover:text-emerald-600 transition-all duration-200 flex items-center justify-center gap-2"
+                >
+                  <Play className="w-4 h-4" />
+                  Watch Demo
+                </button>
+              </div>
+
+              {/* Stats */}
+              <div className="flex flex-wrap gap-8 justify-center lg:justify-start animate-fade-in-up animation-delay-400">
+                {stats.map((stat, index) => (
+                  <div key={index} className="flex flex-col">
+                    <span className="text-3xl sm:text-4xl font-extrabold bg-gradient-to-r from-emerald-600 to-teal-500 bg-clip-text text-transparent">
+                      {stat.value}
+                    </span>
+                    <span className="text-sm text-gray-500">{stat.label}</span>
                   </div>
-                </div>
+                ))}
               </div>
             </div>
-          </div>
-        </div>
-      </section>
 
-      {/* Stats Section */}
-      <section className="py-16 bg-gray-50 border-y border-gray-100">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid md:grid-cols-3 gap-12 text-center">
-            <div>
-              <div className="text-5xl font-bold text-emerald-600 mb-2">10hrs</div>
-              <p className="text-gray-600 text-lg">Saved per week</p>
-            </div>
-            <div>
-              <div className="text-5xl font-bold text-emerald-600 mb-2">5sec</div>
-              <p className="text-gray-600 text-lg">AI extraction time</p>
-            </div>
-            <div>
-              <div className="text-5xl font-bold text-emerald-600 mb-2">99%</div>
-              <p className="text-gray-600 text-lg">Accuracy rate</p>
+            {/* Dashboard Mockup */}
+            <div className="animate-fade-in-up animation-delay-300 lg:animate-float">
+              <DashboardMockup />
             </div>
           </div>
         </div>
       </section>
 
       {/* Features Section */}
-      <section id="features" className="py-24 px-4 sm:px-6 lg:px-8">
+      <section id="features" className="py-24 px-6 bg-white">
         <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-bold mb-4 text-gray-900">
-              Everything you need, nothing you don't
+          {/* Section header */}
+          <div className="text-center max-w-2xl mx-auto mb-16">
+            <span className="inline-block text-sm font-semibold text-emerald-500 uppercase tracking-wider mb-4">
+              Features
+            </span>
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-gray-900 mb-4">
+              Everything you need to manage COIs
             </h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Powerful automation that saves hours every week—without the complexity
+            <p className="text-lg text-gray-600">
+              Powerful tools designed specifically for property managers who are tired
+              of manual data entry.
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8">
-            {/* Feature 1 */}
-            <div className="group relative bg-white rounded-2xl p-8 border border-gray-200 hover:border-emerald-300 hover:shadow-xl transition-all">
-              <div className="w-12 h-12 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                <Sparkles className="w-6 h-6 text-white" />
+          {/* Features grid */}
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">
+            {features.map((feature, index) => (
+              <div
+                key={index}
+                className="group bg-gray-50 rounded-2xl p-8 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
+              >
+                <div className="w-14 h-14 bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 rounded-xl flex items-center justify-center mb-5 transition-transform group-hover:scale-110">
+                  <feature.icon className="w-7 h-7 text-white" />
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-3">
+                  {feature.title}
+                </h3>
+                <p className="text-gray-600 leading-relaxed">
+                  {feature.description}
+                </p>
               </div>
-              <h3 className="text-2xl font-bold mb-4 text-gray-900">AI Extraction</h3>
-              <p className="text-gray-600 leading-relaxed">
-                Upload any COI PDF and watch our AI instantly extract company names, coverage amounts, expiration dates, and policy numbers. Zero manual data entry.
-              </p>
-            </div>
+            ))}
+          </div>
+        </div>
+      </section>
 
-            {/* Feature 2 */}
-            <div className="group relative bg-white rounded-2xl p-8 border border-gray-200 hover:border-emerald-300 hover:shadow-xl transition-all">
-              <div className="w-12 h-12 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                <Shield className="w-6 h-6 text-white" />
-              </div>
-              <h3 className="text-2xl font-bold mb-4 text-gray-900">Smart Compliance</h3>
-              <p className="text-gray-600 leading-relaxed">
-                Automatic compliance checking against your requirements. Red, yellow, or green status at a glance. Know your risk instantly.
-              </p>
-            </div>
+      {/* How It Works Section */}
+      <section id="how-it-works" className="py-24 px-6 bg-gray-900">
+        <div className="max-w-7xl mx-auto">
+          {/* Section header */}
+          <div className="text-center max-w-2xl mx-auto mb-16">
+            <span className="inline-block text-sm font-semibold text-emerald-400 uppercase tracking-wider mb-4">
+              How It Works
+            </span>
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-white mb-4">
+              From PDF to compliant in seconds
+            </h2>
+            <p className="text-lg text-gray-400">
+              Three simple steps to eliminate manual COI data entry forever.
+            </p>
+          </div>
 
-            {/* Feature 3 */}
-            <div className="group relative bg-white rounded-2xl p-8 border border-gray-200 hover:border-emerald-300 hover:shadow-xl transition-all">
-              <div className="w-12 h-12 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                <Bell className="w-6 h-6 text-white" />
-              </div>
-              <h3 className="text-2xl font-bold mb-4 text-gray-900">Proactive Alerts</h3>
-              <p className="text-gray-600 leading-relaxed">
-                Get notified 30 days before policies expire. Never miss a renewal again. Stay ahead without the manual tracking.
-              </p>
-            </div>
+          {/* Steps */}
+          <div className="relative grid md:grid-cols-3 gap-8 md:gap-12">
+            {/* Connecting line */}
+            <div className="hidden md:block absolute top-10 left-[16.66%] right-[16.66%] h-0.5 bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500" />
 
-            {/* Feature 4 */}
-            <div className="group relative bg-white rounded-2xl p-8 border border-gray-200 hover:border-emerald-300 hover:shadow-xl transition-all">
-              <div className="w-12 h-12 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                <Upload className="w-6 h-6 text-white" />
-              </div>
-              <h3 className="text-2xl font-bold mb-4 text-gray-900">Drag & Drop Upload</h3>
-              <p className="text-gray-600 leading-relaxed">
-                Simple, intuitive file uploads. Drag a PDF, drop it, done. We handle the rest automatically with AI-powered processing.
-              </p>
-            </div>
+            {steps.map((step, index) => (
+              <div key={index} className="relative text-center">
+                {/* Step number */}
+                <div className="relative z-10 w-20 h-20 bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 rounded-full flex items-center justify-center mx-auto mb-6 border-4 border-gray-900">
+                  <span className="text-3xl font-extrabold text-white">
+                    {step.number}
+                  </span>
+                </div>
 
-            {/* Feature 5 */}
-            <div className="group relative bg-white rounded-2xl p-8 border border-gray-200 hover:border-emerald-300 hover:shadow-xl transition-all">
-              <div className="w-12 h-12 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                <Zap className="w-6 h-6 text-white" />
+                <h3 className="text-xl font-bold text-white mb-3">
+                  {step.title}
+                </h3>
+                <p className="text-gray-400 leading-relaxed">
+                  {step.description}
+                </p>
               </div>
-              <h3 className="text-2xl font-bold mb-4 text-gray-900">Lightning Fast</h3>
-              <p className="text-gray-600 leading-relaxed">
-                What used to take 30 minutes now takes 30 seconds. Process certificates instantly and get back to managing your properties.
-              </p>
-            </div>
+            ))}
+          </div>
+        </div>
+      </section>
 
-            {/* Feature 6 */}
-            <div className="group relative bg-white rounded-2xl p-8 border border-gray-200 hover:border-emerald-300 hover:shadow-xl transition-all">
-              <div className="w-12 h-12 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                <Clock className="w-6 h-6 text-white" />
+      {/* Pricing Section */}
+      <section id="pricing" className="py-24 px-6 bg-white">
+        <div className="max-w-7xl mx-auto">
+          {/* Section header */}
+          <div className="text-center max-w-2xl mx-auto mb-16">
+            <span className="inline-block text-sm font-semibold text-emerald-500 uppercase tracking-wider mb-4">
+              Pricing
+            </span>
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-gray-900 mb-4">
+              Simple, transparent pricing
+            </h2>
+            <p className="text-lg text-gray-600">
+              One plan. All features. No hidden fees.
+            </p>
+          </div>
+
+          {/* Pricing card */}
+          <div className="max-w-lg mx-auto">
+            <div className="relative bg-white rounded-3xl p-10 shadow-2xl border-2 border-emerald-500 overflow-hidden">
+              {/* Top gradient bar */}
+              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500" />
+
+              {/* Badge */}
+              <div className="absolute top-6 right-6 bg-gradient-to-r from-emerald-600 to-teal-500 text-white text-xs font-semibold px-4 py-1.5 rounded-full">
+                Most Popular
               </div>
-              <h3 className="text-2xl font-bold mb-4 text-gray-900">Real-Time Dashboard</h3>
-              <p className="text-gray-600 leading-relaxed">
-                See all your vendors at a glance. Filter, sort, and search instantly. Export reports with one click for audits or reviews.
+
+              <h3 className="text-2xl font-bold text-gray-900 mb-2">
+                Professional
+              </h3>
+              <p className="text-gray-600 mb-6">
+                Everything you need to manage COI compliance
               </p>
+
+              {/* Price */}
+              <div className="flex items-baseline gap-2 mb-2">
+                <span className="text-6xl font-extrabold bg-gradient-to-r from-emerald-600 to-teal-500 bg-clip-text text-transparent">$49</span>
+                <span className="text-lg text-gray-500">/month</span>
+              </div>
+              <p className="text-sm text-emerald-600 mb-8">
+                Billed annually — Save 20%
+              </p>
+
+              {/* Features */}
+              <ul className="space-y-4 mb-8">
+                {pricingFeatures.map((feature, index) => (
+                  <li
+                    key={index}
+                    className="flex items-center gap-3 py-3 border-b border-gray-100 last:border-b-0"
+                  >
+                    <Check className="w-5 h-5 text-emerald-500 flex-shrink-0" />
+                    <span className="text-gray-900">{feature}</span>
+                  </li>
+                ))}
+              </ul>
+
+              {/* CTA */}
+              <button
+                onClick={onSignUp}
+                className="w-full h-14 bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 text-white rounded-lg font-semibold text-lg shadow-lg shadow-emerald-500/35 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-emerald-500/45 transition-all duration-200"
+              >
+                Start Free Trial
+              </button>
             </div>
           </div>
         </div>
       </section>
 
-      {/* How It Works */}
-      <section className="py-24 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-gray-50 to-white">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-bold mb-4 text-gray-900">
-              From upload to compliance in seconds
-            </h2>
-            <p className="text-xl text-gray-600">
-              Three simple steps to automated COI tracking
-            </p>
-          </div>
-
-          <div className="space-y-12">
-            {/* Step 1 */}
-            <div className="flex flex-col md:flex-row items-center gap-8">
-              <div className="flex-shrink-0 w-16 h-16 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl flex items-center justify-center text-white text-2xl font-bold shadow-lg">
-                1
-              </div>
-              <div className="flex-1 text-center md:text-left">
-                <h3 className="text-2xl font-bold mb-3 text-gray-900">Upload Your COI PDF</h3>
-                <p className="text-lg text-gray-600">
-                  Drag and drop any Certificate of Insurance. Our system accepts all standard formats.
-                </p>
-              </div>
-              <div className="flex-shrink-0 w-64 h-40 bg-gradient-to-br from-emerald-50 to-green-50 rounded-xl border border-emerald-200 flex items-center justify-center">
-                <Upload className="w-16 h-16 text-emerald-500" />
-              </div>
-            </div>
-
-            {/* Step 2 */}
-            <div className="flex flex-col md:flex-row-reverse items-center gap-8">
-              <div className="flex-shrink-0 w-16 h-16 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl flex items-center justify-center text-white text-2xl font-bold shadow-lg">
-                2
-              </div>
-              <div className="flex-1 text-center md:text-right">
-                <h3 className="text-2xl font-bold mb-3 text-gray-900">AI Extracts All Data</h3>
-                <p className="text-lg text-gray-600">
-                  Our AI reads and extracts all relevant information in 5 seconds—coverage amounts, dates, policy numbers.
-                </p>
-              </div>
-              <div className="flex-shrink-0 w-64 h-40 bg-gradient-to-br from-emerald-50 to-green-50 rounded-xl border border-emerald-200 flex items-center justify-center">
-                <Sparkles className="w-16 h-16 text-emerald-500" />
-              </div>
-            </div>
-
-            {/* Step 3 */}
-            <div className="flex flex-col md:flex-row items-center gap-8">
-              <div className="flex-shrink-0 w-16 h-16 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl flex items-center justify-center text-white text-2xl font-bold shadow-lg">
-                3
-              </div>
-              <div className="flex-1 text-center md:text-left">
-                <h3 className="text-2xl font-bold mb-3 text-gray-900">Instant Compliance Status</h3>
-                <p className="text-lg text-gray-600">
-                  See your vendor's compliance status immediately. Green means compliant, yellow means expiring soon, red means action needed.
-                </p>
-              </div>
-              <div className="flex-shrink-0 w-64 h-40 bg-gradient-to-br from-emerald-50 to-green-50 rounded-xl border border-emerald-200 flex items-center justify-center">
-                <CheckCircle className="w-16 h-16 text-emerald-500" />
-              </div>
-            </div>
-          </div>
+      {/* CTA Section */}
+      <section className="relative py-24 px-6 bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 overflow-hidden">
+        {/* Background decoration */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[150%] h-[200%] bg-gradient-radial from-white/10 to-transparent" />
         </div>
-      </section>
 
-      {/* Final CTA */}
-      <section className="py-24 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-emerald-600 to-emerald-700 relative overflow-hidden">
-        <div className="absolute inset-0 bg-grid-white/10 bg-[size:20px_20px]"></div>
-        <div className="max-w-4xl mx-auto text-center relative z-10">
-          <h2 className="text-4xl md:text-5xl font-bold mb-6 text-white">
-            Ready to automate your COI tracking?
+        <div className="max-w-3xl mx-auto text-center relative z-10">
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-white mb-4">
+            Ready to automate your COI management?
           </h2>
-          <p className="text-xl text-emerald-50 mb-10 max-w-2xl mx-auto">
-            Join property managers who've already saved hundreds of hours with SmartCOI
+          <p className="text-lg sm:text-xl text-white/90 mb-8">
+            Join hundreds of property managers who have already saved thousands of
+            hours with SmartCOI.
           </p>
           <button
             onClick={onSignUp}
-            className="group px-10 py-5 bg-white text-emerald-600 rounded-xl hover:bg-gray-50 font-bold text-xl transition-all shadow-xl hover:shadow-2xl inline-flex items-center space-x-3"
+            className="h-14 px-10 bg-white text-emerald-600 rounded-lg font-semibold text-lg hover:-translate-y-0.5 hover:shadow-lg transition-all duration-200"
           >
-            <span>Start Free Trial</span>
-            <ArrowRight className="w-6 h-6 group-hover:translate-x-1 transition-transform" />
+            Start Your Free Trial Today
           </button>
-          <p className="text-sm text-emerald-100 mt-6">
-            No credit card required • 5-second setup • Free forever plan available
-          </p>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="bg-gray-900 text-gray-400 py-12 border-t border-gray-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
-            <div className="flex items-center space-x-4">
-              <Logo size="small" className="opacity-80" />
+      <footer className="py-16 px-6 bg-gray-900">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+            {/* Logo */}
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 bg-gradient-to-r from-emerald-600 to-teal-500 rounded-lg flex items-center justify-center">
+                <FileCheck className="w-5 h-5 text-white" />
+              </div>
+              <span className="text-xl font-bold text-white">
+                Smart<span className="bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">COI</span>
+              </span>
             </div>
-            <div className="flex items-center space-x-6">
-              <button
-                onClick={onPricing}
-                className="text-sm hover:text-white transition-colors"
-              >
-                Pricing
-              </button>
+
+            {/* Links */}
+            <div className="flex items-center gap-8">
               <button
                 onClick={onPrivacy}
-                className="text-sm hover:text-white transition-colors"
+                className="text-sm text-gray-400 hover:text-white transition-colors"
               >
-                Privacy Policy
+                Privacy
               </button>
               <button
                 onClick={onTerms}
-                className="text-sm hover:text-white transition-colors"
+                className="text-sm text-gray-400 hover:text-white transition-colors"
               >
-                Terms of Service
+                Terms
               </button>
+              <a
+                href="mailto:support@smartcoi.io"
+                className="text-sm text-gray-400 hover:text-white transition-colors"
+              >
+                Contact
+              </a>
             </div>
-            <p className="text-sm">&copy; 2026 SmartCOI. All rights reserved.</p>
+
+            {/* Copyright */}
+            <p className="text-sm text-gray-500">
+              &copy; 2025 SmartCOI. All rights reserved.
+            </p>
           </div>
         </div>
       </footer>
