@@ -85,6 +85,8 @@ export function NotificationSettings({ onClose }) {
           notification_email: settings.notificationEmail,
           notification_frequency: settings.notificationFrequency,
           updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'user_id'
         });
 
       if (error) throw error;
