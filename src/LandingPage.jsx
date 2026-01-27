@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Logo } from './Logo';
 import {
-  CheckCircle, Zap, Upload, Bell, FileText, Play, Menu, X,
+  CheckCircle, Zap, Bell, Play, Menu, X,
   FileCheck, FolderOpen, Cloud, Users, Check
 } from 'lucide-react';
 
