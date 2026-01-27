@@ -3,17 +3,17 @@
 
 import React, { useState } from 'react';
 import { Logo } from './Logo';
-import { Check, X, Zap, Building, Building2, ArrowLeft, Loader2 } from 'lucide-react';
+import { Check, X, Loader2, ArrowLeft, Sparkles } from 'lucide-react';
 
 const plans = [
   {
     name: 'Starter',
     price: 49,
-    priceId: '', // Will be filled with Stripe price ID
+    priceId: '',
     description: 'Perfect for small property managers',
-    icon: Zap,
-    color: 'emerald',
     vendors: 25,
+    gradient: 'from-slate-500 to-slate-600',
+    shadowColor: 'shadow-slate-500/20',
     features: [
       { text: 'Up to 25 vendors', included: true },
       { text: 'AI-powered COI extraction', included: true },
@@ -29,12 +29,12 @@ const plans = [
   {
     name: 'Professional',
     price: 99,
-    priceId: '', // Will be filled with Stripe price ID
+    priceId: '',
     description: 'For growing property management companies',
-    icon: Building,
-    color: 'blue',
     vendors: 100,
     popular: true,
+    gradient: 'from-emerald-500 to-teal-500',
+    shadowColor: 'shadow-emerald-500/25',
     features: [
       { text: 'Up to 100 vendors', included: true },
       { text: 'AI-powered COI extraction', included: true },
@@ -50,11 +50,11 @@ const plans = [
   {
     name: 'Business',
     price: 199,
-    priceId: '', // Will be filled with Stripe price ID
+    priceId: '',
     description: 'For large-scale operations',
-    icon: Building2,
-    color: 'purple',
     vendors: 500,
+    gradient: 'from-violet-500 to-purple-600',
+    shadowColor: 'shadow-violet-500/25',
     features: [
       { text: 'Up to 500 vendors', included: true },
       { text: 'AI-powered COI extraction', included: true },
@@ -75,14 +75,12 @@ export function Pricing({ onBack, onSelectPlan, currentPlan, user }) {
 
   const handleSelectPlan = async (plan) => {
     if (!user) {
-      // Redirect to signup if not logged in
       onSelectPlan?.(plan, 'signup');
       return;
     }
 
     setLoading(plan.name);
     try {
-      // This will call the Stripe checkout
       await onSelectPlan?.(plan, 'checkout');
     } catch (error) {
       console.error('Error selecting plan:', error);
@@ -93,7 +91,7 @@ export function Pricing({ onBack, onSelectPlan, currentPlan, user }) {
   };
 
   const getAnnualPrice = (monthlyPrice) => {
-    return Math.round(monthlyPrice * 12 * 0.8); // 20% discount
+    return Math.round(monthlyPrice * 12 * 0.8);
   };
 
   const getDisplayPrice = (plan) => {
@@ -103,47 +101,24 @@ export function Pricing({ onBack, onSelectPlan, currentPlan, user }) {
     return plan.price;
   };
 
-  const getColorClasses = (color, type) => {
-    const colors = {
-      emerald: {
-        bg: 'bg-emerald-500',
-        bgLight: 'bg-emerald-50',
-        border: 'border-emerald-200',
-        text: 'text-emerald-600',
-        button: 'bg-emerald-500 hover:bg-emerald-600',
-        ring: 'ring-emerald-500',
-      },
-      blue: {
-        bg: 'bg-blue-500',
-        bgLight: 'bg-blue-50',
-        border: 'border-blue-200',
-        text: 'text-blue-600',
-        button: 'bg-blue-500 hover:bg-blue-600',
-        ring: 'ring-blue-500',
-      },
-      purple: {
-        bg: 'bg-purple-500',
-        bgLight: 'bg-purple-50',
-        border: 'border-purple-200',
-        text: 'text-purple-600',
-        button: 'bg-purple-500 hover:bg-purple-600',
-        ring: 'ring-purple-500',
-      },
-    };
-    return colors[color][type];
-  };
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+    <div className="min-h-screen bg-gray-50 font-sans overflow-hidden">
+      {/* Animated background */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-0 left-1/4 w-[600px] h-[600px] bg-emerald-500/5 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 right-1/4 w-[500px] h-[500px] bg-teal-500/5 rounded-full blur-3xl" />
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(16,185,129,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(16,185,129,0.02)_1px,transparent_1px)] bg-[size:60px_60px]" />
+      </div>
+
       {/* Header */}
-      <header className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <header className="relative bg-white/80 backdrop-blur-xl border-b border-gray-100 sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-6">
           <div className="flex items-center justify-between h-16">
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center gap-4">
               {onBack && (
                 <button
                   onClick={onBack}
-                  className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                  className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-all"
                 >
                   <ArrowLeft size={20} />
                 </button>
@@ -155,26 +130,33 @@ export function Pricing({ onBack, onSelectPlan, currentPlan, user }) {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+      <main className="relative max-w-7xl mx-auto px-6 py-20">
         {/* Header */}
-        <div className="text-center mb-12">
-          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
-            Simple, Transparent Pricing
+        <div className="text-center mb-16">
+          <div className="inline-flex items-center gap-2 bg-white border border-emerald-200 px-4 py-2 rounded-full text-sm font-medium text-gray-600 mb-6 shadow-sm">
+            <Sparkles className="w-4 h-4 text-emerald-500" />
+            <span>Simple, transparent pricing</span>
+          </div>
+          <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold text-gray-900 mb-6 tracking-tight">
+            Choose your{' '}
+            <span className="bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 bg-clip-text text-transparent">
+              perfect plan
+            </span>
           </h1>
-          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            Choose the plan that fits your business. All plans include our core AI-powered COI tracking features.
+          <p className="text-xl text-gray-500 max-w-2xl mx-auto">
+            Start your 14-day free trial. No credit card required. Cancel anytime.
           </p>
         </div>
 
         {/* Billing Toggle */}
-        <div className="flex items-center justify-center mb-12">
-          <div className="bg-white rounded-xl p-1 shadow-sm border border-gray-200">
-            <div className="flex items-center space-x-1">
+        <div className="flex items-center justify-center mb-16">
+          <div className="relative bg-white rounded-2xl p-1.5 shadow-lg border border-gray-200">
+            <div className="flex items-center gap-1">
               <button
                 onClick={() => setBillingCycle('monthly')}
-                className={`px-6 py-2.5 rounded-lg font-medium transition-all ${
+                className={`relative px-6 py-3 rounded-xl font-semibold text-sm transition-all duration-300 ${
                   billingCycle === 'monthly'
-                    ? 'bg-gray-900 text-white'
+                    ? 'bg-gray-900 text-white shadow-lg'
                     : 'text-gray-600 hover:text-gray-900'
                 }`}
               >
@@ -182,19 +164,19 @@ export function Pricing({ onBack, onSelectPlan, currentPlan, user }) {
               </button>
               <button
                 onClick={() => setBillingCycle('annual')}
-                className={`px-6 py-2.5 rounded-lg font-medium transition-all flex items-center space-x-2 ${
+                className={`relative px-6 py-3 rounded-xl font-semibold text-sm transition-all duration-300 flex items-center gap-2 ${
                   billingCycle === 'annual'
-                    ? 'bg-gray-900 text-white'
+                    ? 'bg-gray-900 text-white shadow-lg'
                     : 'text-gray-600 hover:text-gray-900'
                 }`}
               >
                 <span>Annual</span>
-                <span className={`text-xs px-2 py-0.5 rounded-full ${
+                <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${
                   billingCycle === 'annual'
                     ? 'bg-emerald-500 text-white'
                     : 'bg-emerald-100 text-emerald-700'
                 }`}>
-                  Save 20%
+                  -20%
                 </span>
               </button>
             </div>
@@ -202,101 +184,138 @@ export function Pricing({ onBack, onSelectPlan, currentPlan, user }) {
         </div>
 
         {/* Pricing Cards */}
-        <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+        <div className="grid lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
           {plans.map((plan) => {
-            const Icon = plan.icon;
             const isCurrentPlan = currentPlan === plan.name.toLowerCase();
+            const isProfessional = plan.popular;
 
             return (
               <div
                 key={plan.name}
-                className={`relative bg-white rounded-2xl shadow-lg border-2 transition-all hover:shadow-xl ${
-                  plan.popular
-                    ? 'border-blue-500 scale-105'
-                    : 'border-gray-200 hover:border-gray-300'
-                }`}
+                className={`relative group ${isProfessional ? 'lg:-mt-4 lg:mb-4' : ''}`}
               >
-                {/* Popular Badge */}
-                {plan.popular && (
-                  <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                    <div className="bg-blue-500 text-white text-sm font-semibold px-4 py-1 rounded-full shadow-md">
-                      Most Popular
-                    </div>
-                  </div>
+                {/* Glow effect for popular */}
+                {isProfessional && (
+                  <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-3xl blur-lg opacity-30 group-hover:opacity-40 transition-opacity" />
                 )}
 
-                <div className="p-8">
-                  {/* Plan Header */}
-                  <div className="flex items-center space-x-3 mb-4">
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${getColorClasses(plan.color, 'bgLight')}`}>
-                      <Icon className={`w-6 h-6 ${getColorClasses(plan.color, 'text')}`} />
-                    </div>
-                    <div>
-                      <h3 className="text-xl font-bold text-gray-900">{plan.name}</h3>
-                      <p className="text-sm text-gray-500">{plan.description}</p>
-                    </div>
-                  </div>
-
-                  {/* Price */}
-                  <div className="mb-6">
-                    <div className="flex items-baseline">
-                      <span className="text-5xl font-bold text-gray-900">
-                        ${getDisplayPrice(plan)}
+                <div className={`relative h-full bg-white rounded-3xl border transition-all duration-300 ${
+                  isProfessional
+                    ? 'border-emerald-200 shadow-2xl'
+                    : 'border-gray-200 shadow-lg hover:shadow-xl hover:border-gray-300'
+                }`}>
+                  {/* Popular Badge */}
+                  {isProfessional && (
+                    <div className="absolute -top-4 left-1/2 -translate-x-1/2">
+                      <span className="bg-gradient-to-r from-emerald-600 to-teal-500 text-white text-sm font-bold px-6 py-2 rounded-full shadow-lg">
+                        Most Popular
                       </span>
-                      <span className="text-gray-500 ml-2">/month</span>
                     </div>
-                    {billingCycle === 'annual' && (
-                      <p className="text-sm text-emerald-600 mt-1">
-                        ${getAnnualPrice(plan.price)}/year (save ${plan.price * 12 - getAnnualPrice(plan.price)})
-                      </p>
-                    )}
+                  )}
+
+                  <div className="p-8">
+                    {/* Plan Header */}
+                    <div className="mb-6">
+                      <div className={`inline-flex w-14 h-14 rounded-2xl bg-gradient-to-br ${plan.gradient} items-center justify-center mb-4 shadow-lg ${plan.shadowColor}`}>
+                        {plan.name === 'Starter' && (
+                          <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                          </svg>
+                        )}
+                        {plan.name === 'Professional' && (
+                          <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                          </svg>
+                        )}
+                        {plan.name === 'Business' && (
+                          <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                          </svg>
+                        )}
+                      </div>
+                      <h3 className="text-2xl font-bold text-gray-900">{plan.name}</h3>
+                      <p className="text-gray-500 mt-1">{plan.description}</p>
+                    </div>
+
+                    {/* Price */}
+                    <div className="mb-6">
+                      <div className="flex items-baseline gap-2">
+                        <span className={`text-5xl font-extrabold ${
+                          isProfessional
+                            ? 'bg-gradient-to-r from-emerald-600 to-teal-500 bg-clip-text text-transparent'
+                            : 'text-gray-900'
+                        }`}>
+                          ${getDisplayPrice(plan)}
+                        </span>
+                        <span className="text-gray-500 text-lg">/month</span>
+                      </div>
+                      {billingCycle === 'annual' && (
+                        <p className="text-emerald-600 text-sm font-medium mt-2">
+                          ${getAnnualPrice(plan.price)}/year (save ${plan.price * 12 - getAnnualPrice(plan.price)})
+                        </p>
+                      )}
+                    </div>
+
+                    {/* CTA Button */}
+                    <button
+                      onClick={() => handleSelectPlan(plan)}
+                      disabled={loading === plan.name || isCurrentPlan}
+                      className={`w-full py-4 px-6 rounded-xl font-semibold text-base transition-all duration-300 flex items-center justify-center gap-2 ${
+                        isCurrentPlan
+                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                          : isProfessional
+                            ? 'bg-gradient-to-r from-emerald-600 to-teal-500 text-white shadow-lg shadow-emerald-500/25 hover:shadow-xl hover:shadow-emerald-500/30 hover:-translate-y-0.5'
+                            : 'bg-gray-900 text-white hover:bg-gray-800 hover:-translate-y-0.5'
+                      }`}
+                    >
+                      {loading === plan.name ? (
+                        <>
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                          <span>Processing...</span>
+                        </>
+                      ) : isCurrentPlan ? (
+                        <span>Current Plan</span>
+                      ) : (
+                        <span>Start Free Trial</span>
+                      )}
+                    </button>
+
+                    {/* Vendor Count */}
+                    <p className="text-center text-sm text-gray-500 mt-4">
+                      Up to <span className="font-semibold text-gray-700">{plan.vendors}</span> vendors
+                    </p>
                   </div>
 
-                  {/* CTA Button */}
-                  <button
-                    onClick={() => handleSelectPlan(plan)}
-                    disabled={loading === plan.name || isCurrentPlan}
-                    className={`w-full py-3 px-6 rounded-xl font-semibold text-white transition-all flex items-center justify-center space-x-2 ${
-                      isCurrentPlan
-                        ? 'bg-gray-400 cursor-not-allowed'
-                        : `${getColorClasses(plan.color, 'button')} hover:shadow-lg`
-                    }`}
-                  >
-                    {loading === plan.name ? (
-                      <>
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                        <span>Processing...</span>
-                      </>
-                    ) : isCurrentPlan ? (
-                      <span>Current Plan</span>
-                    ) : (
-                      <span>Get Started</span>
-                    )}
-                  </button>
-
-                  {/* Vendor Count */}
-                  <p className="text-center text-sm text-gray-500 mt-4">
-                    Up to {plan.vendors} vendors
-                  </p>
-                </div>
-
-                {/* Features */}
-                <div className="border-t border-gray-100 p-8 pt-6">
-                  <p className="text-sm font-semibold text-gray-900 mb-4">What's included:</p>
-                  <ul className="space-y-3">
-                    {plan.features.map((feature, idx) => (
-                      <li key={idx} className="flex items-start space-x-3">
-                        {feature.included ? (
-                          <Check className="w-5 h-5 text-emerald-500 flex-shrink-0 mt-0.5" />
-                        ) : (
-                          <X className="w-5 h-5 text-gray-300 flex-shrink-0 mt-0.5" />
-                        )}
-                        <span className={feature.included ? 'text-gray-700' : 'text-gray-400'}>
-                          {feature.text}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
+                  {/* Features */}
+                  <div className="border-t border-gray-100 p-8">
+                    <p className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                      <span>What's included</span>
+                    </p>
+                    <ul className="space-y-3">
+                      {plan.features.map((feature, idx) => (
+                        <li key={idx} className="flex items-start gap-3">
+                          {feature.included ? (
+                            <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                              isProfessional
+                                ? 'bg-emerald-100'
+                                : 'bg-gray-100'
+                            }`}>
+                              <Check className={`w-3 h-3 ${
+                                isProfessional ? 'text-emerald-600' : 'text-gray-600'
+                              }`} />
+                            </div>
+                          ) : (
+                            <div className="w-5 h-5 rounded-full bg-gray-50 flex items-center justify-center flex-shrink-0 mt-0.5">
+                              <X className="w-3 h-3 text-gray-300" />
+                            </div>
+                          )}
+                          <span className={feature.included ? 'text-gray-700' : 'text-gray-400'}>
+                            {feature.text}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 </div>
               </div>
             );
@@ -304,31 +323,38 @@ export function Pricing({ onBack, onSelectPlan, currentPlan, user }) {
         </div>
 
         {/* Enterprise CTA */}
-        <div className="mt-16 max-w-4xl mx-auto">
-          <div className="bg-gradient-to-r from-gray-900 to-gray-800 rounded-2xl p-8 md:p-12 text-center">
-            <h2 className="text-2xl md:text-3xl font-bold text-white mb-4">
-              Need more than 500 vendors?
-            </h2>
-            <p className="text-gray-300 mb-6 max-w-xl mx-auto">
-              Contact us for custom enterprise pricing with unlimited vendors, SSO, dedicated support, and custom integrations.
-            </p>
-            <a
-              href="mailto:sales@smartcoi.io"
-              className="inline-flex items-center px-8 py-3 bg-white text-gray-900 rounded-xl font-semibold hover:bg-gray-100 transition-colors"
-            >
-              Contact Sales
-            </a>
+        <div className="mt-20 max-w-4xl mx-auto">
+          <div className="relative">
+            <div className="absolute inset-0 bg-gradient-to-r from-gray-900 to-gray-800 rounded-3xl" />
+            <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:40px_40px] rounded-3xl" />
+            <div className="relative p-12 text-center">
+              <h2 className="text-3xl font-bold text-white mb-4">
+                Need more than 500 vendors?
+              </h2>
+              <p className="text-gray-400 mb-8 max-w-xl mx-auto">
+                Contact us for custom enterprise pricing with unlimited vendors, SSO, dedicated support, and custom integrations.
+              </p>
+              <a
+                href="mailto:sales@smartcoi.io"
+                className="inline-flex items-center gap-2 px-8 py-4 bg-white text-gray-900 rounded-xl font-semibold hover:bg-gray-100 hover:-translate-y-0.5 transition-all duration-300"
+              >
+                Contact Sales
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                </svg>
+              </a>
+            </div>
           </div>
         </div>
 
-        {/* FAQ or Trust */}
-        <div className="mt-16 text-center">
-          <p className="text-gray-500">
-            All plans include a 14-day free trial. No credit card required to start.
+        {/* FAQ Preview */}
+        <div className="mt-20 text-center">
+          <p className="text-gray-500 mb-2">
+            All plans include a <span className="text-gray-700 font-semibold">14-day free trial</span>
           </p>
-          <p className="text-gray-500 mt-2">
+          <p className="text-gray-500">
             Questions? Email us at{' '}
-            <a href="mailto:support@smartcoi.io" className="text-emerald-600 hover:underline">
+            <a href="mailto:support@smartcoi.io" className="text-emerald-600 hover:text-emerald-700 font-semibold hover:underline">
               support@smartcoi.io
             </a>
           </p>
@@ -336,11 +362,23 @@ export function Pricing({ onBack, onSelectPlan, currentPlan, user }) {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-gray-200 mt-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <p className="text-center text-gray-500 text-sm">
-            &copy; 2026 SmartCOI. All rights reserved.
-          </p>
+      <footer className="relative border-t border-gray-200 bg-white">
+        <div className="max-w-7xl mx-auto px-6 py-8">
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-lg flex items-center justify-center">
+                <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 9h-2v2H9v-2H7v-2h2V7h2v2h2v2z"/>
+                </svg>
+              </div>
+              <span className="font-bold text-gray-900">
+                Smart<span className="bg-gradient-to-r from-emerald-600 to-teal-500 bg-clip-text text-transparent">COI</span>
+              </span>
+            </div>
+            <p className="text-sm text-gray-500">
+              &copy; 2025 SmartCOI. All rights reserved.
+            </p>
+          </div>
         </div>
       </footer>
     </div>
