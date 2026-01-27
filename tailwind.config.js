@@ -6,7 +6,7 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        'comply-green': '#10B981',
+        'smartcoi-green': '#10B981',
       },
     },
   },

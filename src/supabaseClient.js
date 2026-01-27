@@ -1,5 +1,5 @@
 // src/supabaseClient.js
-// Supabase client initialization for Comply
+// Supabase client initialization for SmartCOI
 
 import { createClient } from '@supabase/supabase-js'
 

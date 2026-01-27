@@ -836,7 +836,7 @@ function ComplyApp({ user, onSignOut }) {
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">
                   {searchQuery || quickFilter !== 'all' 
                     ? 'No vendors found'
-                    : 'Welcome to Comply!'}
+                    : 'Welcome to SmartCOI!'}
                 </h3>
                 <p className="text-gray-600 mb-6">
                   {searchQuery || quickFilter !== 'all' 
