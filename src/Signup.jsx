@@ -3,13 +3,14 @@
 
 import React, { useState } from 'react'
 import { useAuth } from './AuthContext'
-import { AlertCircle, CheckCircle } from 'lucide-react'
+import { AlertCircle, CheckCircle, Building2 } from 'lucide-react'
 import { Logo } from './Logo'
 
 export default function Signup({ onSwitchToLogin, onBack }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [companyName, setCompanyName] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(false)
@@ -36,8 +37,15 @@ export default function Signup({ onSwitchToLogin, onBack }) {
       return
     }
 
+    // Validate company name
+    if (!companyName.trim()) {
+      setError('Company name is required')
+      setLoading(false)
+      return
+    }
+
     try {
-      await signUp(email, password)
+      await signUp(email, password, companyName.trim())
       setSuccess(true)
       // User will be redirected by AuthContext
     } catch (error) {
@@ -86,6 +94,24 @@ export default function Signup({ onSwitchToLogin, onBack }) {
         )}
 
         <form onSubmit={handleSignup} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Company Name
+            </label>
+            <div className="relative">
+              <Building2 className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+              <input
+                type="text"
+                value={companyName}
+                onChange={(e) => setCompanyName(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                placeholder="Acme Property Management"
+                required
+              />
+            </div>
+            <p className="text-xs text-gray-500 mt-1">This will be used for Additional Insured verification</p>
+          </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Email

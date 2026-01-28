@@ -38,12 +38,32 @@ export const AuthProvider = ({ children }) => {
   }, [])
 
   // Sign up with email and password
-  const signUp = async (email, password) => {
+  const signUp = async (email, password, companyName = null) => {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
     })
     if (error) throw error
+
+    // If signup successful and we have a company name, create settings record
+    if (data.user && companyName) {
+      try {
+        await supabase.from('settings').upsert({
+          user_id: data.user.id,
+          company_name: companyName,
+          general_liability: 1000000,
+          auto_liability: 1000000,
+          workers_comp: 'Statutory',
+          employers_liability: 500000,
+          require_additional_insured: true,
+          require_waiver_of_subrogation: false
+        }, { onConflict: 'user_id' })
+      } catch (settingsError) {
+        console.error('Failed to create settings:', settingsError)
+        // Don't throw - user is still created
+      }
+    }
+
     return data
   }
 
