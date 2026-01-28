@@ -21,6 +21,18 @@ interface Requirements {
   }>;
 }
 
+/**
+ * Normalize a company name for flexible matching
+ * Removes punctuation and extra whitespace, converts to lowercase
+ */
+function normalizeCompanyName(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()'"]/g, '') // Remove punctuation
+    .replace(/\s+/g, ' ') // Normalize whitespace
+    .trim();
+}
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -243,9 +255,12 @@ function buildVendorData(extractedData: any, requirements: Requirements) {
 
   // Check additional insured requirement
   if (requirements.company_name && requirements.require_additional_insured) {
-    const additionalInsuredText = (vendorData.additionalInsured || '').toLowerCase();
-    const companyName = requirements.company_name.toLowerCase();
-    if (!additionalInsuredText.includes(companyName)) {
+    const additionalInsuredText = vendorData.additionalInsured || '';
+    const normalizedAdditionalInsured = normalizeCompanyName(additionalInsuredText);
+    const normalizedCompanyName = normalizeCompanyName(requirements.company_name);
+
+    // Check if the normalized company name is found in the normalized additional insured text
+    if (!normalizedAdditionalInsured.includes(normalizedCompanyName)) {
       vendorData.status = 'non-compliant';
       vendorData.missingAdditionalInsured = true;
       issues.push({
