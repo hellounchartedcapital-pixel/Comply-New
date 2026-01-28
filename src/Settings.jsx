@@ -212,6 +212,15 @@ export function Settings({ onClose }) {
     }
   };
 
+  // Normalize a company name for flexible matching (removes punctuation, normalizes whitespace)
+  const normalizeCompanyName = (name) => {
+    return name
+      .toLowerCase()
+      .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()'"]/g, '') // Remove punctuation
+      .replace(/\s+/g, ' ') // Normalize whitespace
+      .trim();
+  };
+
   // Build vendor data with the new compliance checking logic
   const buildVendorData = (extractedData, requirements) => {
     // Get GL amounts - support both old format (single amount) and new format (occurrence/aggregate)
@@ -318,11 +327,11 @@ export function Settings({ onClose }) {
       }
     }
 
-    // 6. Check Additional Insured
+    // 6. Check Additional Insured (with flexible name matching)
     if (requirements.company_name && requirements.require_additional_insured) {
-      const additionalInsuredText = (vendorData.additionalInsured || '').toLowerCase();
-      const companyName = requirements.company_name.toLowerCase();
-      if (!additionalInsuredText.includes(companyName)) {
+      const normalizedAdditionalInsured = normalizeCompanyName(vendorData.additionalInsured || '');
+      const normalizedCompanyName = normalizeCompanyName(requirements.company_name);
+      if (!normalizedAdditionalInsured.includes(normalizedCompanyName)) {
         vendorData.status = 'non-compliant';
         vendorData.missingAdditionalInsured = true;
         issues.push({ type: 'error', message: `"${requirements.company_name}" not listed as Additional Insured` });
@@ -331,11 +340,11 @@ export function Settings({ onClose }) {
       }
     }
 
-    // 7. Check Certificate Holder (using company name)
+    // 7. Check Certificate Holder (using company name with flexible matching)
     if (requirements.company_name) {
-      const certHolderText = (vendorData.certificateHolder || '').toLowerCase();
-      const companyName = requirements.company_name.toLowerCase();
-      if (!certHolderText.includes(companyName)) {
+      const normalizedCertHolder = normalizeCompanyName(vendorData.certificateHolder || '');
+      const normalizedCompanyName = normalizeCompanyName(requirements.company_name);
+      if (!normalizedCertHolder.includes(normalizedCompanyName)) {
         // This is a warning, not necessarily non-compliant
         issues.push({ type: 'warning', message: `Certificate Holder may not match "${requirements.company_name}"` });
       }
