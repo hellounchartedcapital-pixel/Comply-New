@@ -1845,10 +1845,12 @@ function ComplyApp({ user, onSignOut }) {
       {/* Properties Modal */}
       {showProperties && (
         <Properties
+          isOpen={showProperties}
           onClose={() => {
             setShowProperties(false);
             loadProperties(); // Refresh properties list when closing
           }}
+          onPropertyChange={loadProperties}
         />
       )}
 
