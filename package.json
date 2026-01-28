@@ -1,6 +1,6 @@
 {
   "name": "smartcoi",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "private": true,
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",
