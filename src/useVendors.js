@@ -98,6 +98,9 @@ export function useVendors() {
       }
       setError(null);
 
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
       const startIndex = reset ? 0 : vendors.length;
       const endIndex = startIndex + PAGE_SIZE - 1;
 
@@ -105,13 +108,15 @@ export function useVendors() {
       if (reset) {
         const { count } = await supabase
           .from('vendors')
-          .select('*', { count: 'exact', head: true });
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', user.id);
         setTotalCount(count || 0);
       }
 
       const { data, error } = await supabase
         .from('vendors')
         .select('*')
+        .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .range(startIndex, endIndex);
 
@@ -235,13 +240,22 @@ export function useVendors() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      const { error } = await supabase
+      // Use select() to return the deleted row and verify deletion
+      const { data, error } = await supabase
         .from('vendors')
         .delete()
         .eq('id', id)
-        .eq('user_id', user.id);
+        .eq('user_id', user.id)
+        .select();
 
       if (error) throw error;
+
+      // Check if any row was actually deleted
+      if (!data || data.length === 0) {
+        throw new Error('Vendor not found or already deleted');
+      }
+
+      console.log('Successfully deleted vendor:', id);
 
       // Remove from local state
       setVendors(prev => prev.filter(v => v.id !== id));
