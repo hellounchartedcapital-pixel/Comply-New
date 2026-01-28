@@ -1603,6 +1603,63 @@ function ComplyApp({ user, onSignOut }) {
                 </div>
               </div>
 
+              {/* Property Assignment */}
+              {properties.length > 0 && (
+                <div className="p-4 bg-purple-50 border border-purple-200 rounded-xl">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <Building2 size={18} className="text-purple-600" />
+                      <h4 className="font-semibold text-purple-900">Assigned Property</h4>
+                    </div>
+                  </div>
+                  <div className="mt-3">
+                    <select
+                      value={selectedVendor.propertyId || ''}
+                      onChange={async (e) => {
+                        const newPropertyId = e.target.value || null;
+                        const result = await updateVendor(selectedVendor.id, {
+                          ...selectedVendor,
+                          propertyId: newPropertyId
+                        });
+                        if (result.success) {
+                          // Update the selected vendor in local state
+                          setSelectedVendor({
+                            ...selectedVendor,
+                            propertyId: newPropertyId
+                          });
+                          showAlert({
+                            type: 'success',
+                            title: 'Property Updated',
+                            message: newPropertyId
+                              ? `Vendor assigned to ${properties.find(p => p.id === newPropertyId)?.name}`
+                              : 'Vendor unassigned from property'
+                          });
+                          refreshVendors();
+                        } else {
+                          showAlert({
+                            type: 'error',
+                            title: 'Update Failed',
+                            message: 'Failed to update property assignment',
+                            details: result.error
+                          });
+                        }
+                      }}
+                      className="w-full px-4 py-2.5 border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white text-gray-900 font-medium"
+                    >
+                      <option value="">No Property (Unassigned)</option>
+                      {properties.map((property) => (
+                        <option key={property.id} value={property.id}>
+                          {property.name}{property.address ? ` - ${property.address}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-purple-600 mt-2">
+                      Assign this vendor to a property to use property-specific insurance requirements
+                    </p>
+                  </div>
+                </div>
+              )}
+
               <div>
                 <h4 className="font-bold text-gray-900 mb-3">Standard Coverage</h4>
                 <div className="grid grid-cols-2 gap-3">

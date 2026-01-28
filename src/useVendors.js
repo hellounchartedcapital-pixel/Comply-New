@@ -231,6 +231,7 @@ export function useVendors(propertyId = null) {
       if (updates.contactEmail !== undefined) dbUpdates.contact_email = updates.contactEmail;
       if (updates.contactPhone !== undefined) dbUpdates.contact_phone = updates.contactPhone;
       if (updates.contactNotes !== undefined) dbUpdates.contact_notes = updates.contactNotes;
+      if (updates.propertyId !== undefined) dbUpdates.property_id = updates.propertyId;
 
       const { data, error } = await supabase
         .from('vendors')
