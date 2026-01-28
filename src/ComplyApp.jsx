@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
-import { Upload, CheckCircle, XCircle, AlertCircle, FileText, Calendar, X, Search, Download, Settings as SettingsIcon, Eye, Bell, BarChart3, FileDown, Phone, Mail, User, Send, Clock, History, FileCheck } from 'lucide-react';
+import { Upload, CheckCircle, XCircle, AlertCircle, FileText, Calendar, X, Search, Download, Settings as SettingsIcon, Eye, Bell, FileDown, Phone, Mail, User, Send, Clock, History, FileCheck } from 'lucide-react';
 import { useVendors } from './useVendors';
 import { UploadModal } from './UploadModal';
 import { Settings } from './Settings';
 import { NotificationSettings } from './NotificationSettings';
-import { Analytics } from './Analytics';
 import { OnboardingTutorial } from './OnboardingTutorial';
 import { supabase } from './supabaseClient';
 import { extractCOIFromPDF } from './extractCOI';
@@ -49,7 +48,6 @@ function ComplyApp({ user, onSignOut }) {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [showAnalytics, setShowAnalytics] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboardingChecked, setOnboardingChecked] = useState(false);
   const [userRequirements, setUserRequirements] = useState(null);
@@ -320,6 +318,7 @@ function ComplyApp({ user, onSignOut }) {
   const stats = {
     total: vendors.length,
     expired: vendors.filter(v => v.status === 'expired').length,
+    expiring: vendors.filter(v => v.status === 'expiring').length,
     nonCompliant: vendors.filter(v => v.status === 'non-compliant').length,
     compliant: vendors.filter(v => v.status === 'compliant').length
   };
@@ -627,9 +626,159 @@ function ComplyApp({ user, onSignOut }) {
 
       {/* Main Content */}
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Stats */}
+        {/* Overview Section - Pie Chart & Upcoming Expirations */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          {/* Pie Chart Card */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-4">Compliance Overview</h3>
+            <div className="flex items-center justify-center">
+              <div className="relative">
+                {/* SVG Pie Chart */}
+                <svg width="180" height="180" viewBox="0 0 180 180" className="transform -rotate-90">
+                  {stats.total === 0 ? (
+                    <circle cx="90" cy="90" r="70" fill="none" stroke="#e5e7eb" strokeWidth="24" />
+                  ) : (
+                    <>
+                      {/* Compliant slice (green) */}
+                      <circle
+                        cx="90" cy="90" r="70"
+                        fill="none"
+                        stroke="#10b981"
+                        strokeWidth="24"
+                        strokeDasharray={`${(stats.compliant / stats.total) * 439.82} 439.82`}
+                        strokeDashoffset="0"
+                      />
+                      {/* Non-compliant slice (orange) */}
+                      <circle
+                        cx="90" cy="90" r="70"
+                        fill="none"
+                        stroke="#f97316"
+                        strokeWidth="24"
+                        strokeDasharray={`${(stats.nonCompliant / stats.total) * 439.82} 439.82`}
+                        strokeDashoffset={`${-(stats.compliant / stats.total) * 439.82}`}
+                      />
+                      {/* Expired slice (red) */}
+                      <circle
+                        cx="90" cy="90" r="70"
+                        fill="none"
+                        stroke="#ef4444"
+                        strokeWidth="24"
+                        strokeDasharray={`${(stats.expired / stats.total) * 439.82} 439.82`}
+                        strokeDashoffset={`${-((stats.compliant + stats.nonCompliant) / stats.total) * 439.82}`}
+                      />
+                      {/* Expiring slice (amber) */}
+                      <circle
+                        cx="90" cy="90" r="70"
+                        fill="none"
+                        stroke="#f59e0b"
+                        strokeWidth="24"
+                        strokeDasharray={`${(stats.expiring / stats.total) * 439.82} 439.82`}
+                        strokeDashoffset={`${-((stats.compliant + stats.nonCompliant + stats.expired) / stats.total) * 439.82}`}
+                      />
+                    </>
+                  )}
+                </svg>
+                {/* Center text */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="text-3xl font-bold text-gray-900">{stats.total}</span>
+                  <span className="text-xs text-gray-500 font-medium">Total</span>
+                </div>
+              </div>
+
+              {/* Legend */}
+              <div className="ml-8 space-y-3">
+                <div className="flex items-center space-x-3">
+                  <div className="w-4 h-4 rounded-full bg-emerald-500"></div>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">{stats.compliant} Compliant</p>
+                    <p className="text-xs text-gray-500">{stats.total > 0 ? Math.round((stats.compliant / stats.total) * 100) : 0}%</p>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <div className="w-4 h-4 rounded-full bg-orange-500"></div>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">{stats.nonCompliant} Non-Compliant</p>
+                    <p className="text-xs text-gray-500">{stats.total > 0 ? Math.round((stats.nonCompliant / stats.total) * 100) : 0}%</p>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <div className="w-4 h-4 rounded-full bg-red-500"></div>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">{stats.expired} Expired</p>
+                    <p className="text-xs text-gray-500">{stats.total > 0 ? Math.round((stats.expired / stats.total) * 100) : 0}%</p>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <div className="w-4 h-4 rounded-full bg-amber-500"></div>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">{stats.expiring} Expiring Soon</p>
+                    <p className="text-xs text-gray-500">{stats.total > 0 ? Math.round((stats.expiring / stats.total) * 100) : 0}%</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Upcoming Expirations Card */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-gray-900">Upcoming Expirations</h3>
+              <span className="text-xs bg-amber-100 text-amber-700 px-2.5 py-1 rounded-full font-semibold">Next 30 Days</span>
+            </div>
+            <div className="space-y-3 max-h-[220px] overflow-y-auto">
+              {vendors
+                .filter(v => {
+                  const today = new Date();
+                  const expDate = new Date(v.expirationDate);
+                  const daysUntil = Math.floor((expDate - today) / (1000 * 60 * 60 * 24));
+                  return daysUntil >= 0 && daysUntil <= 30;
+                })
+                .sort((a, b) => new Date(a.expirationDate) - new Date(b.expirationDate))
+                .slice(0, 5)
+                .map((vendor) => {
+                  const today = new Date();
+                  const expDate = new Date(vendor.expirationDate);
+                  const daysUntil = Math.floor((expDate - today) / (1000 * 60 * 60 * 24));
+                  return (
+                    <div key={vendor.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+                      <div className="flex items-center space-x-3">
+                        <div className={`w-2 h-2 rounded-full ${daysUntil <= 7 ? 'bg-red-500' : daysUntil <= 14 ? 'bg-amber-500' : 'bg-yellow-400'}`}></div>
+                        <div>
+                          <p className="text-sm font-semibold text-gray-900 truncate max-w-[180px]">{vendor.name}</p>
+                          <p className="text-xs text-gray-500">{formatDate(vendor.expirationDate)}</p>
+                        </div>
+                      </div>
+                      <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${
+                        daysUntil <= 7 ? 'bg-red-100 text-red-700' :
+                        daysUntil <= 14 ? 'bg-amber-100 text-amber-700' :
+                        'bg-yellow-100 text-yellow-700'
+                      }`}>
+                        {daysUntil === 0 ? 'Today' : daysUntil === 1 ? '1 day' : `${daysUntil} days`}
+                      </span>
+                    </div>
+                  );
+                })}
+              {vendors.filter(v => {
+                const today = new Date();
+                const expDate = new Date(v.expirationDate);
+                const daysUntil = Math.floor((expDate - today) / (1000 * 60 * 60 * 24));
+                return daysUntil >= 0 && daysUntil <= 30;
+              }).length === 0 && (
+                <div className="text-center py-8">
+                  <CheckCircle className="mx-auto text-emerald-400 mb-2" size={32} />
+                  <p className="text-sm text-gray-500 font-medium">No expirations in the next 30 days</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Stats Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5 hover:shadow-md transition-shadow">
+          <button
+            onClick={() => setQuickFilter('all')}
+            className={`bg-white rounded-2xl shadow-sm border p-5 hover:shadow-md transition-all text-left ${quickFilter === 'all' ? 'border-gray-900 ring-2 ring-gray-900' : 'border-gray-200'}`}
+          >
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-500 font-medium">Total Vendors</p>
@@ -639,9 +788,12 @@ function ComplyApp({ user, onSignOut }) {
                 <FileText className="text-gray-500" size={24} />
               </div>
             </div>
-          </div>
+          </button>
 
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5 hover:shadow-md transition-shadow">
+          <button
+            onClick={() => setQuickFilter('expired')}
+            className={`bg-white rounded-2xl shadow-sm border p-5 hover:shadow-md transition-all text-left ${quickFilter === 'expired' ? 'border-red-500 ring-2 ring-red-500' : 'border-gray-200'}`}
+          >
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-500 font-medium">Expired</p>
@@ -651,9 +803,12 @@ function ComplyApp({ user, onSignOut }) {
                 <XCircle className="text-red-500" size={24} />
               </div>
             </div>
-          </div>
+          </button>
 
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5 hover:shadow-md transition-shadow">
+          <button
+            onClick={() => setQuickFilter('non-compliant')}
+            className={`bg-white rounded-2xl shadow-sm border p-5 hover:shadow-md transition-all text-left ${quickFilter === 'non-compliant' ? 'border-orange-500 ring-2 ring-orange-500' : 'border-gray-200'}`}
+          >
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-500 font-medium">Non-Compliant</p>
@@ -663,9 +818,12 @@ function ComplyApp({ user, onSignOut }) {
                 <AlertCircle className="text-orange-500" size={24} />
               </div>
             </div>
-          </div>
+          </button>
 
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5 hover:shadow-md transition-shadow">
+          <button
+            onClick={() => setQuickFilter('compliant')}
+            className={`bg-white rounded-2xl shadow-sm border p-5 hover:shadow-md transition-all text-left ${quickFilter === 'compliant' ? 'border-emerald-500 ring-2 ring-emerald-500' : 'border-gray-200'}`}
+          >
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-500 font-medium">Compliant</p>
@@ -675,87 +833,14 @@ function ComplyApp({ user, onSignOut }) {
                 <CheckCircle className="text-emerald-500" size={24} />
               </div>
             </div>
-          </div>
-        </div>
-
-        {/* Analytics Button */}
-        <div className="mb-6" data-onboarding="analytics-button">
-          <button
-            onClick={() => setShowAnalytics(true)}
-            className="w-full bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 text-white rounded-2xl p-4 hover:shadow-lg hover:shadow-emerald-500/25 transition-all duration-200 flex items-center justify-center space-x-3 font-semibold"
-          >
-            <BarChart3 size={22} />
-            <span className="text-lg">View Detailed Analytics & Insights</span>
           </button>
         </div>
 
-        {/* Filters */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5 mb-6">
-          {/* Quick Filter Buttons */}
-          <div className="mb-5" data-onboarding="quick-filters">
-            <h3 className="text-sm font-semibold text-gray-700 mb-3">Quick Filters</h3>
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={() => setQuickFilter('all')}
-                className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
-                  quickFilter === 'all'
-                    ? 'bg-gray-900 text-white shadow-md'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                All ({vendors.length})
-              </button>
-              <button
-                onClick={() => setQuickFilter('expired')}
-                className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all flex items-center gap-1.5 ${
-                  quickFilter === 'expired'
-                    ? 'bg-red-600 text-white shadow-md'
-                    : 'bg-red-50 text-red-700 hover:bg-red-100'
-                }`}
-              >
-                <XCircle size={14} />
-                Expired ({vendors.filter(v => v.status === 'expired').length})
-              </button>
-              <button
-                onClick={() => setQuickFilter('expiring')}
-                className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all flex items-center gap-1.5 ${
-                  quickFilter === 'expiring'
-                    ? 'bg-amber-500 text-white shadow-md'
-                    : 'bg-amber-50 text-amber-700 hover:bg-amber-100'
-                }`}
-              >
-                <AlertCircle size={14} />
-                <span className="hidden sm:inline">Expiring Soon</span>
-                <span className="sm:hidden">Expiring</span>
-                ({vendors.filter(v => v.status === 'expiring').length})
-              </button>
-              <button
-                onClick={() => setQuickFilter('non-compliant')}
-                className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all flex items-center gap-1.5 ${
-                  quickFilter === 'non-compliant'
-                    ? 'bg-orange-600 text-white shadow-md'
-                    : 'bg-orange-50 text-orange-700 hover:bg-orange-100'
-                }`}
-              >
-                <AlertCircle size={14} />
-                Non-Compliant ({vendors.filter(v => v.status === 'non-compliant').length})
-              </button>
-              <button
-                onClick={() => setQuickFilter('compliant')}
-                className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all flex items-center gap-1.5 ${
-                  quickFilter === 'compliant'
-                    ? 'bg-emerald-600 text-white shadow-md'
-                    : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                }`}
-              >
-                <CheckCircle size={14} />
-                Compliant ({vendors.filter(v => v.status === 'compliant').length})
-              </button>
-            </div>
-          </div>
 
+        {/* Filters */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5 mb-6" data-onboarding="quick-filters">
           {/* Search and Sort Controls */}
-          <div className="flex flex-wrap gap-3 items-center pt-4 border-t border-gray-100">
+          <div className="flex flex-wrap gap-3 items-center">
             {/* Search */}
             <div className="flex-1 min-w-[200px]">
               <div className="relative">
@@ -1495,10 +1580,6 @@ function ComplyApp({ user, onSignOut }) {
         <NotificationSettings onClose={() => setShowNotifications(false)} />
       )}
 
-      {/* Analytics Modal */}
-      {showAnalytics && (
-        <Analytics vendors={vendors} onClose={() => setShowAnalytics(false)} />
-      )}
 
       {/* Onboarding Tutorial */}
       {onboardingChecked && showOnboarding && (
