@@ -216,7 +216,7 @@ export function Settings({ onClose }) {
   const normalizeCompanyName = (name) => {
     return name
       .toLowerCase()
-      .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()'"]/g, '') // Remove punctuation
+      .replace(/[.,/#!$%^&*;:{}=\-_`~()'"]/g, '') // Remove punctuation
       .replace(/\s+/g, ' ') // Normalize whitespace
       .trim();
   };
