@@ -1592,28 +1592,31 @@ function ComplyApp({ user, onSignOut }) {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {vendorActivity.map((activity) => (
+                    {vendorActivity.map((activity) => {
+                      const actionType = activity.action || activity.activity_type;
+                      const description = activity.details?.reason || activity.details?.description || activity.description || '';
+                      return (
                       <div
                         key={activity.id}
                         className={`p-4 rounded-xl border ${
-                          activity.activity_type === 'coi_uploaded'
+                          actionType === 'coi_uploaded'
                             ? 'bg-emerald-50 border-emerald-200'
-                            : activity.activity_type === 'email_sent'
+                            : actionType === 'email_sent' || actionType === 'auto_follow_up_sent'
                             ? 'bg-blue-50 border-blue-200'
                             : 'bg-gray-50 border-gray-200'
                         }`}
                       >
                         <div className="flex items-start space-x-3">
                           <div className={`p-2 rounded-xl ${
-                            activity.activity_type === 'coi_uploaded'
+                            actionType === 'coi_uploaded'
                               ? 'bg-emerald-100'
-                              : activity.activity_type === 'email_sent'
+                              : actionType === 'email_sent' || actionType === 'auto_follow_up_sent'
                               ? 'bg-blue-100'
                               : 'bg-gray-100'
                           }`}>
-                            {activity.activity_type === 'coi_uploaded' ? (
+                            {actionType === 'coi_uploaded' ? (
                               <Upload size={16} className="text-emerald-600" />
-                            ) : activity.activity_type === 'email_sent' ? (
+                            ) : actionType === 'email_sent' || actionType === 'auto_follow_up_sent' ? (
                               <Mail size={16} className="text-blue-600" />
                             ) : (
                               <Clock size={16} className="text-gray-600" />
@@ -1621,20 +1624,25 @@ function ComplyApp({ user, onSignOut }) {
                           </div>
                           <div className="flex-1">
                             <p className="font-semibold text-gray-900">
-                              {activity.activity_type === 'coi_uploaded'
+                              {actionType === 'coi_uploaded'
                                 ? 'COI Uploaded'
-                                : activity.activity_type === 'email_sent'
+                                : actionType === 'email_sent'
                                 ? 'Request Email Sent'
-                                : activity.activity_type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                                : actionType === 'auto_follow_up_sent'
+                                ? 'Auto Follow-Up Sent'
+                                : actionType?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Activity'}
                             </p>
-                            <p className="text-sm text-gray-600 mt-1">{activity.description}</p>
+                            {description && <p className="text-sm text-gray-600 mt-1">{description}</p>}
+                            {activity.details?.email && (
+                              <p className="text-sm text-gray-500 mt-1">To: {activity.details.email}</p>
+                            )}
                             <p className="text-xs text-gray-400 mt-2">
                               {new Date(activity.created_at).toLocaleString()}
                             </p>
                           </div>
                         </div>
                       </div>
-                    ))}
+                    )})}
                   </div>
                 )}
               </div>
