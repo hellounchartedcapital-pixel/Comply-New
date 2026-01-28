@@ -632,11 +632,11 @@ export function LandingPage({ onLogin, onSignUp, onPrivacy, onTerms }) {
           </div>
 
           {/* Pricing cards */}
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
             {pricingTiers.map((tier, index) => (
               <div
                 key={index}
-                className={`relative bg-white rounded-2xl p-6 shadow-xl overflow-hidden transition-all duration-300 hover:-translate-y-1 ${
+                className={`relative bg-white rounded-2xl p-6 shadow-xl overflow-hidden transition-all duration-300 hover:-translate-y-1 max-w-sm mx-auto md:max-w-none w-full ${
                   tier.popular ? 'border-2 border-emerald-500 shadow-2xl' : 'border border-gray-200'
                 }`}
               >
