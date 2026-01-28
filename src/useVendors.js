@@ -155,6 +155,9 @@ export function useVendors() {
 
       if (!user) throw new Error('Not authenticated');
 
+      // Generate upload token if not provided (for vendor upload portal)
+      const uploadToken = vendorData.rawData?.uploadToken || crypto.randomUUID();
+
       const { data, error } = await supabase
         .from('vendors')
         .insert([{
@@ -179,7 +182,8 @@ export function useVendors() {
           contact_name: vendorData.contactName || null,
           contact_email: vendorData.contactEmail || null,
           contact_phone: vendorData.contactPhone || null,
-          contact_notes: vendorData.contactNotes || null
+          contact_notes: vendorData.contactNotes || null,
+          upload_token: uploadToken
         }])
         .select()
         .single();

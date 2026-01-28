@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { X, Upload, AlertCircle, CheckCircle } from 'lucide-react';
+import { X, Upload, AlertCircle, CheckCircle, Mail, Info } from 'lucide-react';
 
 export function UploadModal({ isOpen, onClose, onUploadComplete }) {
   const [selectedFile, setSelectedFile] = useState(null);
+  const [vendorEmail, setVendorEmail] = useState('');
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState(null);
   const [dragActive, setDragActive] = useState(false);
@@ -62,6 +63,12 @@ export function UploadModal({ isOpen, onClose, onUploadComplete }) {
       return;
     }
 
+    // Validate email if provided
+    if (vendorEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(vendorEmail)) {
+      setError('Please enter a valid email address');
+      return;
+    }
+
     setUploading(true);
     setError(null);
     setExtractionStatus('Reading PDF...');
@@ -71,10 +78,12 @@ export function UploadModal({ isOpen, onClose, onUploadComplete }) {
       const progressCallback = (status) => {
         setExtractionStatus(status);
       };
-      
-      await onUploadComplete(selectedFile, progressCallback);
-      
+
+      // Pass vendor email along with file
+      await onUploadComplete(selectedFile, progressCallback, vendorEmail || null);
+
       setSelectedFile(null);
+      setVendorEmail('');
       setExtractionStatus('');
       onClose();
     } catch (err) {
@@ -88,6 +97,7 @@ export function UploadModal({ isOpen, onClose, onUploadComplete }) {
   const handleClose = () => {
     if (!uploading) {
       setSelectedFile(null);
+      setVendorEmail('');
       setError(null);
       onClose();
     }
@@ -152,6 +162,31 @@ export function UploadModal({ isOpen, onClose, onUploadComplete }) {
           )}
         </div>
 
+        {/* Vendor Email Input - shown after file is selected */}
+        {selectedFile && (
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              Vendor Contact Email
+              <span className="text-gray-400 font-normal ml-1">(recommended)</span>
+            </label>
+            <div className="relative">
+              <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+              <input
+                type="email"
+                value={vendorEmail}
+                onChange={(e) => setVendorEmail(e.target.value)}
+                placeholder="vendor@example.com"
+                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                disabled={uploading}
+              />
+            </div>
+            <div className="mt-2 flex items-start gap-1.5 text-xs text-gray-500">
+              <Info size={14} className="flex-shrink-0 mt-0.5" />
+              <span>Adding an email enables automatic follow-ups when the certificate expires or is non-compliant.</span>
+            </div>
+          </div>
+        )}
+
         {error && (
           <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start space-x-2">
             <AlertCircle className="text-red-500 flex-shrink-0 mt-0.5" size={20} />
@@ -159,8 +194,8 @@ export function UploadModal({ isOpen, onClose, onUploadComplete }) {
           </div>
         )}
 
-        <div className="mb-3 sm:mb-4 p-2.5 sm:p-3 bg-blue-50 border border-blue-200 rounded-lg">
-          <p className="text-xs sm:text-sm text-blue-800">
+        <div className="mb-3 sm:mb-4 p-2.5 sm:p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+          <p className="text-xs sm:text-sm text-emerald-800">
             <strong>AI-Powered!</strong> Upload your COI PDF and our AI will automatically extract all data and check compliance.
           </p>
         </div>
