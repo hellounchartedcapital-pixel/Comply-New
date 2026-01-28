@@ -238,9 +238,12 @@ export function Settings({ onClose }) {
         }))
       };
 
+      console.log('Rechecking compliance with requirements:', requirements);
+      console.log('Supabase URL:', process.env.REACT_APP_SUPABASE_URL);
+
       // Call the recheck-compliance edge function
       const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/recheck-compliance`,
+        `${process.env.REACT_APP_SUPABASE_URL}/functions/v1/recheck-compliance`,
         {
           method: 'POST',
           headers: {
@@ -251,7 +254,9 @@ export function Settings({ onClose }) {
         }
       );
 
+      console.log('Response status:', response.status);
       const result = await response.json();
+      console.log('Recheck result:', result);
 
       if (!result.success) {
         console.error('Recheck compliance error:', result.error);
