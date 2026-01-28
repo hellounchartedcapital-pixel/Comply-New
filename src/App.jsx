@@ -10,7 +10,6 @@ import ComplyApp from './ComplyApp'
 import { PrivacyPolicy } from './PrivacyPolicy'
 import { TermsOfService } from './TermsOfService'
 import { VendorUploadPortal } from './VendorUploadPortal'
-import { Pricing } from './Pricing'
 import { Loader2 } from 'lucide-react'
 
 function AppContent() {
@@ -19,7 +18,6 @@ function AppContent() {
   const [showAuth, setShowAuth] = useState(false)
   const [showPrivacy, setShowPrivacy] = useState(false)
   const [showTerms, setShowTerms] = useState(false)
-  const [showPricing, setShowPricing] = useState(false)
   const [uploadToken, setUploadToken] = useState(null)
 
   // Check URL for upload token on mount
@@ -66,26 +64,6 @@ function AppContent() {
     return <TermsOfService onBack={() => setShowTerms(false)} />
   }
 
-  // Show Pricing page
-  if (showPricing) {
-    return (
-      <Pricing
-        onBack={() => setShowPricing(false)}
-        user={user}
-        onSelectPlan={(plan, action) => {
-          if (action === 'signup') {
-            setShowPricing(false)
-            setShowSignup(true)
-            setShowAuth(true)
-          } else {
-            // TODO: Implement Stripe checkout
-            console.log('Checkout for plan:', plan)
-          }
-        }}
-      />
-    )
-  }
-
   // If not logged in, show Landing Page or Auth screens
   if (!user) {
     // Show landing page unless user clicked Login or Sign Up
@@ -96,7 +74,6 @@ function AppContent() {
           onSignUp={() => { setShowSignup(true); setShowAuth(true); }}
           onPrivacy={() => setShowPrivacy(true)}
           onTerms={() => setShowTerms(true)}
-          onPricing={() => setShowPricing(true)}
         />
       )
     }
