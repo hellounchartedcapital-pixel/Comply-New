@@ -310,17 +310,31 @@ export function LandingPage({ onLogin, onSignUp, onPrivacy, onTerms }) {
       popular: false,
     },
     {
+      name: "Basic",
+      price: "$29",
+      period: "/month",
+      description: "For small teams",
+      vendors: "Up to 25 vendors",
+      features: [
+        "Everything in Starter",
+        "Automated vendor follow-ups",
+        "Custom compliance requirements",
+        "PDF & CSV exports",
+        "Email support",
+      ],
+      cta: "Get Started Free",
+      popular: false,
+    },
+    {
       name: "Professional",
       price: "$49",
       period: "/month",
       description: "For growing businesses",
       vendors: "Up to 50 vendors",
       features: [
-        "Everything in Starter",
-        "Automated vendor follow-ups",
-        "Custom compliance requirements",
-        "PDF & CSV exports",
+        "Everything in Basic",
         "Priority email support",
+        "Advanced reporting",
       ],
       cta: "Get Started Free",
       popular: true,
@@ -618,11 +632,11 @@ export function LandingPage({ onLogin, onSignUp, onPrivacy, onTerms }) {
           </div>
 
           {/* Pricing cards */}
-          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
             {pricingTiers.map((tier, index) => (
               <div
                 key={index}
-                className={`relative bg-white rounded-3xl p-8 shadow-xl overflow-hidden transition-all duration-300 hover:-translate-y-1 ${
+                className={`relative bg-white rounded-2xl p-6 shadow-xl overflow-hidden transition-all duration-300 hover:-translate-y-1 ${
                   tier.popular ? 'border-2 border-emerald-500 shadow-2xl' : 'border border-gray-200'
                 }`}
               >
