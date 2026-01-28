@@ -1,18 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { Save, X, CheckCircle, AlertCircle, FileText, Sparkles, Info } from 'lucide-react';
+import { Save, X, CheckCircle, AlertCircle, Sparkles, Info } from 'lucide-react';
 import { supabase } from './supabaseClient';
-import { extractRequirementsFromPDF } from './extractRequirements';
 
 export function Settings({ onClose }) {
   const [settings, setSettings] = useState({
-    // GL Requirements
+    // GL Requirements (stored as general_liability in DB)
     glEachOccurrence: 1000000,
     glAggregate: 2000000,
 
     // Workers Comp
     workersCompRequired: true,
 
-    // Auto Liability
+    // Auto Liability (stored as auto_liability in DB)
     autoLiabilityRequired: false,
     autoLiabilityMinimum: 1000000,
 
@@ -20,7 +19,7 @@ export function Settings({ onClose }) {
     companyName: '',
     requireAdditionalInsured: true,
 
-    // Waiver of Subrogation (keeping this as it's common)
+    // Waiver of Subrogation
     requireWaiverOfSubrogation: false
   });
 
@@ -29,11 +28,6 @@ export function Settings({ onClose }) {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [error, setError] = useState(null);
   const [recheckingCompliance, setRecheckingCompliance] = useState(false);
-
-  // AI Extraction states
-  const [extracting, setExtracting] = useState(false);
-  const [extractionResult, setExtractionResult] = useState(null);
-  const [showExtractedData, setShowExtractedData] = useState(false);
 
   // Load settings on mount
   useEffect(() => {
@@ -57,13 +51,15 @@ export function Settings({ onClose }) {
       }
 
       if (data) {
-        // Support both old and new field names for backward compatibility
+        // Map existing DB columns to our settings structure
+        // GL occurrence is stored in general_liability, aggregate is 2x that
+        const glOccurrence = data.general_liability || 1000000;
         setSettings({
-          glEachOccurrence: data.gl_each_occurrence || data.general_liability || 1000000,
-          glAggregate: data.gl_aggregate || (data.general_liability ? data.general_liability * 2 : 2000000),
-          workersCompRequired: data.workers_comp_required !== undefined ? data.workers_comp_required : true,
-          autoLiabilityRequired: data.auto_liability_required !== undefined ? data.auto_liability_required : false,
-          autoLiabilityMinimum: data.auto_liability_minimum || data.auto_liability || 1000000,
+          glEachOccurrence: glOccurrence,
+          glAggregate: glOccurrence * 2, // Aggregate is typically 2x occurrence
+          workersCompRequired: data.workers_comp !== 'Not Required',
+          autoLiabilityRequired: (data.auto_liability || 0) > 0,
+          autoLiabilityMinimum: data.auto_liability || 1000000,
           companyName: data.company_name || '',
           requireAdditionalInsured: data.require_additional_insured !== false,
           requireWaiverOfSubrogation: data.require_waiver_of_subrogation || false
@@ -77,60 +73,6 @@ export function Settings({ onClose }) {
     }
   };
 
-  const handlePDFUpload = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (file.type !== 'application/pdf') {
-      setError('Please upload a PDF file');
-      return;
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      setError('File size must be less than 5MB');
-      return;
-    }
-
-    try {
-      setExtracting(true);
-      setError(null);
-      setExtractionResult(null);
-
-      const result = await extractRequirementsFromPDF(file);
-
-      if (result.success) {
-        setExtractionResult(result.data);
-        setShowExtractedData(true);
-        applyExtractedRequirements(result.data);
-      } else {
-        setError('Failed to extract requirements: ' + result.error);
-      }
-    } catch (err) {
-      console.error('Error processing PDF:', err);
-      setError('Failed to process PDF: ' + err.message);
-    } finally {
-      setExtracting(false);
-      e.target.value = '';
-    }
-  };
-
-  const applyExtractedRequirements = (extractedData) => {
-    const { requirements } = extractedData;
-    const newSettings = { ...settings };
-
-    if (requirements.general_liability?.amount) {
-      newSettings.glEachOccurrence = requirements.general_liability.amount;
-      newSettings.glAggregate = requirements.general_liability.amount * 2;
-    }
-
-    if (requirements.auto_liability?.amount) {
-      newSettings.autoLiabilityRequired = true;
-      newSettings.autoLiabilityMinimum = requirements.auto_liability.amount;
-    }
-
-    setSettings(newSettings);
-  };
-
   const saveSettings = async () => {
     try {
       setSaving(true);
@@ -140,22 +82,16 @@ export function Settings({ onClose }) {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
+      // Use only existing database columns
       const settingsData = {
         user_id: user.id,
-        // New field names
-        gl_each_occurrence: settings.glEachOccurrence,
-        gl_aggregate: settings.glAggregate,
-        workers_comp_required: settings.workersCompRequired,
-        auto_liability_required: settings.autoLiabilityRequired,
-        auto_liability_minimum: settings.autoLiabilityMinimum,
+        general_liability: settings.glEachOccurrence,
+        auto_liability: settings.autoLiabilityRequired ? settings.autoLiabilityMinimum : 0,
+        workers_comp: settings.workersCompRequired ? 'Statutory' : 'Not Required',
+        employers_liability: 500000,
         company_name: settings.companyName,
         require_additional_insured: settings.requireAdditionalInsured,
-        require_waiver_of_subrogation: settings.requireWaiverOfSubrogation,
-        // Keep old field names for backward compatibility
-        general_liability: settings.glEachOccurrence,
-        auto_liability: settings.autoLiabilityMinimum,
-        workers_comp: 'Statutory',
-        employers_liability: 500000
+        require_waiver_of_subrogation: settings.requireWaiverOfSubrogation
       };
 
       const { error } = await supabase
@@ -167,8 +103,22 @@ export function Settings({ onClose }) {
       setSaving(false);
       setSaveSuccess(true);
 
+      // Build requirements object for compliance rechecking
+      const requirements = {
+        general_liability: settings.glEachOccurrence,
+        gl_aggregate: settings.glAggregate,
+        auto_liability: settings.autoLiabilityRequired ? settings.autoLiabilityMinimum : 0,
+        auto_liability_required: settings.autoLiabilityRequired,
+        workers_comp: settings.workersCompRequired ? 'Statutory' : 'Not Required',
+        workers_comp_required: settings.workersCompRequired,
+        employers_liability: 500000,
+        company_name: settings.companyName,
+        require_additional_insured: settings.requireAdditionalInsured,
+        require_waiver_of_subrogation: settings.requireWaiverOfSubrogation
+      };
+
       // Recheck compliance for all vendors with new requirements
-      await recheckAllVendors(settingsData);
+      await recheckAllVendors(requirements);
 
     } catch (err) {
       console.error('Error saving settings:', err);
@@ -177,24 +127,12 @@ export function Settings({ onClose }) {
     }
   };
 
-  const recheckAllVendors = async (settingsData) => {
+  const recheckAllVendors = async (requirements) => {
     try {
       setRecheckingCompliance(true);
 
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
-
-      // Prepare requirements with new structure
-      const requirements = {
-        gl_each_occurrence: settingsData.gl_each_occurrence,
-        gl_aggregate: settingsData.gl_aggregate,
-        workers_comp_required: settingsData.workers_comp_required,
-        auto_liability_required: settingsData.auto_liability_required,
-        auto_liability_minimum: settingsData.auto_liability_minimum,
-        company_name: settingsData.company_name,
-        require_additional_insured: settingsData.require_additional_insured,
-        require_waiver_of_subrogation: settingsData.require_waiver_of_subrogation
-      };
 
       console.log('Rechecking compliance with requirements:', requirements);
 
@@ -261,6 +199,13 @@ export function Settings({ onClose }) {
     const glOccurrence = extractedData.generalLiability?.eachOccurrence || extractedData.generalLiability?.amount || 0;
     const glAggregate = extractedData.generalLiability?.aggregate || (extractedData.generalLiability?.amount ? extractedData.generalLiability.amount * 2 : 0);
 
+    // Get required values from requirements (using existing DB column names)
+    const reqGLOccurrence = requirements.general_liability || 1000000;
+    const reqGLAggregate = requirements.gl_aggregate || (reqGLOccurrence * 2);
+    const autoLiabilityRequired = requirements.auto_liability_required || (requirements.auto_liability > 0);
+    const autoLiabilityMin = requirements.auto_liability || 1000000;
+    const workersCompRequired = requirements.workers_comp_required !== false && requirements.workers_comp !== 'Not Required';
+
     const vendorData = {
       name: extractedData.companyName || 'Unknown Company',
       dba: extractedData.dba,
@@ -271,19 +216,19 @@ export function Settings({ onClose }) {
           aggregate: glAggregate,
           amount: glOccurrence, // Keep for backward compatibility
           expirationDate: extractedData.generalLiability?.expirationDate,
-          compliant: glOccurrence >= requirements.gl_each_occurrence && glAggregate >= requirements.gl_aggregate
+          compliant: glOccurrence >= reqGLOccurrence && glAggregate >= reqGLAggregate
         },
         autoLiability: {
           amount: extractedData.autoLiability?.amount || 0,
           expirationDate: extractedData.autoLiability?.expirationDate,
           present: (extractedData.autoLiability?.amount || 0) > 0,
-          compliant: !requirements.auto_liability_required || (extractedData.autoLiability?.amount || 0) >= requirements.auto_liability_minimum
+          compliant: !autoLiabilityRequired || (extractedData.autoLiability?.amount || 0) >= autoLiabilityMin
         },
         workersComp: {
           amount: extractedData.workersComp?.amount || 'Statutory',
           expirationDate: extractedData.workersComp?.expirationDate,
           present: extractedData.workersComp?.amount !== null && extractedData.workersComp?.amount !== undefined,
-          compliant: !requirements.workers_comp_required || (extractedData.workersComp?.amount !== null && extractedData.workersComp?.amount !== undefined)
+          compliant: !workersCompRequired || (extractedData.workersComp?.amount !== null && extractedData.workersComp?.amount !== undefined)
         },
         employersLiability: {
           amount: extractedData.employersLiability?.amount || 0,
@@ -317,39 +262,39 @@ export function Settings({ onClose }) {
     }
 
     // 2. Check GL Each Occurrence
-    if (glOccurrence < requirements.gl_each_occurrence) {
+    if (glOccurrence < reqGLOccurrence) {
       vendorData.status = 'non-compliant';
       issues.push({
         type: 'error',
-        message: `GL Each Occurrence: $${formatAmount(glOccurrence)} (requires $${formatAmount(requirements.gl_each_occurrence)})`
+        message: `GL Each Occurrence: $${formatAmount(glOccurrence)} (requires $${formatAmount(reqGLOccurrence)})`
       });
     }
 
     // 3. Check GL Aggregate
-    if (glAggregate < requirements.gl_aggregate) {
+    if (glAggregate < reqGLAggregate) {
       vendorData.status = 'non-compliant';
       issues.push({
         type: 'error',
-        message: `GL Aggregate: $${formatAmount(glAggregate)} (requires $${formatAmount(requirements.gl_aggregate)})`
+        message: `GL Aggregate: $${formatAmount(glAggregate)} (requires $${formatAmount(reqGLAggregate)})`
       });
     }
 
     // 4. Check Workers Comp (Present?)
-    if (requirements.workers_comp_required && !vendorData.coverage.workersComp.present) {
+    if (workersCompRequired && !vendorData.coverage.workersComp.present) {
       vendorData.status = 'non-compliant';
       issues.push({ type: 'error', message: 'Workers Compensation not present' });
     }
 
     // 5. Check Auto Liability (Present & meets minimum if required)
-    if (requirements.auto_liability_required) {
+    if (autoLiabilityRequired) {
       if (!vendorData.coverage.autoLiability.present) {
         vendorData.status = 'non-compliant';
         issues.push({ type: 'error', message: 'Auto Liability not present (required)' });
-      } else if ((extractedData.autoLiability?.amount || 0) < requirements.auto_liability_minimum) {
+      } else if ((extractedData.autoLiability?.amount || 0) < autoLiabilityMin) {
         vendorData.status = 'non-compliant';
         issues.push({
           type: 'error',
-          message: `Auto Liability: $${formatAmount(extractedData.autoLiability?.amount || 0)} (requires $${formatAmount(requirements.auto_liability_minimum)})`
+          message: `Auto Liability: $${formatAmount(extractedData.autoLiability?.amount || 0)} (requires $${formatAmount(autoLiabilityMin)})`
         });
       }
     }
@@ -482,56 +427,6 @@ export function Settings({ onClose }) {
               <p className="text-red-800">{error}</p>
             </div>
           )}
-
-          {/* AI Upload Section */}
-          <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 hover:border-green-400 transition-colors">
-            <div className="text-center">
-              <div className="flex justify-center mb-4">
-                <div className="w-14 h-14 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-xl flex items-center justify-center">
-                  <Sparkles className="text-white" size={28} />
-                </div>
-              </div>
-              <h3 className="text-base font-semibold mb-2">Import from Document</h3>
-              <p className="text-sm text-gray-600 mb-4">
-                Upload a lease or requirements doc - AI will extract coverage requirements
-              </p>
-
-              {extracting ? (
-                <div className="flex flex-col items-center space-y-3">
-                  <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-green-500"></div>
-                  <p className="text-gray-600 font-medium">Analyzing document...</p>
-                </div>
-              ) : (
-                <label className="inline-flex items-center space-x-2 px-5 py-2.5 bg-green-500 text-white rounded-lg hover:bg-green-600 cursor-pointer transition-colors">
-                  <FileText size={18} />
-                  <span className="font-medium">Upload PDF</span>
-                  <input
-                    type="file"
-                    accept=".pdf"
-                    onChange={handlePDFUpload}
-                    className="hidden"
-                  />
-                </label>
-              )}
-
-              {extractionResult && showExtractedData && (
-                <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg text-left">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <CheckCircle className="text-green-500" size={18} />
-                      <p className="font-medium text-green-800 text-sm">Requirements extracted!</p>
-                    </div>
-                    <button
-                      onClick={() => setShowExtractedData(false)}
-                      className="text-gray-400 hover:text-gray-600"
-                    >
-                      <X size={16} />
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
 
           {/* Compliance Checklist */}
           <div className="space-y-4">
