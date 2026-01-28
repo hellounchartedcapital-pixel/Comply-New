@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Upload, CheckCircle, XCircle, AlertCircle, FileText, Calendar, X, Search, Download, Settings as SettingsIcon, Eye, Bell, FileDown, Phone, Mail, User, Send, Clock, History, FileCheck } from 'lucide-react';
+import { Upload, CheckCircle, XCircle, AlertCircle, FileText, Calendar, X, Search, Download, Settings as SettingsIcon, Eye, Bell, FileDown, Phone, Mail, User, Send, Clock, History, FileCheck, Sparkles } from 'lucide-react';
 import { useVendors } from './useVendors';
 import { UploadModal } from './UploadModal';
 import { Settings } from './Settings';
@@ -56,6 +56,8 @@ function ComplyApp({ user, onSignOut }) {
   const [vendorDetailsTab, setVendorDetailsTab] = useState('details');
   const [vendorActivity, setVendorActivity] = useState([]);
   const [loadingActivity, setLoadingActivity] = useState(false);
+  const [uploadingCOI, setUploadingCOI] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState('');
 
   // Load user requirements and check onboarding status on mount
   React.useEffect(() => {
@@ -486,10 +488,16 @@ function ComplyApp({ user, onSignOut }) {
   // Handle file upload with AI extraction
   const handleFileUpload = async (file, progressCallback) => {
     try {
+      // Show full-screen loading overlay
+      setUploadingCOI(true);
+      setUploadStatus('Reading PDF...');
+      setShowUploadModal(false); // Close the upload modal
+
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
       // Step 1: Extract data using AI
+      setUploadStatus('AI analyzing certificate...');
       if (progressCallback) progressCallback('AI extracting data...');
       console.log('Extracting COI data with AI...');
       const extractionResult = await extractCOIFromPDF(file, userRequirements);
@@ -502,6 +510,7 @@ function ComplyApp({ user, onSignOut }) {
       console.log('Extracted vendor data:', vendorData);
 
       // Step 2: Upload file to Storage
+      setUploadStatus('Uploading document...');
       if (progressCallback) progressCallback('Uploading to cloud...');
       const fileExt = file.name.split('.').pop();
       const fileName = `${user.id}/${Date.now()}.${fileExt}`;
@@ -513,6 +522,7 @@ function ComplyApp({ user, onSignOut }) {
       if (storageError) throw storageError;
 
       // Step 3: Create vendor in database
+      setUploadStatus('Checking compliance...');
       if (progressCallback) progressCallback('Saving vendor...');
       const result = await addVendor({
         ...vendorData,
@@ -528,14 +538,21 @@ function ComplyApp({ user, onSignOut }) {
       }
 
       // Step 4: Refresh vendor list
+      setUploadStatus('Finalizing...');
       if (progressCallback) progressCallback('Complete!');
       await refreshVendors();
+
+      // Hide overlay
+      setUploadingCOI(false);
+      setUploadStatus('');
 
       // Success!
       alert(`Success! Created vendor: ${vendorData.name}\n\nStatus: ${vendorData.status.toUpperCase()}\nExpires: ${vendorData.expirationDate}\n\nThe vendor has been added to your dashboard.`);
 
     } catch (error) {
       console.error('Upload error:', error);
+      setUploadingCOI(false);
+      setUploadStatus('');
       throw new Error(error.message || 'Failed to upload and process COI');
     }
   };
@@ -1587,6 +1604,34 @@ function ComplyApp({ user, onSignOut }) {
           onComplete={handleOnboardingComplete}
           onSkip={handleOnboardingSkip}
         />
+      )}
+
+      {/* COI Upload Loading Overlay */}
+      {uploadingCOI && (
+        <div className="fixed inset-0 bg-gradient-to-br from-emerald-900/95 via-gray-900/95 to-teal-900/95 flex items-center justify-center z-[60]">
+          <div className="text-center max-w-md px-6">
+            <div className="relative mb-8">
+              <div className="absolute inset-0 w-24 h-24 mx-auto bg-emerald-500/30 rounded-full animate-ping"></div>
+              <div className="relative w-24 h-24 mx-auto bg-gradient-to-br from-emerald-400 to-teal-500 rounded-2xl flex items-center justify-center shadow-2xl shadow-emerald-500/30">
+                <Sparkles className="w-12 h-12 text-white animate-pulse" />
+              </div>
+            </div>
+            <h2 className="text-2xl sm:text-3xl font-bold text-white mb-4">
+              Processing COI
+            </h2>
+            <p className="text-emerald-200 text-lg mb-6">
+              {uploadStatus || 'Analyzing your certificate...'}
+            </p>
+            <div className="flex items-center justify-center space-x-2 mb-6">
+              <div className="w-3 h-3 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+              <div className="w-3 h-3 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+              <div className="w-3 h-3 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+            </div>
+            <p className="text-emerald-300/70 text-sm">
+              Our AI is extracting coverage details and checking compliance...
+            </p>
+          </div>
+        </div>
       )}
     </div>
   );
