@@ -548,7 +548,7 @@ function ComplyApp({ user, onSignOut }) {
   };
 
   // Handle file upload with AI extraction
-  const handleFileUpload = async (file, progressCallback) => {
+  const handleFileUpload = async (file, progressCallback, vendorEmail = null) => {
     try {
       // Show full-screen loading overlay
       setUploadingCOI(true);
@@ -583,15 +583,20 @@ function ComplyApp({ user, onSignOut }) {
 
       if (storageError) throw storageError;
 
+      // Generate upload token for vendor portal
+      const uploadToken = crypto.randomUUID();
+
       // Step 3: Create vendor in database
       setUploadStatus('Checking compliance...');
       if (progressCallback) progressCallback('Saving vendor...');
       const result = await addVendor({
         ...vendorData,
+        contactEmail: vendorEmail, // Add vendor email for automated follow-ups
         rawData: {
           ...vendorData.rawData,
           documentPath: fileName,
-          documentUrl: storageData.path
+          documentUrl: storageData.path,
+          uploadToken: uploadToken // Store upload token for vendor portal
         }
       });
 
@@ -608,12 +613,16 @@ function ComplyApp({ user, onSignOut }) {
       setUploadingCOI(false);
       setUploadStatus('');
 
-      // Success!
+      // Success message with email info
+      const emailNote = vendorEmail
+        ? `\nContact Email: ${vendorEmail}\nAutomatic follow-ups enabled.`
+        : '\nTip: Add a contact email to enable automatic follow-ups.';
+
       showAlert({
         type: 'success',
         title: 'COI Uploaded Successfully',
         message: `Vendor "${vendorData.name}" has been added to your dashboard.`,
-        details: `Status: ${vendorData.status.toUpperCase()}\nExpiration Date: ${vendorData.expirationDate}`
+        details: `Status: ${vendorData.status.toUpperCase()}\nExpiration Date: ${vendorData.expirationDate}${emailNote}`
       });
 
     } catch (error) {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Save, X, CheckCircle, AlertCircle, Sparkles, Info } from 'lucide-react';
+import { Save, X, CheckCircle, AlertCircle, Sparkles, Info, Mail, Bell, Clock } from 'lucide-react';
 import { supabase } from './supabaseClient';
 
 export function Settings({ onClose }) {
@@ -20,7 +20,14 @@ export function Settings({ onClose }) {
     requireAdditionalInsured: true,
 
     // Waiver of Subrogation
-    requireWaiverOfSubrogation: false
+    requireWaiverOfSubrogation: false,
+
+    // Auto Follow-Up Settings
+    autoFollowUpEnabled: false,
+    followUpDays: [30, 14, 7], // Days before expiration to send reminders
+    followUpOnExpired: true, // Send follow-up when expired
+    followUpOnNonCompliant: true, // Send follow-up when non-compliant
+    followUpFrequencyDays: 7 // Minimum days between follow-ups to same vendor
   });
 
   const [loading, setLoading] = useState(true);
@@ -62,7 +69,13 @@ export function Settings({ onClose }) {
           autoLiabilityMinimum: data.auto_liability || 1000000,
           companyName: data.company_name || '',
           requireAdditionalInsured: data.require_additional_insured !== false,
-          requireWaiverOfSubrogation: data.require_waiver_of_subrogation || false
+          requireWaiverOfSubrogation: data.require_waiver_of_subrogation || false,
+          // Auto Follow-Up Settings
+          autoFollowUpEnabled: data.auto_follow_up_enabled || false,
+          followUpDays: data.follow_up_days || [30, 14, 7],
+          followUpOnExpired: data.follow_up_on_expired !== false,
+          followUpOnNonCompliant: data.follow_up_on_non_compliant !== false,
+          followUpFrequencyDays: data.follow_up_frequency_days || 7
         });
       }
     } catch (err) {
@@ -91,7 +104,13 @@ export function Settings({ onClose }) {
         employers_liability: 500000,
         company_name: settings.companyName,
         require_additional_insured: settings.requireAdditionalInsured,
-        require_waiver_of_subrogation: settings.requireWaiverOfSubrogation
+        require_waiver_of_subrogation: settings.requireWaiverOfSubrogation,
+        // Auto Follow-Up Settings
+        auto_follow_up_enabled: settings.autoFollowUpEnabled,
+        follow_up_days: settings.followUpDays,
+        follow_up_on_expired: settings.followUpOnExpired,
+        follow_up_on_non_compliant: settings.followUpOnNonCompliant,
+        follow_up_frequency_days: settings.followUpFrequencyDays
       };
 
       const { error } = await supabase
@@ -586,6 +605,142 @@ export function Settings({ onClose }) {
                 </label>
               </div>
             </div>
+          </div>
+
+          {/* Auto Follow-Up Section */}
+          <div className="border-t border-gray-200 pt-6">
+            <div className="flex items-center space-x-3 mb-4">
+              <div className="w-10 h-10 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-lg flex items-center justify-center">
+                <Mail className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Automated Vendor Follow-Ups</h3>
+                <p className="text-sm text-gray-500">Automatically contact vendors about compliance issues</p>
+              </div>
+            </div>
+
+            {/* Enable Auto Follow-Up */}
+            <div className="p-4 bg-gradient-to-r from-emerald-50 to-teal-50 rounded-lg border border-emerald-200 mb-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="font-medium text-gray-900">Enable Automated Follow-Ups</h4>
+                  <p className="text-sm text-gray-500">Send automatic emails to vendors with compliance issues</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={settings.autoFollowUpEnabled}
+                    onChange={(e) => setSettings({...settings, autoFollowUpEnabled: e.target.checked})}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-300 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-emerald-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                </label>
+              </div>
+            </div>
+
+            {settings.autoFollowUpEnabled && (
+              <div className="space-y-4">
+                {/* When to Send */}
+                <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                  <div className="flex items-center space-x-2 mb-3">
+                    <Bell size={18} className="text-gray-600" />
+                    <h4 className="font-medium text-gray-900">Expiration Reminders</h4>
+                  </div>
+                  <p className="text-sm text-gray-500 mb-3">Send reminders before certificates expire:</p>
+                  <div className="flex flex-wrap gap-2">
+                    {[30, 14, 7, 3, 1].map((days) => (
+                      <button
+                        key={days}
+                        onClick={() => {
+                          const current = settings.followUpDays || [];
+                          if (current.includes(days)) {
+                            setSettings({...settings, followUpDays: current.filter(d => d !== days)});
+                          } else {
+                            setSettings({...settings, followUpDays: [...current, days].sort((a, b) => b - a)});
+                          }
+                        }}
+                        className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                          (settings.followUpDays || []).includes(days)
+                            ? 'bg-emerald-500 text-white'
+                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        }`}
+                      >
+                        {days} days
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Follow Up Triggers */}
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="font-medium text-gray-900 text-sm">Expired Certificates</h4>
+                        <p className="text-xs text-gray-500">Contact when COI has expired</p>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={settings.followUpOnExpired}
+                          onChange={(e) => setSettings({...settings, followUpOnExpired: e.target.checked})}
+                          className="sr-only peer"
+                        />
+                        <div className="w-9 h-5 bg-gray-300 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-emerald-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="font-medium text-gray-900 text-sm">Non-Compliant Coverage</h4>
+                        <p className="text-xs text-gray-500">Contact about coverage gaps</p>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={settings.followUpOnNonCompliant}
+                          onChange={(e) => setSettings({...settings, followUpOnNonCompliant: e.target.checked})}
+                          className="sr-only peer"
+                        />
+                        <div className="w-9 h-5 bg-gray-300 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-emerald-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Frequency Limit */}
+                <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                  <div className="flex items-center space-x-2 mb-3">
+                    <Clock size={18} className="text-gray-600" />
+                    <h4 className="font-medium text-gray-900">Follow-Up Frequency</h4>
+                  </div>
+                  <p className="text-sm text-gray-500 mb-3">Minimum days between emails to the same vendor:</p>
+                  <div className="flex items-center space-x-4">
+                    <input
+                      type="range"
+                      min="1"
+                      max="30"
+                      value={settings.followUpFrequencyDays}
+                      onChange={(e) => setSettings({...settings, followUpFrequencyDays: parseInt(e.target.value)})}
+                      className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                    />
+                    <span className="text-sm font-medium text-gray-900 min-w-[60px]">
+                      {settings.followUpFrequencyDays} days
+                    </span>
+                  </div>
+                </div>
+
+                {/* Info about vendor emails */}
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-start space-x-2">
+                  <Info size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-amber-800">
+                    Follow-ups are only sent to vendors with an email address on file. Add vendor emails when uploading COIs to enable automatic follow-ups.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Info Box */}
