@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Upload, CheckCircle, XCircle, AlertCircle, FileText, Calendar, X, Search, Download, Settings as SettingsIcon, Eye, Bell, FileDown, Phone, Mail, User, Send, Clock, History, FileCheck, Sparkles } from 'lucide-react';
+import { Upload, CheckCircle, XCircle, AlertCircle, FileText, Calendar, X, Search, Download, Settings as SettingsIcon, Eye, Bell, FileDown, Phone, Mail, User, Send, Clock, History, FileCheck, Sparkles, Building2, ChevronDown } from 'lucide-react';
 import { useVendors } from './useVendors';
 import { UploadModal } from './UploadModal';
 import { Settings } from './Settings';
@@ -10,14 +10,23 @@ import { supabase } from './supabaseClient';
 import { extractCOIFromPDF } from './extractCOI';
 import { exportPDFReport } from './exportPDFReport';
 import { Logo } from './Logo';
+import Properties from './Properties';
 
 function ComplyApp({ user, onSignOut }) {
-  // Use database hook instead of local state
-  const { vendors: dbVendors, loading, loadingMore, error, hasMore, totalCount, addVendor, updateVendor, deleteVendor, loadMore, refreshVendors } = useVendors();
+  // Properties state
+  const [properties, setProperties] = useState([]);
+  const [selectedProperty, setSelectedProperty] = useState(null);
+  const [showProperties, setShowProperties] = useState(false);
+  const [loadingProperties, setLoadingProperties] = useState(true);
+  const [showPropertyDropdown, setShowPropertyDropdown] = useState(false);
+
+  // Use database hook instead of local state - filter by selected property
+  const { vendors: dbVendors, loading, loadingMore, error, hasMore, totalCount, addVendor, updateVendor, deleteVendor, loadMore, refreshVendors } = useVendors(selectedProperty?.id);
 
   // Convert database format (snake_case) to app format (camelCase)
   const vendors = dbVendors.map(v => ({
     id: v.id,
+    propertyId: v.property_id,
     name: v.name,
     dba: v.dba,
     status: v.status,
@@ -61,9 +70,38 @@ function ComplyApp({ user, onSignOut }) {
   const [uploadStatus, setUploadStatus] = useState('');
   const { alertModal, showAlert, hideAlert } = useAlertModal();
 
-  // Load user requirements and check onboarding status on mount
+  // Load properties
+  const loadProperties = async () => {
+    try {
+      setLoadingProperties(true);
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (!currentUser) return;
+
+      const { data, error } = await supabase
+        .from('properties')
+        .select('*')
+        .eq('user_id', currentUser.id)
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        console.error('Error loading properties:', error);
+        return;
+      }
+
+      setProperties(data || []);
+      // If no property is selected and we have properties, select the first one
+      // Or if "All Properties" mode (selectedProperty = null), keep it
+    } catch (err) {
+      console.error('Error loading properties:', err);
+    } finally {
+      setLoadingProperties(false);
+    }
+  };
+
+  // Load user requirements, properties, and check onboarding status on mount
   React.useEffect(() => {
     loadUserRequirements();
+    loadProperties();
     checkOnboardingStatus();
   }, []);
 
@@ -558,11 +596,25 @@ function ComplyApp({ user, onSignOut }) {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
+      // Determine which requirements to use (property-specific or global)
+      const requirementsToUse = selectedProperty ? {
+        general_liability: selectedProperty.general_liability || 1000000,
+        gl_aggregate: selectedProperty.gl_aggregate || 2000000,
+        auto_liability: selectedProperty.auto_liability || 1000000,
+        auto_liability_required: selectedProperty.auto_liability_required || false,
+        workers_comp: selectedProperty.workers_comp_required ? 'Statutory' : 'Not Required',
+        employers_liability: selectedProperty.employers_liability || 500000,
+        company_name: selectedProperty.company_name || userRequirements?.company_name || '',
+        require_additional_insured: selectedProperty.require_additional_insured !== false,
+        require_waiver_of_subrogation: selectedProperty.require_waiver_of_subrogation || false,
+        custom_coverages: selectedProperty.custom_coverages || []
+      } : userRequirements;
+
       // Step 1: Extract data using AI
       setUploadStatus('AI analyzing certificate...');
       if (progressCallback) progressCallback('AI extracting data...');
       console.log('Extracting COI data with AI...');
-      const extractionResult = await extractCOIFromPDF(file, userRequirements);
+      const extractionResult = await extractCOIFromPDF(file, requirementsToUse);
 
       if (!extractionResult.success) {
         throw new Error(extractionResult.error);
@@ -591,6 +643,7 @@ function ComplyApp({ user, onSignOut }) {
       if (progressCallback) progressCallback('Saving vendor...');
       const result = await addVendor({
         ...vendorData,
+        propertyId: selectedProperty?.id || null, // Assign to selected property
         contactEmail: vendorEmail, // Add vendor email for automated follow-ups
         rawData: {
           ...vendorData.rawData,
@@ -684,7 +737,90 @@ function ComplyApp({ user, onSignOut }) {
       <header className="relative bg-white/95 backdrop-blur-md border-b border-gray-200 shadow-sm sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
-            <Logo size="default" />
+            <div className="flex items-center space-x-4">
+              <Logo size="default" />
+              {/* Property Selector */}
+              {properties.length > 0 && (
+                <div className="relative">
+                  <button
+                    onClick={() => setShowPropertyDropdown(!showPropertyDropdown)}
+                    className="flex items-center space-x-2 px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-xl transition-all text-sm font-medium text-gray-700"
+                  >
+                    <Building2 size={16} className="text-gray-500" />
+                    <span className="max-w-[150px] truncate">
+                      {selectedProperty ? selectedProperty.name : 'All Properties'}
+                    </span>
+                    <ChevronDown size={16} className={`text-gray-400 transition-transform ${showPropertyDropdown ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {showPropertyDropdown && (
+                    <>
+                      <div
+                        className="fixed inset-0 z-40"
+                        onClick={() => setShowPropertyDropdown(false)}
+                      />
+                      <div className="absolute left-0 top-full mt-2 w-64 bg-white rounded-xl shadow-lg border border-gray-200 z-50 overflow-hidden">
+                        <div className="p-2">
+                          <button
+                            onClick={() => {
+                              setSelectedProperty(null);
+                              setShowPropertyDropdown(false);
+                            }}
+                            className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                              !selectedProperty
+                                ? 'bg-emerald-50 text-emerald-700'
+                                : 'text-gray-700 hover:bg-gray-100'
+                            }`}
+                          >
+                            All Properties
+                          </button>
+                          {properties.map((property) => (
+                            <button
+                              key={property.id}
+                              onClick={() => {
+                                setSelectedProperty(property);
+                                setShowPropertyDropdown(false);
+                              }}
+                              className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                                selectedProperty?.id === property.id
+                                  ? 'bg-emerald-50 text-emerald-700'
+                                  : 'text-gray-700 hover:bg-gray-100'
+                              }`}
+                            >
+                              <div className="truncate">{property.name}</div>
+                              {property.address && (
+                                <div className="text-xs text-gray-500 truncate">{property.address}</div>
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="border-t border-gray-200 p-2">
+                          <button
+                            onClick={() => {
+                              setShowPropertyDropdown(false);
+                              setShowProperties(true);
+                            }}
+                            className="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-emerald-600 hover:bg-emerald-50 transition-colors flex items-center space-x-2"
+                          >
+                            <SettingsIcon size={14} />
+                            <span>Manage Properties</span>
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+              {properties.length === 0 && !loadingProperties && (
+                <button
+                  onClick={() => setShowProperties(true)}
+                  className="flex items-center space-x-2 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 rounded-xl transition-all text-sm font-medium text-emerald-700"
+                >
+                  <Building2 size={16} />
+                  <span>Add Property</span>
+                </button>
+              )}
+            </div>
             <div className="flex items-center space-x-3">
               <div className="text-right hidden sm:block">
                 <p className="text-sm font-medium text-gray-900">{user?.email}</p>
@@ -1704,6 +1840,16 @@ function ComplyApp({ user, onSignOut }) {
       {/* Notification Settings Modal */}
       {showNotifications && (
         <NotificationSettings onClose={() => setShowNotifications(false)} />
+      )}
+
+      {/* Properties Modal */}
+      {showProperties && (
+        <Properties
+          onClose={() => {
+            setShowProperties(false);
+            loadProperties(); // Refresh properties list when closing
+          }}
+        />
       )}
 
 

@@ -79,7 +79,7 @@ function recalculateVendorStatus(vendor) {
   return { ...vendor, status: newStatus, issues: normalizedIssues };
 }
 
-export function useVendors() {
+export function useVendors(propertyId = null) {
   const [vendors, setVendors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -104,19 +104,30 @@ export function useVendors() {
       const startIndex = reset ? 0 : vendors.length;
       const endIndex = startIndex + PAGE_SIZE - 1;
 
+      // Build query with optional property filter
+      let countQuery = supabase
+        .from('vendors')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id);
+
+      let dataQuery = supabase
+        .from('vendors')
+        .select('*')
+        .eq('user_id', user.id);
+
+      // Filter by property if specified
+      if (propertyId) {
+        countQuery = countQuery.eq('property_id', propertyId);
+        dataQuery = dataQuery.eq('property_id', propertyId);
+      }
+
       // Get total count first (only on initial load)
       if (reset) {
-        const { count } = await supabase
-          .from('vendors')
-          .select('*', { count: 'exact', head: true })
-          .eq('user_id', user.id);
+        const { count } = await countQuery;
         setTotalCount(count || 0);
       }
 
-      const { data, error } = await supabase
-        .from('vendors')
-        .select('*')
-        .eq('user_id', user.id)
+      const { data, error } = await dataQuery
         .order('created_at', { ascending: false })
         .range(startIndex, endIndex);
 
@@ -139,7 +150,7 @@ export function useVendors() {
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [vendors.length]);
+  }, [vendors.length, propertyId]);
 
   // Load more vendors
   const loadMore = useCallback(() => {
@@ -162,6 +173,7 @@ export function useVendors() {
         .from('vendors')
         .insert([{
           user_id: user.id,
+          property_id: vendorData.propertyId || propertyId || null,
           name: vendorData.name,
           dba: vendorData.dba,
           status: vendorData.status,
@@ -271,11 +283,11 @@ export function useVendors() {
     }
   };
 
-  // Fetch vendors on mount
+  // Fetch vendors on mount and when propertyId changes
   useEffect(() => {
     fetchVendors(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [propertyId]);
 
   return {
     vendors,
