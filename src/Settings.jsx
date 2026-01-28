@@ -260,15 +260,21 @@ export function Settings({ onClose }) {
 
       if (!result.success) {
         console.error('Recheck compliance error:', result.error);
+        setRecheckingCompliance(false);
+        setError(`Recheck failed: ${result.error}. Settings were saved but COIs were not updated.`);
+        return;
       }
 
-      // Reload the page to show updated vendor compliance
-      window.location.reload();
+      // Wait 2 seconds so user can see console logs, then reload
+      console.log('Success! Reloading page in 2 seconds...');
+      setTimeout(() => {
+        window.location.reload();
+      }, 2000);
 
     } catch (err) {
       console.error('Error rechecking compliance:', err);
-      // Still reload to show the saved settings
-      window.location.reload();
+      setRecheckingCompliance(false);
+      setError(`Recheck error: ${err.message}. Settings were saved but COIs were not updated.`);
     }
   };
 
