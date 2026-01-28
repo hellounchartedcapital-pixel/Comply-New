@@ -219,10 +219,10 @@ export function Settings({ onClose }) {
     try {
       setRecheckingCompliance(true);
 
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('No session');
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
 
-      // Prepare requirements for the edge function
+      // Prepare requirements
       const requirements = {
         general_liability: settingsData.general_liability,
         auto_liability: settingsData.auto_liability,
@@ -239,44 +239,177 @@ export function Settings({ onClose }) {
       };
 
       console.log('Rechecking compliance with requirements:', requirements);
-      console.log('Supabase URL:', process.env.REACT_APP_SUPABASE_URL);
 
-      // Call the recheck-compliance edge function
-      const response = await fetch(
-        `${process.env.REACT_APP_SUPABASE_URL}/functions/v1/recheck-compliance`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`,
-            'apikey': process.env.REACT_APP_SUPABASE_ANON_KEY
-          },
-          body: JSON.stringify({ requirements })
-        }
-      );
+      // Fetch all vendors with raw_data
+      const { data: vendors, error: fetchError } = await supabase
+        .from('vendors')
+        .select('*')
+        .eq('user_id', user.id)
+        .not('raw_data', 'is', null);
 
-      console.log('Response status:', response.status);
-      const result = await response.json();
-      console.log('Recheck result:', result);
+      if (fetchError) throw fetchError;
 
-      if (!result.success) {
-        console.error('Recheck compliance error:', result.error);
-        setRecheckingCompliance(false);
-        setError(`Recheck failed: ${result.error}. Settings were saved but COIs were not updated.`);
+      console.log(`Found ${vendors?.length || 0} vendors to recheck`);
+
+      if (!vendors || vendors.length === 0) {
+        console.log('No vendors to recheck');
+        window.location.reload();
         return;
       }
 
-      // Wait 2 seconds so user can see console logs, then reload
-      console.log('Success! Reloading page in 2 seconds...');
-      setTimeout(() => {
-        window.location.reload();
-      }, 2000);
+      // Recheck each vendor
+      let updatedCount = 0;
+      for (const vendor of vendors) {
+        const rawData = vendor.raw_data;
+        if (!rawData) continue;
+
+        const recheckedData = buildVendorData(rawData, requirements);
+
+        const { error: updateError } = await supabase
+          .from('vendors')
+          .update({
+            status: recheckedData.status,
+            issues: recheckedData.issues,
+            coverage: recheckedData.coverage,
+            requirements: requirements,
+            has_additional_insured: recheckedData.hasAdditionalInsured || false,
+            missing_additional_insured: recheckedData.missingAdditionalInsured || false,
+            has_waiver_of_subrogation: recheckedData.hasWaiverOfSubrogation || false,
+            missing_waiver_of_subrogation: recheckedData.missingWaiverOfSubrogation || false,
+            days_overdue: recheckedData.daysOverdue || 0
+          })
+          .eq('id', vendor.id);
+
+        if (!updateError) {
+          updatedCount++;
+        } else {
+          console.error(`Failed to update vendor ${vendor.id}:`, updateError);
+        }
+      }
+
+      console.log(`Successfully updated ${updatedCount} of ${vendors.length} vendors`);
+      window.location.reload();
 
     } catch (err) {
       console.error('Error rechecking compliance:', err);
       setRecheckingCompliance(false);
       setError(`Recheck error: ${err.message}. Settings were saved but COIs were not updated.`);
     }
+  };
+
+  // Build vendor data with compliance checking (client-side version)
+  const buildVendorData = (extractedData, requirements) => {
+    const vendorData = {
+      name: extractedData.companyName || 'Unknown Company',
+      dba: extractedData.dba,
+      expirationDate: extractedData.expirationDate || new Date().toISOString().split('T')[0],
+      coverage: {
+        generalLiability: {
+          amount: extractedData.generalLiability?.amount || 0,
+          expirationDate: extractedData.generalLiability?.expirationDate,
+          compliant: (extractedData.generalLiability?.amount || 0) >= requirements.general_liability
+        },
+        autoLiability: {
+          amount: extractedData.autoLiability?.amount || 0,
+          expirationDate: extractedData.autoLiability?.expirationDate,
+          compliant: (extractedData.autoLiability?.amount || 0) >= requirements.auto_liability
+        },
+        workersComp: {
+          amount: extractedData.workersComp?.amount || 'Statutory',
+          expirationDate: extractedData.workersComp?.expirationDate,
+          compliant: true
+        },
+        employersLiability: {
+          amount: extractedData.employersLiability?.amount || 0,
+          expirationDate: extractedData.employersLiability?.expirationDate,
+          compliant: (extractedData.employersLiability?.amount || 0) >= requirements.employers_liability
+        }
+      },
+      additionalCoverages: extractedData.additionalCoverages || [],
+      additionalInsured: extractedData.additionalInsured || '',
+      certificateHolder: extractedData.certificateHolder || '',
+      waiverOfSubrogation: extractedData.waiverOfSubrogation || ''
+    };
+
+    const issues = [];
+    const today = new Date();
+    const expirationDate = new Date(vendorData.expirationDate);
+    const daysUntilExpiration = Math.floor((expirationDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+    // Check expiration
+    if (daysUntilExpiration < 0) {
+      vendorData.status = 'expired';
+      vendorData.daysOverdue = Math.abs(daysUntilExpiration);
+      issues.push({ type: 'critical', message: `All policies expired ${vendorData.expirationDate} (${vendorData.daysOverdue} days overdue)` });
+    } else if (daysUntilExpiration <= 30) {
+      vendorData.status = 'expiring';
+      vendorData.daysOverdue = 0;
+      issues.push({ type: 'warning', message: `Policies expiring in ${daysUntilExpiration} days` });
+    } else {
+      vendorData.status = 'compliant';
+      vendorData.daysOverdue = 0;
+    }
+
+    // Check coverage compliance
+    if (!vendorData.coverage.generalLiability.compliant) {
+      vendorData.status = 'non-compliant';
+      issues.push({ type: 'error', message: `General Liability below requirement: $${(vendorData.coverage.generalLiability.amount / 1000000).toFixed(1)}M (requires $${(requirements.general_liability / 1000000).toFixed(1)}M)` });
+    }
+
+    if (!vendorData.coverage.autoLiability.compliant) {
+      vendorData.status = 'non-compliant';
+      issues.push({ type: 'error', message: `Auto Liability below requirement: $${(vendorData.coverage.autoLiability.amount / 1000000).toFixed(1)}M (requires $${(requirements.auto_liability / 1000000).toFixed(1)}M)` });
+    }
+
+    if (!vendorData.coverage.employersLiability.compliant) {
+      vendorData.status = 'non-compliant';
+      issues.push({ type: 'error', message: `Employers Liability below requirement: $${(vendorData.coverage.employersLiability.amount / 1000).toFixed(0)}K (requires $${(requirements.employers_liability / 1000).toFixed(0)}K)` });
+    }
+
+    // Check waiver of subrogation
+    if (requirements.require_waiver_of_subrogation) {
+      const waiverText = (vendorData.waiverOfSubrogation || '').toLowerCase();
+      if (waiverText.includes('yes') || waiverText.includes('included') || waiverText.includes('waived')) {
+        vendorData.hasWaiverOfSubrogation = true;
+      } else {
+        vendorData.status = 'non-compliant';
+        vendorData.missingWaiverOfSubrogation = true;
+        issues.push({ type: 'error', message: 'Waiver of Subrogation not included' });
+      }
+    }
+
+    // Check additional insured
+    if (requirements.company_name && requirements.require_additional_insured) {
+      const additionalInsuredText = (vendorData.additionalInsured || '').toLowerCase();
+      const companyName = requirements.company_name.toLowerCase();
+      if (!additionalInsuredText.includes(companyName)) {
+        vendorData.status = 'non-compliant';
+        vendorData.missingAdditionalInsured = true;
+        issues.push({ type: 'error', message: `${requirements.company_name} not listed as Additional Insured` });
+      } else {
+        vendorData.hasAdditionalInsured = true;
+      }
+    }
+
+    // Check custom coverages
+    if (requirements.custom_coverages && requirements.custom_coverages.length > 0) {
+      requirements.custom_coverages.forEach(requiredCoverage => {
+        if (!requiredCoverage.required) return;
+        const foundCoverage = vendorData.additionalCoverages.find(
+          cov => cov.type && cov.type.toLowerCase().includes(requiredCoverage.type.toLowerCase())
+        );
+        if (!foundCoverage) {
+          vendorData.status = 'non-compliant';
+          issues.push({ type: 'error', message: `Missing required coverage: ${requiredCoverage.type}` });
+        } else if (foundCoverage.amount < requiredCoverage.amount) {
+          vendorData.status = 'non-compliant';
+          issues.push({ type: 'error', message: `${requiredCoverage.type} below requirement` });
+        }
+      });
+    }
+
+    vendorData.issues = issues;
+    return vendorData;
   };
 
   const formatCurrency = (value) => {
