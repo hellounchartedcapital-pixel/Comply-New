@@ -8,10 +8,30 @@ import { AlertModal, useAlertModal } from './AlertModal';
 
 const plans = [
   {
-    name: 'Starter',
-    price: 49,
+    name: 'Free',
+    price: 0,
     priceId: '',
-    description: 'Perfect for small property managers',
+    description: 'Perfect for getting started',
+    vendors: 10,
+    gradient: 'from-gray-400 to-gray-500',
+    shadowColor: 'shadow-gray-400/20',
+    features: [
+      { text: 'Up to 10 vendors', included: true },
+      { text: 'AI-powered COI extraction', included: true },
+      { text: 'Email COI requests', included: true },
+      { text: 'Compliance dashboard', included: true },
+      { text: 'Expiration alerts', included: true },
+      { text: 'CSV export', included: false },
+      { text: 'Analytics & reports', included: false },
+      { text: 'Priority support', included: false },
+      { text: 'API access', included: false },
+    ],
+  },
+  {
+    name: 'Starter',
+    price: 79,
+    priceId: '',
+    description: 'For small property managers',
     vendors: 25,
     gradient: 'from-slate-500 to-slate-600',
     shadowColor: 'shadow-slate-500/20',
@@ -29,7 +49,7 @@ const plans = [
   },
   {
     name: 'Professional',
-    price: 99,
+    price: 149,
     priceId: '',
     description: 'For growing property management companies',
     vendors: 100,
@@ -49,8 +69,8 @@ const plans = [
     ],
   },
   {
-    name: 'Business',
-    price: 199,
+    name: 'Enterprise',
+    price: 299,
     priceId: '',
     description: 'For large-scale operations',
     vendors: 500,
@@ -225,6 +245,11 @@ export function Pricing({ onBack, onSelectPlan, currentPlan, user }) {
                     {/* Plan Header */}
                     <div className="mb-6">
                       <div className={`inline-flex w-14 h-14 rounded-2xl bg-gradient-to-br ${plan.gradient} items-center justify-center mb-4 shadow-lg ${plan.shadowColor}`}>
+                        {plan.name === 'Free' && (
+                          <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
+                          </svg>
+                        )}
                         {plan.name === 'Starter' && (
                           <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -233,7 +258,7 @@ export function Pricing({ onBack, onSelectPlan, currentPlan, user }) {
                         {plan.name === 'Professional' && (
                           <FileCheck className="w-7 h-7 text-white" />
                         )}
-                        {plan.name === 'Business' && (
+                        {plan.name === 'Enterprise' && (
                           <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                           </svg>
@@ -251,13 +276,18 @@ export function Pricing({ onBack, onSelectPlan, currentPlan, user }) {
                             ? 'bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 bg-clip-text text-transparent'
                             : 'text-gray-900'
                         }`}>
-                          ${getDisplayPrice(plan)}
+                          {plan.price === 0 ? 'Free' : `$${getDisplayPrice(plan)}`}
                         </span>
-                        <span className="text-gray-500 text-lg">/month</span>
+                        {plan.price > 0 && <span className="text-gray-500 text-lg">/month</span>}
                       </div>
-                      {billingCycle === 'annual' && (
+                      {billingCycle === 'annual' && plan.price > 0 && (
                         <p className="text-emerald-600 text-sm font-medium mt-2">
                           ${getAnnualPrice(plan.price)}/year (save ${plan.price * 12 - getAnnualPrice(plan.price)})
+                        </p>
+                      )}
+                      {plan.price === 0 && (
+                        <p className="text-gray-500 text-sm font-medium mt-2">
+                          Free forever
                         </p>
                       )}
                     </div>
@@ -281,6 +311,8 @@ export function Pricing({ onBack, onSelectPlan, currentPlan, user }) {
                         </>
                       ) : isCurrentPlan ? (
                         <span>Current Plan</span>
+                      ) : plan.price === 0 ? (
+                        <span>Get Started Free</span>
                       ) : (
                         <span>Start Free Trial</span>
                       )}
