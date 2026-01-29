@@ -3,8 +3,183 @@ import { Logo } from './Logo';
 import {
   CheckCircle, Zap, Bell, Menu, X,
   FileCheck, FolderOpen, Cloud, Users, Check,
-  AlertCircle, XCircle, Calendar
+  AlertCircle, XCircle, Calendar, Send, Mail, User, MessageSquare, Loader2
 } from 'lucide-react';
+import { supabase } from './supabaseClient';
+
+// Contact Form Modal
+function ContactModal({ isOpen, onClose }) {
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    message: ''
+  });
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState(null);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSending(true);
+    setError(null);
+
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke('send-contact', {
+        body: {
+          name: formData.name,
+          email: formData.email,
+          message: formData.message
+        }
+      });
+
+      if (fnError) throw fnError;
+      if (data && !data.success) throw new Error(data.error || 'Failed to send message');
+
+      setSent(true);
+      setFormData({ name: '', email: '', message: '' });
+    } catch (err) {
+      console.error('Contact form error:', err);
+      setError('Failed to send message. Please try emailing us directly at contact@smartcoi.io');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleClose = () => {
+    setSent(false);
+    setError(null);
+    onClose();
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 p-6 text-white">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                <Mail className="w-6 h-6" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold">Get in Touch</h2>
+                <p className="text-emerald-100 text-sm">We'd love to hear from you</p>
+              </div>
+            </div>
+            <button
+              onClick={handleClose}
+              className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="p-6">
+          {sent ? (
+            <div className="text-center py-8">
+              <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <CheckCircle className="w-8 h-8 text-emerald-600" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">Message Sent!</h3>
+              <p className="text-gray-600 mb-6">
+                Thank you for reaching out. We'll get back to you within 24 hours.
+              </p>
+              <button
+                onClick={handleClose}
+                className="px-6 py-3 bg-emerald-500 text-white rounded-xl font-semibold hover:bg-emerald-600 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {error && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
+                  <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-red-700">{error}</p>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type="text"
+                    required
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                    placeholder="Your name"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type="email"
+                    required
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                    placeholder="you@example.com"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Message</label>
+                <div className="relative">
+                  <MessageSquare className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+                  <textarea
+                    required
+                    rows={4}
+                    value={formData.message}
+                    onChange={(e) => setFormData({ ...formData, message: e.target.value })}
+                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent resize-none"
+                    placeholder="How can we help you?"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={sending}
+                className="w-full py-3 bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 text-white rounded-xl font-semibold hover:shadow-lg hover:shadow-emerald-500/25 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {sending ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <span>Sending...</span>
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-5 h-5" />
+                    <span>Send Message</span>
+                  </>
+                )}
+              </button>
+
+              <p className="text-center text-sm text-gray-500">
+                Or email us directly at{' '}
+                <a href="mailto:contact@smartcoi.io" className="text-emerald-600 hover:underline">
+                  contact@smartcoi.io
+                </a>
+              </p>
+            </form>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // Dashboard Mockup Component - Realistic preview of actual dashboard
 function DashboardMockup() {
@@ -220,6 +395,7 @@ function DashboardMockup() {
 export function LandingPage({ onLogin, onSignUp, onPrivacy, onTerms }) {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [showContactModal, setShowContactModal] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -781,12 +957,12 @@ export function LandingPage({ onLogin, onSignUp, onPrivacy, onTerms }) {
               >
                 Terms
               </button>
-              <a
-                href="mailto:support@smartcoi.io"
+              <button
+                onClick={() => setShowContactModal(true)}
                 className="text-sm text-gray-400 hover:text-white transition-colors"
               >
                 Contact
-              </a>
+              </button>
             </div>
 
             {/* Copyright */}
@@ -796,6 +972,12 @@ export function LandingPage({ onLogin, onSignUp, onPrivacy, onTerms }) {
           </div>
         </div>
       </footer>
+
+      {/* Contact Modal */}
+      <ContactModal
+        isOpen={showContactModal}
+        onClose={() => setShowContactModal(false)}
+      />
     </div>
   );
 }
