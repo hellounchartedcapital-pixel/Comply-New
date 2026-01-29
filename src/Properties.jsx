@@ -162,12 +162,34 @@ export function Properties({ isOpen, onClose, onPropertyChange }) {
 
       if (error) throw error;
 
+      // Recheck compliance for all vendors assigned to this property
+      try {
+        await supabase.functions.invoke('recheck-compliance', {
+          body: {
+            propertyId: editingProperty,
+            requirements: {
+              general_liability: formData.general_liability,
+              auto_liability: formData.auto_liability,
+              auto_liability_required: formData.auto_liability_required,
+              workers_comp_required: formData.workers_comp_required,
+              employers_liability: formData.employers_liability,
+              company_name: formData.company_name.trim() || null,
+              require_additional_insured: formData.require_additional_insured,
+              require_waiver_of_subrogation: formData.require_waiver_of_subrogation
+            }
+          }
+        });
+      } catch (recheckErr) {
+        console.error('Error rechecking compliance:', recheckErr);
+        // Don't fail the save if recheck fails
+      }
+
       setProperties(properties.map(p =>
         p.id === editingProperty ? { ...p, ...formData } : p
       ));
       setEditingProperty(null);
       resetForm();
-      setSuccess('Property updated successfully');
+      setSuccess('Property updated and vendor compliance rechecked');
       setTimeout(() => setSuccess(null), 3000);
       if (onPropertyChange) onPropertyChange();
     } catch (err) {

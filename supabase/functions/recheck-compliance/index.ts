@@ -9,7 +9,8 @@ const corsHeaders = {
 interface Requirements {
   general_liability: number;
   auto_liability: number;
-  workers_comp: string | number;
+  auto_liability_required?: boolean;
+  workers_comp_required?: boolean;
   employers_liability: number;
   company_name?: string;
   require_additional_insured?: boolean;
@@ -59,18 +60,25 @@ serve(async (req) => {
       throw new Error('Invalid or expired token');
     }
 
-    const { requirements } = await req.json();
+    const { requirements, propertyId } = await req.json();
 
     if (!requirements) {
       throw new Error('No requirements provided');
     }
 
-    // Fetch all vendors for this user that have raw_data (previously analyzed COIs)
-    const { data: vendors, error: fetchError } = await supabase
+    // Build query to fetch vendors
+    let query = supabase
       .from('vendors')
       .select('*')
       .eq('user_id', user.id)
       .not('raw_data', 'is', null);
+
+    // If propertyId is provided, only recheck vendors for that property
+    if (propertyId) {
+      query = query.eq('property_id', propertyId);
+    }
+
+    const { data: vendors, error: fetchError } = await query;
 
     if (fetchError) {
       throw new Error(`Failed to fetch vendors: ${fetchError.message}`);
@@ -166,17 +174,19 @@ function buildVendorData(extractedData: any, requirements: Requirements) {
       autoLiability: {
         amount: extractedData.autoLiability?.amount || 0,
         expirationDate: extractedData.autoLiability?.expirationDate,
-        compliant: (extractedData.autoLiability?.amount || 0) >= requirements.auto_liability
+        // Only check auto if required
+        compliant: !requirements.auto_liability_required || (extractedData.autoLiability?.amount || 0) >= requirements.auto_liability
       },
       workersComp: {
         amount: extractedData.workersComp?.amount || 'Statutory',
         expirationDate: extractedData.workersComp?.expirationDate,
-        compliant: true
+        // Only check workers comp if required
+        compliant: !requirements.workers_comp_required || (extractedData.workersComp?.amount === 'Statutory' || extractedData.workersComp?.amount > 0)
       },
       employersLiability: {
         amount: extractedData.employersLiability?.amount || 0,
         expirationDate: extractedData.employersLiability?.expirationDate,
-        compliant: (extractedData.employersLiability?.amount || 0) >= requirements.employers_liability
+        compliant: !requirements.workers_comp_required || (extractedData.employersLiability?.amount || 0) >= requirements.employers_liability
       }
     },
     additionalCoverages: extractedData.additionalCoverages || [],
@@ -222,7 +232,7 @@ function buildVendorData(extractedData: any, requirements: Requirements) {
     });
   }
 
-  if (!vendorData.coverage.autoLiability.compliant) {
+  if (requirements.auto_liability_required && !vendorData.coverage.autoLiability.compliant) {
     vendorData.status = 'non-compliant';
     issues.push({
       type: 'error',
@@ -230,7 +240,7 @@ function buildVendorData(extractedData: any, requirements: Requirements) {
     });
   }
 
-  if (!vendorData.coverage.employersLiability.compliant) {
+  if (requirements.workers_comp_required && !vendorData.coverage.employersLiability.compliant) {
     vendorData.status = 'non-compliant';
     issues.push({
       type: 'error',
