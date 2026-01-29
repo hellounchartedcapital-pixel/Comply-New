@@ -190,8 +190,8 @@ function DashboardMockup() {
 
   const vendors = [
     {
-      name: "Captivate Holdings, LLC",
-      dba: "Captivate, LLC",
+      name: "Riverside Cleaning Co.",
+      dba: "Riverside Services",
       status: "expired",
       expDate: "9/25/2025",
       daysInfo: "126 days",
@@ -201,7 +201,7 @@ function DashboardMockup() {
       issue: "Coverage expired 2025-09-25 (126 days overdue)"
     },
     {
-      name: "Everon, LLC",
+      name: "Summit HVAC Solutions",
       status: "compliant",
       expDate: "10/2/2026",
       gl: "$1,000,000",
@@ -209,8 +209,8 @@ function DashboardMockup() {
       wc: "Statutory"
     },
     {
-      name: "GroundMasters Landscape Services, LLC",
-      dba: "Snow Management Services LLC",
+      name: "GreenScape Landscaping LLC",
+      dba: "GreenScape Services",
       status: "compliant",
       expDate: "3/1/2026",
       gl: "$1,000,000",
@@ -282,9 +282,8 @@ function DashboardMockup() {
                     strokeDasharray={`${(stats.expired / stats.total) * 188.5} 188.5`}
                     strokeDashoffset={`${-((stats.compliant + stats.nonCompliant) / stats.total) * 188.5}`} />
                 </svg>
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-lg font-bold text-amber-500">{compliancePercent}%</span>
-                  <span className="text-[8px] text-gray-500">Compliant</span>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="text-xl font-bold text-amber-500">{compliancePercent}%</span>
                 </div>
               </div>
               {/* Legend */}
@@ -330,7 +329,7 @@ function DashboardMockup() {
             <div className="space-y-2">
               <div className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2">
                 <div>
-                  <p className="text-[10px] font-medium text-gray-900">GroundMasters Landsca...</p>
+                  <p className="text-[10px] font-medium text-gray-900">GreenScape Landsca...</p>
                   <p className="text-[9px] text-gray-500">3/1/2026</p>
                 </div>
                 <span className="text-[9px] font-semibold text-amber-600 bg-amber-50 px-2 py-1 rounded-full">30 days</span>
