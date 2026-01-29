@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Upload, CheckCircle, XCircle, AlertCircle, FileText, Calendar, X, Search, Download, Settings as SettingsIcon, Eye, Bell, FileDown, Phone, Mail, User, Send, Clock, History, FileCheck, Sparkles, Building2, ChevronDown } from 'lucide-react';
+import { Upload, CheckCircle, XCircle, AlertCircle, FileText, Calendar, X, Search, Download, Settings as SettingsIcon, Eye, Bell, FileDown, Phone, Mail, User, Send, Clock, History, FileCheck, Sparkles, Building2, ChevronDown, CreditCard } from 'lucide-react';
 import { useVendors } from './useVendors';
+import { useSubscription } from './useSubscription';
 import { UploadModal } from './UploadModal';
 import { Settings } from './Settings';
 import { NotificationSettings } from './NotificationSettings';
@@ -12,7 +13,7 @@ import { exportPDFReport } from './exportPDFReport';
 import { Logo } from './Logo';
 import Properties from './Properties';
 
-function ComplyApp({ user, onSignOut }) {
+function ComplyApp({ user, onSignOut, onShowPricing }) {
   // Properties state
   const [properties, setProperties] = useState([]);
   const [selectedProperty, setSelectedProperty] = useState(null);
@@ -69,6 +70,7 @@ function ComplyApp({ user, onSignOut }) {
   const [uploadingCOI, setUploadingCOI] = useState(false);
   const [uploadStatus, setUploadStatus] = useState('');
   const { alertModal, showAlert, hideAlert } = useAlertModal();
+  const { subscription, isFreePlan, canAddVendor, getRemainingVendors } = useSubscription();
 
   // Load properties
   const loadProperties = async () => {
@@ -508,16 +510,22 @@ function ComplyApp({ user, onSignOut }) {
       const companyName = userRequirements?.company_name || 'Our Company';
       const issues = requestCOIVendor.issues.map(i => i.message);
 
-      // Generate upload token if vendor doesn't have one
+      // Generate upload token if vendor doesn't have one or if it's expired
       let uploadToken = requestCOIVendor.rawData?.uploadToken;
+      const tokenExpiresAt = new Date();
+      tokenExpiresAt.setDate(tokenExpiresAt.getDate() + 30); // Token valid for 30 days
+
       if (!uploadToken) {
         uploadToken = crypto.randomUUID();
-        // Save the upload token to the vendor
-        await supabase
-          .from('vendors')
-          .update({ upload_token: uploadToken })
-          .eq('id', requestCOIVendor.id);
       }
+      // Always update the token expiration when sending a COI request
+      await supabase
+        .from('vendors')
+        .update({
+          upload_token: uploadToken,
+          upload_token_expires_at: tokenExpiresAt.toISOString()
+        })
+        .eq('id', requestCOIVendor.id);
 
       // Get the app URL (current origin)
       const appUrl = window.location.origin;
@@ -660,8 +668,10 @@ function ComplyApp({ user, onSignOut }) {
 
       if (storageError) throw storageError;
 
-      // Generate upload token for vendor portal
+      // Generate upload token for vendor portal (valid for 30 days)
       const uploadToken = crypto.randomUUID();
+      const tokenExpiresAt = new Date();
+      tokenExpiresAt.setDate(tokenExpiresAt.getDate() + 30);
 
       // Step 3: Create vendor in database
       setUploadStatus('Checking compliance...');
@@ -674,7 +684,8 @@ function ComplyApp({ user, onSignOut }) {
           ...vendorData.rawData,
           documentPath: fileName,
           documentUrl: storageData.path,
-          uploadToken: uploadToken // Store upload token for vendor portal
+          uploadToken: uploadToken, // Store upload token for vendor portal
+          uploadTokenExpiresAt: tokenExpiresAt.toISOString()
         }
       });
 
@@ -715,26 +726,36 @@ function ComplyApp({ user, onSignOut }) {
   const exportToCSV = () => {
     const headers = ['Company Name', 'DBA', 'Status', 'Expiration Date', 'Days Overdue', 'General Liability', 'Auto Liability', 'Workers Comp', 'Employers Liability', 'Issues'];
 
+    // Helper to escape CSV fields (handle commas, quotes, newlines)
+    const escapeCSV = (field) => {
+      const str = String(field ?? '');
+      if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    };
+
     const rows = filteredVendors.map(v => [
-      v.name,
-      v.dba || '',
+      escapeCSV(v.name),
+      escapeCSV(v.dba || ''),
       v.status.toUpperCase(),
       new Date(v.expirationDate).toLocaleDateString(),
       v.daysOverdue || 0,
-      formatCurrency(v.coverage.generalLiability.amount),
-      formatCurrency(v.coverage.autoLiability.amount),
+      escapeCSV(formatCurrency(v.coverage.generalLiability.amount)),
+      escapeCSV(formatCurrency(v.coverage.autoLiability.amount)),
       v.coverage.workersComp.amount,
-      formatCurrency(v.coverage.employersLiability.amount),
-      v.issues.map(i => i.message).join('; ')
+      escapeCSV(formatCurrency(v.coverage.employersLiability.amount)),
+      escapeCSV(v.issues.map(i => i.message).join('; '))
     ]);
 
-    const csvContent = [headers, ...rows].map(row => row.join(',')).join('\\n');
-    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const csvContent = [headers.map(escapeCSV), ...rows].map(row => row.join(',')).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = `smartcoi-vendor-report-${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
+    URL.revokeObjectURL(url); // Clean up
   };
 
   // Export to PDF
@@ -850,8 +871,20 @@ function ComplyApp({ user, onSignOut }) {
             <div className="flex items-center space-x-3">
               <div className="text-right hidden sm:block">
                 <p className="text-sm font-medium text-gray-900">{user?.email}</p>
-                <p className="text-xs text-gray-500">Signed in</p>
+                <p className="text-xs text-gray-500">
+                  {subscription?.plan ? `${subscription.plan.charAt(0).toUpperCase() + subscription.plan.slice(1)} Plan` : 'Free Plan'}
+                </p>
               </div>
+              {isFreePlan && (
+                <button
+                  onClick={onShowPricing}
+                  className="px-3 py-2 bg-gradient-to-r from-violet-500 to-purple-600 text-white rounded-xl hover:shadow-lg hover:shadow-violet-500/25 hover:-translate-y-0.5 transition-all duration-200 flex items-center space-x-1.5 text-sm font-semibold"
+                  title="Upgrade Plan"
+                >
+                  <CreditCard size={16} />
+                  <span className="hidden sm:inline">Upgrade</span>
+                </button>
+              )}
               <button
                 onClick={() => setShowSettings(true)}
                 className="p-2.5 bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 hover:text-gray-900 transition-all"
@@ -1913,6 +1946,12 @@ function ComplyApp({ user, onSignOut }) {
         isOpen={showUploadModal}
         onClose={() => setShowUploadModal(false)}
         onUploadComplete={handleFileUpload}
+        canAddVendor={canAddVendor(totalCount)}
+        remainingVendors={getRemainingVendors(totalCount)}
+        onUpgrade={onShowPricing}
+        selectedProperty={selectedProperty}
+        properties={properties}
+        onPropertyChange={setSelectedProperty}
       />
 
       {/* Settings Modal */}

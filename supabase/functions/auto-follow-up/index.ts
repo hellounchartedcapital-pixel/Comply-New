@@ -29,6 +29,15 @@ interface UserSettings {
   follow_up_frequency_days: number;
 }
 
+interface Subscription {
+  user_id: string;
+  plan: 'free' | 'starter' | 'professional' | 'enterprise';
+  status: string;
+}
+
+// Plans that have auto follow-up feature
+const PLANS_WITH_AUTO_FOLLOWUP = ['starter', 'professional', 'enterprise'];
+
 interface FollowUpResult {
   vendorId: string;
   vendorName: string;
@@ -89,9 +98,51 @@ serve(async (req) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
+    // Get all subscriptions to check plan eligibility
+    const { data: subscriptions, error: subError } = await supabase
+      .from('subscriptions')
+      .select('user_id, plan, status');
+
+    if (subError) {
+      console.error('Failed to fetch subscriptions:', subError);
+    }
+
+    // Create a map for quick lookup
+    const subscriptionMap = new Map<string, Subscription>();
+    if (subscriptions) {
+      for (const sub of subscriptions) {
+        subscriptionMap.set(sub.user_id, sub as Subscription);
+      }
+    }
+
     // Process each user
     for (const settings of settingsData as UserSettings[]) {
       processedUsers++;
+
+      // Check if user has a plan with auto follow-up feature
+      const subscription = subscriptionMap.get(settings.user_id);
+      if (!subscription || !PLANS_WITH_AUTO_FOLLOWUP.includes(subscription.plan)) {
+        results.push({
+          vendorId: '',
+          vendorName: 'N/A',
+          email: 'N/A',
+          success: false,
+          reason: `User ${settings.user_id} is on ${subscription?.plan || 'free'} plan (auto follow-up requires paid plan)`,
+        });
+        continue;
+      }
+
+      // Check if subscription is active
+      if (subscription.status !== 'active' && subscription.status !== 'trialing') {
+        results.push({
+          vendorId: '',
+          vendorName: 'N/A',
+          email: 'N/A',
+          success: false,
+          reason: `User ${settings.user_id} subscription is ${subscription.status}`,
+        });
+        continue;
+      }
 
       // Get vendors for this user
       const { data: vendors, error: vendorsError } = await supabase

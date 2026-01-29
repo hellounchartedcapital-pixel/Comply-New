@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { X, Upload, AlertCircle, CheckCircle, Mail, Info } from 'lucide-react';
+import { X, Upload, AlertCircle, CheckCircle, Mail, Info, CreditCard, Building2, ChevronDown } from 'lucide-react';
 
-export function UploadModal({ isOpen, onClose, onUploadComplete }) {
+export function UploadModal({ isOpen, onClose, onUploadComplete, canAddVendor = true, remainingVendors = null, onUpgrade, selectedProperty = null, properties = [], onPropertyChange }) {
   const [selectedFile, setSelectedFile] = useState(null);
   const [vendorEmail, setVendorEmail] = useState('');
   const [uploading, setUploading] = useState(false);
@@ -162,6 +162,46 @@ export function UploadModal({ isOpen, onClose, onUploadComplete }) {
           )}
         </div>
 
+        {/* Property Assignment - shown when multiple properties exist */}
+        {properties.length > 0 && (
+          <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+            <div className="flex items-center gap-2 mb-2">
+              <Building2 size={16} className="text-gray-500" />
+              <span className="text-sm font-medium text-gray-700">Assign to Property</span>
+            </div>
+            {properties.length === 1 ? (
+              <p className="text-sm text-gray-600 pl-6">
+                {properties[0].name}
+              </p>
+            ) : (
+              <div className="relative pl-6">
+                <select
+                  value={selectedProperty?.id || ''}
+                  onChange={(e) => {
+                    const property = properties.find(p => p.id === e.target.value);
+                    onPropertyChange?.(property || null);
+                  }}
+                  className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent appearance-none cursor-pointer"
+                  disabled={uploading}
+                >
+                  <option value="">All Properties (no specific assignment)</option>
+                  {properties.map(property => (
+                    <option key={property.id} value={property.id}>
+                      {property.name}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+              </div>
+            )}
+            {!selectedProperty && properties.length > 1 && (
+              <p className="text-xs text-amber-600 mt-2 pl-6">
+                Tip: Assigning vendors to a property helps organize and track compliance per location.
+              </p>
+            )}
+          </div>
+        )}
+
         {/* Vendor Email Input - shown after file is selected */}
         {selectedFile && (
           <div className="mb-4">
@@ -200,10 +240,43 @@ export function UploadModal({ isOpen, onClose, onUploadComplete }) {
           </p>
         </div>
 
+        {/* Vendor limit warning */}
+        {!canAddVendor && (
+          <div className="mb-3 sm:mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="text-amber-500 flex-shrink-0 mt-0.5" size={20} />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-amber-800">Vendor limit reached</p>
+                <p className="text-xs text-amber-700 mt-1">
+                  You've reached your plan's vendor limit. Upgrade your plan to add more vendors.
+                </p>
+                {onUpgrade && (
+                  <button
+                    onClick={onUpgrade}
+                    className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-violet-500 to-purple-600 text-white rounded-lg text-xs font-semibold hover:shadow-lg transition-all"
+                  >
+                    <CreditCard size={14} />
+                    Upgrade Plan
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Remaining vendors notice */}
+        {canAddVendor && remainingVendors !== null && remainingVendors <= 3 && remainingVendors > 0 && (
+          <div className="mb-3 sm:mb-4 p-2.5 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-xs text-blue-700">
+              <strong>Note:</strong> You have {remainingVendors} vendor slot{remainingVendors === 1 ? '' : 's'} remaining on your current plan.
+            </p>
+          </div>
+        )}
+
         <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
           <button
             onClick={handleUpload}
-            disabled={!selectedFile || uploading}
+            disabled={!selectedFile || uploading || !canAddVendor}
             className="flex-1 px-4 py-2.5 sm:py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed font-medium flex items-center justify-center space-x-2 text-sm sm:text-base"
           >
             {uploading ? (
