@@ -766,7 +766,7 @@ function ComplyApp({ user, onSignOut }) {
               <Logo size="default" />
               {/* Property Selector */}
               {properties.length > 0 && (
-                <div className="relative">
+                <div className="relative" data-onboarding="property-selector">
                   <button
                     onClick={() => setShowPropertyDropdown(!showPropertyDropdown)}
                     className="flex items-center space-x-2 px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-xl transition-all text-sm font-medium text-gray-700"
@@ -840,6 +840,7 @@ function ComplyApp({ user, onSignOut }) {
                 <button
                   onClick={() => setShowProperties(true)}
                   className="flex items-center space-x-2 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 rounded-xl transition-all text-sm font-medium text-emerald-700"
+                  data-onboarding="property-selector"
                 >
                   <Building2 size={16} />
                   <span>Add Property</span>
@@ -1187,7 +1188,7 @@ function ComplyApp({ user, onSignOut }) {
         </div>
 
         {/* Vendors List */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden" data-onboarding="vendor-list">
           {loading ? (
             <div className="p-12 text-center">
               <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500 mb-4"></div>
