@@ -8,7 +8,7 @@ import { AlertModal, useAlertModal } from './AlertModal';
 
 const plans = [
   {
-    name: 'Starter',
+    name: 'Basic',
     price: 49,
     priceId: '',
     description: 'Perfect for small property managers',
@@ -49,7 +49,7 @@ const plans = [
     ],
   },
   {
-    name: 'Business',
+    name: 'Enterprise',
     price: 199,
     priceId: '',
     description: 'For large-scale operations',
@@ -225,7 +225,7 @@ export function Pricing({ onBack, onSelectPlan, currentPlan, user }) {
                     {/* Plan Header */}
                     <div className="mb-6">
                       <div className={`inline-flex w-14 h-14 rounded-2xl bg-gradient-to-br ${plan.gradient} items-center justify-center mb-4 shadow-lg ${plan.shadowColor}`}>
-                        {plan.name === 'Starter' && (
+                        {plan.name === 'Basic' && (
                           <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
                           </svg>
@@ -233,7 +233,7 @@ export function Pricing({ onBack, onSelectPlan, currentPlan, user }) {
                         {plan.name === 'Professional' && (
                           <FileCheck className="w-7 h-7 text-white" />
                         )}
-                        {plan.name === 'Business' && (
+                        {plan.name === 'Enterprise' && (
                           <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                           </svg>
