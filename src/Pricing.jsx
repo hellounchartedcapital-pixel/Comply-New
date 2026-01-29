@@ -1,10 +1,11 @@
 // Pricing.jsx
 // Pricing page with subscription tiers - matches new landing page style
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Logo } from './Logo';
 import { Check, X, Loader2, ArrowLeft, Zap, FileCheck } from 'lucide-react';
 import { AlertModal, useAlertModal } from './AlertModal';
+import { useSubscription } from './useSubscription';
 
 const plans = [
   {
@@ -90,27 +91,107 @@ const plans = [
   },
 ];
 
-export function Pricing({ onBack, onSelectPlan, currentPlan, user }) {
+export function Pricing({ onBack, onSignUp, user }) {
   const [billingCycle, setBillingCycle] = useState('monthly');
   const [loading, setLoading] = useState(null);
   const { alertModal, showAlert, hideAlert } = useAlertModal();
+  const { subscription, createCheckoutSession, openCustomerPortal } = useSubscription();
+
+  // Check for checkout result in URL
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const checkoutResult = params.get('checkout');
+    if (checkoutResult === 'success') {
+      showAlert({
+        type: 'success',
+        title: 'Subscription Activated!',
+        message: 'Welcome to your new plan. Your subscription is now active.',
+      });
+      // Clean up URL
+      window.history.replaceState({}, '', window.location.pathname);
+    } else if (checkoutResult === 'cancelled') {
+      showAlert({
+        type: 'info',
+        title: 'Checkout Cancelled',
+        message: 'No charges were made. You can try again anytime.',
+      });
+      // Clean up URL
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, [showAlert]);
+
+  const currentPlan = subscription?.plan || 'free';
 
   const handleSelectPlan = async (plan) => {
+    const planKey = plan.name.toLowerCase();
+
+    // If user is not logged in, redirect to signup
     if (!user) {
-      onSelectPlan?.(plan, 'signup');
+      onSignUp?.(planKey);
       return;
     }
 
+    // If selecting free plan and already on free, do nothing
+    if (planKey === 'free') {
+      if (currentPlan === 'free') {
+        showAlert({
+          type: 'info',
+          title: 'Already on Free Plan',
+          message: 'You are already on the Free plan.',
+        });
+      } else {
+        // User wants to downgrade - open customer portal
+        try {
+          setLoading(plan.name);
+          await openCustomerPortal();
+        } catch (error) {
+          showAlert({
+            type: 'error',
+            title: 'Portal Error',
+            message: 'Failed to open subscription management.',
+            details: 'Please try again or contact support.',
+          });
+        } finally {
+          setLoading(null);
+        }
+      }
+      return;
+    }
+
+    // If already on this plan, open customer portal to manage
+    if (planKey === currentPlan) {
+      try {
+        setLoading(plan.name);
+        await openCustomerPortal();
+      } catch (error) {
+        showAlert({
+          type: 'error',
+          title: 'Portal Error',
+          message: 'Failed to open subscription management.',
+          details: 'Please try again or contact support.',
+        });
+      } finally {
+        setLoading(null);
+      }
+      return;
+    }
+
+    // Create checkout session for upgrade
     setLoading(plan.name);
     try {
-      await onSelectPlan?.(plan, 'checkout');
+      const { url } = await createCheckoutSession(planKey, billingCycle === 'annual' ? 'annual' : 'monthly');
+      if (url) {
+        window.location.href = url;
+      } else {
+        throw new Error('No checkout URL returned');
+      }
     } catch (error) {
-      console.error('Error selecting plan:', error);
+      console.error('Error creating checkout session:', error);
       showAlert({
         type: 'error',
         title: 'Checkout Failed',
         message: 'Failed to start checkout.',
-        details: 'Please try again or contact support if the issue persists.'
+        details: error.message || 'Please try again or contact support if the issue persists.'
       });
     } finally {
       setLoading(null);
@@ -214,7 +295,8 @@ export function Pricing({ onBack, onSelectPlan, currentPlan, user }) {
         {/* Pricing Cards */}
         <div className="grid lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
           {plans.map((plan) => {
-            const isCurrentPlan = currentPlan === plan.name.toLowerCase();
+            const planKey = plan.name.toLowerCase();
+            const isCurrentPlan = currentPlan === planKey;
             const isProfessional = plan.popular;
 
             return (
@@ -295,13 +377,15 @@ export function Pricing({ onBack, onSelectPlan, currentPlan, user }) {
                     {/* CTA Button */}
                     <button
                       onClick={() => handleSelectPlan(plan)}
-                      disabled={loading === plan.name || isCurrentPlan}
+                      disabled={loading === plan.name || (isCurrentPlan && plan.price === 0 && user)}
                       className={`w-full py-4 px-6 rounded-xl font-semibold text-base transition-all duration-300 flex items-center justify-center gap-2 ${
-                        isCurrentPlan
+                        isCurrentPlan && plan.price === 0 && user
                           ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                          : isProfessional
-                            ? 'bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/25 hover:shadow-xl hover:shadow-emerald-500/30 hover:-translate-y-0.5'
-                            : 'bg-gray-900 text-white hover:bg-gray-800 hover:-translate-y-0.5'
+                          : isCurrentPlan && user
+                            ? 'bg-gray-200 text-gray-700 hover:bg-gray-300 hover:-translate-y-0.5'
+                            : isProfessional
+                              ? 'bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/25 hover:shadow-xl hover:shadow-emerald-500/30 hover:-translate-y-0.5'
+                              : 'bg-gray-900 text-white hover:bg-gray-800 hover:-translate-y-0.5'
                       }`}
                     >
                       {loading === plan.name ? (
@@ -309,12 +393,12 @@ export function Pricing({ onBack, onSelectPlan, currentPlan, user }) {
                           <Loader2 className="w-5 h-5 animate-spin" />
                           <span>Processing...</span>
                         </>
-                      ) : isCurrentPlan ? (
-                        <span>Current Plan</span>
+                      ) : isCurrentPlan && user ? (
+                        <span>{plan.price === 0 ? 'Current Plan' : 'Manage Subscription'}</span>
                       ) : plan.price === 0 ? (
                         <span>Get Started Free</span>
                       ) : (
-                        <span>Start Free Trial</span>
+                        <span>{user ? 'Upgrade Now' : 'Start Free Trial'}</span>
                       )}
                     </button>
 

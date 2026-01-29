@@ -459,7 +459,7 @@ function DashboardMockup() {
   );
 }
 
-export function LandingPage({ onLogin, onSignUp, onPrivacy, onTerms }) {
+export function LandingPage({ onLogin, onSignUp, onPrivacy, onTerms, onPricing }) {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showContactModal, setShowContactModal] = useState(false);

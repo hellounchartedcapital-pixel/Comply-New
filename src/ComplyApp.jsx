@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Upload, CheckCircle, XCircle, AlertCircle, FileText, Calendar, X, Search, Download, Settings as SettingsIcon, Eye, Bell, FileDown, Phone, Mail, User, Send, Clock, History, FileCheck, Sparkles, Building2, ChevronDown } from 'lucide-react';
+import { Upload, CheckCircle, XCircle, AlertCircle, FileText, Calendar, X, Search, Download, Settings as SettingsIcon, Eye, Bell, FileDown, Phone, Mail, User, Send, Clock, History, FileCheck, Sparkles, Building2, ChevronDown, CreditCard } from 'lucide-react';
 import { useVendors } from './useVendors';
+import { useSubscription } from './useSubscription';
 import { UploadModal } from './UploadModal';
 import { Settings } from './Settings';
 import { NotificationSettings } from './NotificationSettings';
@@ -12,7 +13,7 @@ import { exportPDFReport } from './exportPDFReport';
 import { Logo } from './Logo';
 import Properties from './Properties';
 
-function ComplyApp({ user, onSignOut }) {
+function ComplyApp({ user, onSignOut, onShowPricing }) {
   // Properties state
   const [properties, setProperties] = useState([]);
   const [selectedProperty, setSelectedProperty] = useState(null);
@@ -69,6 +70,7 @@ function ComplyApp({ user, onSignOut }) {
   const [uploadingCOI, setUploadingCOI] = useState(false);
   const [uploadStatus, setUploadStatus] = useState('');
   const { alertModal, showAlert, hideAlert } = useAlertModal();
+  const { subscription, isFreePlan, canAddVendor, getRemainingVendors } = useSubscription();
 
   // Load properties
   const loadProperties = async () => {
@@ -860,8 +862,20 @@ function ComplyApp({ user, onSignOut }) {
             <div className="flex items-center space-x-3">
               <div className="text-right hidden sm:block">
                 <p className="text-sm font-medium text-gray-900">{user?.email}</p>
-                <p className="text-xs text-gray-500">Signed in</p>
+                <p className="text-xs text-gray-500">
+                  {subscription?.plan ? `${subscription.plan.charAt(0).toUpperCase() + subscription.plan.slice(1)} Plan` : 'Free Plan'}
+                </p>
               </div>
+              {isFreePlan && (
+                <button
+                  onClick={onShowPricing}
+                  className="px-3 py-2 bg-gradient-to-r from-violet-500 to-purple-600 text-white rounded-xl hover:shadow-lg hover:shadow-violet-500/25 hover:-translate-y-0.5 transition-all duration-200 flex items-center space-x-1.5 text-sm font-semibold"
+                  title="Upgrade Plan"
+                >
+                  <CreditCard size={16} />
+                  <span className="hidden sm:inline">Upgrade</span>
+                </button>
+              )}
               <button
                 onClick={() => setShowSettings(true)}
                 className="p-2.5 bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 hover:text-gray-900 transition-all"
@@ -1923,6 +1937,9 @@ function ComplyApp({ user, onSignOut }) {
         isOpen={showUploadModal}
         onClose={() => setShowUploadModal(false)}
         onUploadComplete={handleFileUpload}
+        canAddVendor={canAddVendor(totalCount)}
+        remainingVendors={getRemainingVendors(totalCount)}
+        onUpgrade={onShowPricing}
       />
 
       {/* Settings Modal */}

@@ -10,6 +10,7 @@ import ComplyApp from './ComplyApp'
 import { PrivacyPolicy } from './PrivacyPolicy'
 import { TermsOfService } from './TermsOfService'
 import { VendorUploadPortal } from './VendorUploadPortal'
+import { Pricing } from './Pricing'
 import { Loader2 } from 'lucide-react'
 
 function AppContent() {
@@ -18,14 +19,20 @@ function AppContent() {
   const [showAuth, setShowAuth] = useState(false)
   const [showPrivacy, setShowPrivacy] = useState(false)
   const [showTerms, setShowTerms] = useState(false)
+  const [showPricing, setShowPricing] = useState(false)
   const [uploadToken, setUploadToken] = useState(null)
 
-  // Check URL for upload token on mount
+  // Check URL for upload token or pricing page on mount
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const token = params.get('upload')
     if (token) {
       setUploadToken(token)
+    }
+    // Check if coming back from checkout
+    const checkoutResult = params.get('checkout')
+    if (checkoutResult) {
+      setShowPricing(true)
     }
   }, [])
 
@@ -64,6 +71,27 @@ function AppContent() {
     return <TermsOfService onBack={() => setShowTerms(false)} />
   }
 
+  // Show Pricing page (for both logged in and not logged in users)
+  if (showPricing) {
+    return (
+      <Pricing
+        onBack={() => {
+          setShowPricing(false)
+          // Clean up URL params
+          const url = new URL(window.location)
+          url.searchParams.delete('checkout')
+          window.history.replaceState({}, '', url.pathname)
+        }}
+        onSignUp={() => {
+          setShowPricing(false)
+          setShowSignup(true)
+          setShowAuth(true)
+        }}
+        user={user}
+      />
+    )
+  }
+
   // If not logged in, show Landing Page or Auth screens
   if (!user) {
     // Show landing page unless user clicked Login or Sign Up
@@ -74,6 +102,7 @@ function AppContent() {
           onSignUp={() => { setShowSignup(true); setShowAuth(true); }}
           onPrivacy={() => setShowPrivacy(true)}
           onTerms={() => setShowTerms(true)}
+          onPricing={() => setShowPricing(true)}
         />
       )
     }
@@ -86,7 +115,7 @@ function AppContent() {
   }
 
   // User is logged in, show main app
-  return <ComplyApp user={user} onSignOut={signOut} />
+  return <ComplyApp user={user} onSignOut={signOut} onShowPricing={() => setShowPricing(true)} />
 }
 
 export default function App() {
