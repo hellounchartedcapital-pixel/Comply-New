@@ -168,6 +168,9 @@ export function useVendors(propertyId = null) {
 
       // Generate upload token if not provided (for vendor upload portal)
       const uploadToken = vendorData.rawData?.uploadToken || crypto.randomUUID();
+      // Token expiration: use provided value or default to 30 days from now
+      const tokenExpiresAt = vendorData.rawData?.uploadTokenExpiresAt ||
+        new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
       const { data, error } = await supabase
         .from('vendors')
@@ -195,7 +198,8 @@ export function useVendors(propertyId = null) {
           contact_email: vendorData.contactEmail || null,
           contact_phone: vendorData.contactPhone || null,
           contact_notes: vendorData.contactNotes || null,
-          upload_token: uploadToken
+          upload_token: uploadToken,
+          upload_token_expires_at: tokenExpiresAt
         }])
         .select()
         .single();

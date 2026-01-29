@@ -61,13 +61,22 @@ export function VendorUploadPortal({ token, onBack }) {
       // Fetch vendor by upload token
       const { data, error: fetchError } = await supabase
         .from('vendors')
-        .select('id, name, dba, status, expiration_date, upload_token, user_id')
+        .select('id, name, dba, status, expiration_date, upload_token, upload_token_expires_at, user_id')
         .eq('upload_token', token)
         .single();
 
       if (fetchError || !data) {
         setError('Invalid or expired upload link. Please contact the company that sent you this request.');
         return;
+      }
+
+      // Check if token has expired
+      if (data.upload_token_expires_at) {
+        const expiresAt = new Date(data.upload_token_expires_at);
+        if (expiresAt < new Date()) {
+          setError('This upload link has expired. Please contact the company to request a new link.');
+          return;
+        }
       }
 
       // Fetch user's requirements settings

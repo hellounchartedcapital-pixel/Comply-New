@@ -510,16 +510,22 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
       const companyName = userRequirements?.company_name || 'Our Company';
       const issues = requestCOIVendor.issues.map(i => i.message);
 
-      // Generate upload token if vendor doesn't have one
+      // Generate upload token if vendor doesn't have one or if it's expired
       let uploadToken = requestCOIVendor.rawData?.uploadToken;
+      const tokenExpiresAt = new Date();
+      tokenExpiresAt.setDate(tokenExpiresAt.getDate() + 30); // Token valid for 30 days
+
       if (!uploadToken) {
         uploadToken = crypto.randomUUID();
-        // Save the upload token to the vendor
-        await supabase
-          .from('vendors')
-          .update({ upload_token: uploadToken })
-          .eq('id', requestCOIVendor.id);
       }
+      // Always update the token expiration when sending a COI request
+      await supabase
+        .from('vendors')
+        .update({
+          upload_token: uploadToken,
+          upload_token_expires_at: tokenExpiresAt.toISOString()
+        })
+        .eq('id', requestCOIVendor.id);
 
       // Get the app URL (current origin)
       const appUrl = window.location.origin;
@@ -662,8 +668,10 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
 
       if (storageError) throw storageError;
 
-      // Generate upload token for vendor portal
+      // Generate upload token for vendor portal (valid for 30 days)
       const uploadToken = crypto.randomUUID();
+      const tokenExpiresAt = new Date();
+      tokenExpiresAt.setDate(tokenExpiresAt.getDate() + 30);
 
       // Step 3: Create vendor in database
       setUploadStatus('Checking compliance...');
@@ -676,7 +684,8 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
           ...vendorData.rawData,
           documentPath: fileName,
           documentUrl: storageData.path,
-          uploadToken: uploadToken // Store upload token for vendor portal
+          uploadToken: uploadToken, // Store upload token for vendor portal
+          uploadTokenExpiresAt: tokenExpiresAt.toISOString()
         }
       });
 
@@ -1940,6 +1949,9 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
         canAddVendor={canAddVendor(totalCount)}
         remainingVendors={getRemainingVendors(totalCount)}
         onUpgrade={onShowPricing}
+        selectedProperty={selectedProperty}
+        properties={properties}
+        onPropertyChange={setSelectedProperty}
       />
 
       {/* Settings Modal */}

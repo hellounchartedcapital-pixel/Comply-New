@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { X, Upload, AlertCircle, CheckCircle, Mail, Info, CreditCard } from 'lucide-react';
+import { X, Upload, AlertCircle, CheckCircle, Mail, Info, CreditCard, Building2, ChevronDown } from 'lucide-react';
 
-export function UploadModal({ isOpen, onClose, onUploadComplete, canAddVendor = true, remainingVendors = null, onUpgrade }) {
+export function UploadModal({ isOpen, onClose, onUploadComplete, canAddVendor = true, remainingVendors = null, onUpgrade, selectedProperty = null, properties = [], onPropertyChange }) {
   const [selectedFile, setSelectedFile] = useState(null);
   const [vendorEmail, setVendorEmail] = useState('');
   const [uploading, setUploading] = useState(false);
@@ -161,6 +161,46 @@ export function UploadModal({ isOpen, onClose, onUploadComplete, canAddVendor = 
             </>
           )}
         </div>
+
+        {/* Property Assignment - shown when multiple properties exist */}
+        {properties.length > 0 && (
+          <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+            <div className="flex items-center gap-2 mb-2">
+              <Building2 size={16} className="text-gray-500" />
+              <span className="text-sm font-medium text-gray-700">Assign to Property</span>
+            </div>
+            {properties.length === 1 ? (
+              <p className="text-sm text-gray-600 pl-6">
+                {properties[0].name}
+              </p>
+            ) : (
+              <div className="relative pl-6">
+                <select
+                  value={selectedProperty?.id || ''}
+                  onChange={(e) => {
+                    const property = properties.find(p => p.id === e.target.value);
+                    onPropertyChange?.(property || null);
+                  }}
+                  className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent appearance-none cursor-pointer"
+                  disabled={uploading}
+                >
+                  <option value="">All Properties (no specific assignment)</option>
+                  {properties.map(property => (
+                    <option key={property.id} value={property.id}>
+                      {property.name}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+              </div>
+            )}
+            {!selectedProperty && properties.length > 1 && (
+              <p className="text-xs text-amber-600 mt-2 pl-6">
+                Tip: Assigning vendors to a property helps organize and track compliance per location.
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Vendor Email Input - shown after file is selected */}
         {selectedFile && (
