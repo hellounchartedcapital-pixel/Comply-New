@@ -269,8 +269,6 @@ function DashboardMockup() {
               {/* Donut Chart */}
               <div className="relative">
                 <svg width="80" height="80" viewBox="0 0 80 80" className="transform -rotate-90">
-                  {/* Background circle */}
-                  <circle cx="40" cy="40" r="30" fill="none" stroke="#e5e7eb" strokeWidth="12" />
                   {/* Compliant (green) */}
                   <circle cx="40" cy="40" r="30" fill="none" stroke="#10b981" strokeWidth="12"
                     strokeDasharray={`${(stats.compliant / stats.total) * 188.5} 188.5`} strokeDashoffset="0" />
@@ -282,9 +280,13 @@ function DashboardMockup() {
                   <circle cx="40" cy="40" r="30" fill="none" stroke="#ef4444" strokeWidth="12"
                     strokeDasharray={`${(stats.expired / stats.total) * 188.5} 188.5`}
                     strokeDashoffset={`${-((stats.compliant + stats.nonCompliant) / stats.total) * 188.5}`} />
+                  {/* Expiring (amber) */}
+                  <circle cx="40" cy="40" r="30" fill="none" stroke="#f59e0b" strokeWidth="12"
+                    strokeDasharray={`${(stats.expiring / stats.total) * 188.5} 188.5`}
+                    strokeDashoffset={`${-((stats.compliant + stats.nonCompliant + stats.expired) / stats.total) * 188.5}`} />
                 </svg>
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-xl font-bold text-emerald-500">{compliancePercent}%</span>
+                  <span className="text-base font-bold text-emerald-500">{compliancePercent}%</span>
                 </div>
               </div>
               {/* Legend */}
