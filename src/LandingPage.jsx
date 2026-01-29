@@ -3,7 +3,8 @@ import { Logo } from './Logo';
 import {
   CheckCircle, Zap, Bell, Menu, X,
   FileCheck, FolderOpen, Cloud, Users, Check,
-  AlertCircle, XCircle, Calendar, Send, Mail, User, MessageSquare, Loader2
+  AlertCircle, XCircle, Calendar, Send, Mail, User, MessageSquare, Loader2,
+  Building2, ChevronDown, Upload, Search, Sparkles
 } from 'lucide-react';
 import { supabase } from './supabaseClient';
 
@@ -183,51 +184,50 @@ function ContactModal({ isOpen, onClose }) {
 
 // Dashboard Mockup Component - Realistic preview of actual dashboard
 function DashboardMockup() {
-  // Fake vendor data for the mockup
-  const stats = { total: 58, compliant: 47, nonCompliant: 5, expired: 3, expiring: 3 };
-
-  const upcomingExpirations = [
-    { name: "Pro Electric LLC", date: "Feb 12, 2025", days: 14 },
-    { name: "Swift Plumbing Co.", date: "Feb 18, 2025", days: 20 },
-    { name: "Green Lawn Care", date: "Feb 25, 2025", days: 27 },
-  ];
+  // Fake property and vendor data for the mockup
+  const currentProperty = "The Metropolitan";
+  const stats = { total: 24, compliant: 18, nonCompliant: 3, expired: 1, expiring: 2 };
 
   const vendors = [
     {
-      name: "ABC Cleaning Services",
+      name: "Elite Cleaning Services",
       status: "compliant",
-      expDate: "08/15/2025",
+      expDate: "09/15/2026",
       gl: "$1,000,000",
       auto: "$1,000,000",
       wc: "Statutory",
-      issues: []
+      issues: [],
+      hasAI: true
     },
     {
-      name: "Pro Electric LLC",
+      name: "Apex Landscaping Co.",
       status: "expiring",
-      expDate: "02/12/2025",
+      expDate: "02/14/2026",
       gl: "$2,000,000",
       auto: "$1,000,000",
       wc: "Statutory",
-      issues: []
+      issues: [],
+      hasAI: false
     },
     {
-      name: "Metro HVAC Inc.",
+      name: "Premier HVAC Solutions",
       status: "expired",
-      expDate: "01/15/2025",
+      expDate: "01/10/2026",
       gl: "$1,000,000",
       auto: "$500,000",
       wc: "Statutory",
-      issues: ["Policy expired 13 days ago"]
+      issues: ["Policy expired 19 days ago"],
+      hasAI: true
     },
     {
-      name: "SafeGuard Security",
+      name: "Guardian Security Inc.",
       status: "non-compliant",
-      expDate: "06/30/2025",
+      expDate: "07/30/2026",
       gl: "$500,000",
       auto: "$500,000",
       wc: "Statutory",
-      issues: ["GL below minimum ($1M required)"]
+      issues: ["GL below minimum ($1M required)"],
+      hasAI: false
     },
   ];
 
@@ -252,95 +252,71 @@ function DashboardMockup() {
         </div>
       </div>
 
-      {/* Dashboard content */}
-      <div className="p-4 bg-gray-50">
-        {/* Overview Row - Pie Chart & Upcoming */}
-        <div className="grid grid-cols-2 gap-3 mb-3">
-          {/* Mini Pie Chart */}
-          <div className="bg-white rounded-xl p-3 border border-gray-200 shadow-sm">
-            <p className="text-xs font-bold text-gray-900 mb-2">Compliance Overview</p>
-            <div className="flex items-center gap-3">
-              <div className="relative">
-                <svg width="60" height="60" viewBox="0 0 60 60" className="transform -rotate-90">
-                  <circle cx="30" cy="30" r="22" fill="none" stroke="#10b981" strokeWidth="8"
-                    strokeDasharray={`${(stats.compliant / stats.total) * 138.23} 138.23`} strokeDashoffset="0" />
-                  <circle cx="30" cy="30" r="22" fill="none" stroke="#f97316" strokeWidth="8"
-                    strokeDasharray={`${(stats.nonCompliant / stats.total) * 138.23} 138.23`}
-                    strokeDashoffset={`${-(stats.compliant / stats.total) * 138.23}`} />
-                  <circle cx="30" cy="30" r="22" fill="none" stroke="#ef4444" strokeWidth="8"
-                    strokeDasharray={`${(stats.expired / stats.total) * 138.23} 138.23`}
-                    strokeDashoffset={`${-((stats.compliant + stats.nonCompliant) / stats.total) * 138.23}`} />
-                  <circle cx="30" cy="30" r="22" fill="none" stroke="#f59e0b" strokeWidth="8"
-                    strokeDasharray={`${(stats.expiring / stats.total) * 138.23} 138.23`}
-                    strokeDashoffset={`${-((stats.compliant + stats.nonCompliant + stats.expired) / stats.total) * 138.23}`} />
-                </svg>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-sm font-bold text-gray-900">{stats.total}</span>
-                </div>
-              </div>
-              <div className="space-y-1 text-[10px]">
-                <div className="flex items-center gap-1.5">
-                  <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-                  <span className="text-gray-600">{stats.compliant} Compliant</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-2 h-2 rounded-full bg-orange-500"></div>
-                  <span className="text-gray-600">{stats.nonCompliant} Non-Compliant</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-2 h-2 rounded-full bg-red-500"></div>
-                  <span className="text-gray-600">{stats.expired} Expired</span>
-                </div>
-              </div>
+      {/* App Header */}
+      <div className="bg-white border-b border-gray-200 px-4 py-2.5 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 bg-gradient-to-r from-emerald-600 to-teal-500 rounded-md flex items-center justify-center">
+              <FileCheck className="w-3.5 h-3.5 text-white" />
             </div>
+            <span className="text-sm font-bold text-gray-900">Smart<span className="text-emerald-500">COI</span></span>
           </div>
-
-          {/* Upcoming Expirations */}
-          <div className="bg-white rounded-xl p-3 border border-gray-200 shadow-sm">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-xs font-bold text-gray-900">Upcoming Expirations</p>
-              <span className="text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-semibold">30 Days</span>
-            </div>
-            <div className="space-y-1.5">
-              {upcomingExpirations.map((item, idx) => (
-                <div key={idx} className="flex items-center justify-between bg-gray-50 rounded-lg px-2 py-1.5">
-                  <div className="flex items-center gap-1.5">
-                    <div className={`w-1.5 h-1.5 rounded-full ${item.days <= 14 ? 'bg-amber-500' : 'bg-yellow-400'}`}></div>
-                    <span className="text-[10px] font-medium text-gray-900 truncate max-w-[80px]">{item.name}</span>
-                  </div>
-                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
-                    item.days <= 14 ? 'bg-amber-100 text-amber-700' : 'bg-yellow-100 text-yellow-700'
-                  }`}>{item.days}d</span>
-                </div>
-              ))}
-            </div>
+          {/* Property Selector */}
+          <div className="flex items-center gap-1.5 bg-gray-100 rounded-lg px-2.5 py-1.5 ml-2">
+            <Building2 className="w-3.5 h-3.5 text-gray-500" />
+            <span className="text-[10px] font-medium text-gray-700">{currentProperty}</span>
+            <ChevronDown className="w-3 h-3 text-gray-400" />
           </div>
         </div>
+        <div className="flex items-center gap-2">
+          <button className="px-2.5 py-1 bg-emerald-500 text-white rounded-md text-[10px] font-semibold flex items-center gap-1">
+            <Upload className="w-3 h-3" />
+            Upload COI
+          </button>
+        </div>
+      </div>
 
+      {/* Dashboard content */}
+      <div className="p-4 bg-gray-50">
         {/* Stats Cards Row */}
         <div className="grid grid-cols-4 gap-2 mb-3">
           <div className="bg-white rounded-xl p-2.5 border border-gray-200 shadow-sm">
-            <p className="text-[9px] text-gray-500 font-medium">Total</p>
+            <p className="text-[9px] text-gray-500 font-medium">Total Vendors</p>
             <p className="text-lg font-bold text-gray-900">{stats.total}</p>
           </div>
-          <div className="bg-white rounded-xl p-2.5 border border-gray-200 shadow-sm">
+          <div className="bg-white rounded-xl p-2.5 border border-gray-200 shadow-sm cursor-pointer hover:border-red-300 transition-colors">
             <p className="text-[9px] text-gray-500 font-medium">Expired</p>
             <p className="text-lg font-bold text-red-600">{stats.expired}</p>
           </div>
-          <div className="bg-white rounded-xl p-2.5 border border-gray-200 shadow-sm">
+          <div className="bg-white rounded-xl p-2.5 border border-gray-200 shadow-sm cursor-pointer hover:border-orange-300 transition-colors">
             <p className="text-[9px] text-gray-500 font-medium">Non-Compliant</p>
             <p className="text-lg font-bold text-orange-600">{stats.nonCompliant}</p>
           </div>
-          <div className="bg-white rounded-xl p-2.5 border border-gray-200 shadow-sm">
+          <div className="bg-white rounded-xl p-2.5 border border-gray-200 shadow-sm cursor-pointer hover:border-emerald-300 transition-colors">
             <p className="text-[9px] text-gray-500 font-medium">Compliant</p>
             <p className="text-lg font-bold text-emerald-600">{stats.compliant}</p>
+          </div>
+        </div>
+
+        {/* Search and Filter Row */}
+        <div className="flex items-center gap-2 mb-3">
+          <div className="flex-1 relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+            <div className="w-full bg-white border border-gray-200 rounded-lg pl-8 pr-3 py-2 text-[10px] text-gray-400">
+              Search vendors...
+            </div>
+          </div>
+          <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-lg p-1">
+            <button className="px-2 py-1 text-[9px] font-medium bg-emerald-100 text-emerald-700 rounded">All</button>
+            <button className="px-2 py-1 text-[9px] font-medium text-gray-500 hover:bg-gray-100 rounded">Expired</button>
+            <button className="px-2 py-1 text-[9px] font-medium text-gray-500 hover:bg-gray-100 rounded">Expiring</button>
           </div>
         </div>
 
         {/* Vendor List */}
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
           {vendors.map((vendor, index) => (
-            <div key={index} className={`p-3 ${index !== vendors.length - 1 ? 'border-b border-gray-100' : ''} hover:bg-gray-50`}>
+            <div key={index} className={`p-3 ${index !== vendors.length - 1 ? 'border-b border-gray-100' : ''} hover:bg-gray-50 cursor-pointer`}>
               <div className="flex items-start justify-between">
                 <div className="flex items-start gap-2 flex-1 min-w-0">
                   <div className="mt-0.5">
@@ -363,6 +339,12 @@ function DashboardMockup() {
                       <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full border ${statusConfig[vendor.status].badge}`}>
                         {vendor.status.toUpperCase().replace('-', ' ')}
                       </span>
+                      {vendor.hasAI && (
+                        <span className="text-[8px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-full font-medium flex items-center gap-0.5">
+                          <Sparkles size={7} />
+                          AI
+                        </span>
+                      )}
                     </div>
                     {vendor.issues.length > 0 && (
                       <p className="text-[9px] text-red-600 mb-1 flex items-center gap-1">
