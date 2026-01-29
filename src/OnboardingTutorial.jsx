@@ -124,7 +124,6 @@ export function OnboardingTutorial({ onComplete, onSkip }) {
 
     // Determine best position for modal relative to highlighted element
     const spaceAbove = highlightRect.top;
-    const spaceBelow = viewportHeight - (highlightRect.top + highlightRect.height);
     const spaceLeft = highlightRect.left;
     const spaceRight = viewportWidth - (highlightRect.left + highlightRect.width);
 
