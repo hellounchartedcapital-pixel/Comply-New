@@ -185,7 +185,8 @@ function ContactModal({ isOpen, onClose }) {
 // Dashboard Mockup Component - Realistic preview of actual dashboard
 function DashboardMockup() {
   // Fake data matching the actual dashboard layout
-  const stats = { total: 5, compliant: 3, nonCompliant: 1, expired: 1, expiring: 0 };
+  // 35 total: 28 compliant (80%), 4 non-compliant, 2 expired, 1 expiring
+  const stats = { total: 35, compliant: 28, nonCompliant: 4, expired: 2, expiring: 1 };
   const compliancePercent = Math.round((stats.compliant / stats.total) * 100);
 
   const vendors = [
@@ -283,7 +284,7 @@ function DashboardMockup() {
                     strokeDashoffset={`${-((stats.compliant + stats.nonCompliant) / stats.total) * 188.5}`} />
                 </svg>
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-xl font-bold text-amber-500">{compliancePercent}%</span>
+                  <span className="text-xl font-bold text-emerald-500">{compliancePercent}%</span>
                 </div>
               </div>
               {/* Legend */}
