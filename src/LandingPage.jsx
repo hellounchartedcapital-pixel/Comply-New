@@ -278,6 +278,57 @@ function DashboardMockup() {
 
       {/* Dashboard content */}
       <div className="p-4 bg-gray-50">
+        {/* Compliance Overview with Pie Chart */}
+        <div className="bg-white rounded-xl p-3 border border-gray-200 shadow-sm mb-3">
+          <p className="text-xs font-bold text-gray-900 mb-2">Compliance Overview</p>
+          <div className="flex items-center justify-center gap-6">
+            {/* Pie Chart */}
+            <div className="relative">
+              <svg width="70" height="70" viewBox="0 0 70 70" className="transform -rotate-90">
+                {/* Compliant slice (green) - 75% */}
+                <circle cx="35" cy="35" r="26" fill="none" stroke="#10b981" strokeWidth="10"
+                  strokeDasharray={`${(stats.compliant / stats.total) * 163.36} 163.36`} strokeDashoffset="0" />
+                {/* Non-compliant slice (orange) */}
+                <circle cx="35" cy="35" r="26" fill="none" stroke="#f97316" strokeWidth="10"
+                  strokeDasharray={`${(stats.nonCompliant / stats.total) * 163.36} 163.36`}
+                  strokeDashoffset={`${-(stats.compliant / stats.total) * 163.36}`} />
+                {/* Expired slice (red) */}
+                <circle cx="35" cy="35" r="26" fill="none" stroke="#ef4444" strokeWidth="10"
+                  strokeDasharray={`${(stats.expired / stats.total) * 163.36} 163.36`}
+                  strokeDashoffset={`${-((stats.compliant + stats.nonCompliant) / stats.total) * 163.36}`} />
+                {/* Expiring slice (amber) */}
+                <circle cx="35" cy="35" r="26" fill="none" stroke="#f59e0b" strokeWidth="10"
+                  strokeDasharray={`${(stats.expiring / stats.total) * 163.36} 163.36`}
+                  strokeDashoffset={`${-((stats.compliant + stats.nonCompliant + stats.expired) / stats.total) * 163.36}`} />
+              </svg>
+              {/* Center percentage */}
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <span className="text-base font-bold text-emerald-600">{Math.round((stats.compliant / stats.total) * 100)}%</span>
+                <span className="text-[8px] text-gray-500">Compliant</span>
+              </div>
+            </div>
+            {/* Legend */}
+            <div className="space-y-1.5 text-[10px]">
+              <div className="flex items-center gap-1.5">
+                <div className="w-2.5 h-2.5 rounded-full bg-emerald-500"></div>
+                <span className="text-gray-700 font-medium">{stats.compliant} Compliant</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-2.5 h-2.5 rounded-full bg-orange-500"></div>
+                <span className="text-gray-700 font-medium">{stats.nonCompliant} Non-Compliant</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-2.5 h-2.5 rounded-full bg-red-500"></div>
+                <span className="text-gray-700 font-medium">{stats.expired} Expired</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-2.5 h-2.5 rounded-full bg-amber-500"></div>
+                <span className="text-gray-700 font-medium">{stats.expiring} Expiring</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Stats Cards Row */}
         <div className="grid grid-cols-4 gap-2 mb-3">
           <div className="bg-white rounded-xl p-2.5 border border-gray-200 shadow-sm">
