@@ -67,12 +67,12 @@ function TenantModal({ isOpen, onClose, onSave, tenant, properties, units }) {
     workers_comp_exempt: false,
     // Employer's Liability
     required_employers_liability_min: 0,
-    // Additional Insured (Alturas defaults)
+    // Additional Insured
     requires_additional_insured: true,
-    additional_insured_text: 'A. Alturas Stanford, LLC.\nB. Alturas Capital Partners, LLC.',
-    // Certificate Holder (Alturas defaults)
-    certificate_holder_name: 'Alturas Stanford, LLC. c/o Alturas Capital Partners, LLC.',
-    certificate_holder_address: '250 East Eagles Gate Dr., Suite 340, Eagle, Idaho 83616',
+    additional_insured_text: '',
+    // Certificate Holder
+    certificate_holder_name: '',
+    certificate_holder_address: '',
     // Other requirements
     cancellation_notice_days: 30,
     requires_declarations_page: true,
@@ -99,9 +99,9 @@ function TenantModal({ isOpen, onClose, onSave, tenant, properties, units }) {
         workers_comp_exempt: tenant.workers_comp_exempt || false,
         required_employers_liability_min: tenant.required_employers_liability_min || 0,
         requires_additional_insured: tenant.requires_additional_insured !== false,
-        additional_insured_text: tenant.additional_insured_text || 'A. Alturas Stanford, LLC.\nB. Alturas Capital Partners, LLC.',
-        certificate_holder_name: tenant.certificate_holder_name || 'Alturas Stanford, LLC. c/o Alturas Capital Partners, LLC.',
-        certificate_holder_address: tenant.certificate_holder_address || '250 East Eagles Gate Dr., Suite 340, Eagle, Idaho 83616',
+        additional_insured_text: tenant.additional_insured_text || '',
+        certificate_holder_name: tenant.certificate_holder_name || '',
+        certificate_holder_address: tenant.certificate_holder_address || '',
         cancellation_notice_days: tenant.cancellation_notice_days || 30,
         requires_declarations_page: tenant.requires_declarations_page !== false,
         requires_endorsement_pages: tenant.requires_endorsement_pages !== false,
@@ -123,9 +123,9 @@ function TenantModal({ isOpen, onClose, onSave, tenant, properties, units }) {
         workers_comp_exempt: false,
         required_employers_liability_min: 0,
         requires_additional_insured: true,
-        additional_insured_text: 'A. Alturas Stanford, LLC.\nB. Alturas Capital Partners, LLC.',
-        certificate_holder_name: 'Alturas Stanford, LLC. c/o Alturas Capital Partners, LLC.',
-        certificate_holder_address: '250 East Eagles Gate Dr., Suite 340, Eagle, Idaho 83616',
+        additional_insured_text: '',
+        certificate_holder_name: '',
+        certificate_holder_address: '',
         cancellation_notice_days: 30,
         requires_declarations_page: true,
         requires_endorsement_pages: true,
