@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Upload, CheckCircle, XCircle, AlertCircle, FileText, Calendar, X, Search, Download, Settings as SettingsIcon, Eye, Bell, FileDown, Phone, Mail, User, Send, Clock, History, FileCheck, Sparkles, Building2, ChevronDown, CreditCard } from 'lucide-react';
+import { Upload, CheckCircle, XCircle, AlertCircle, FileText, Calendar, X, Search, Download, Settings as SettingsIcon, Eye, Bell, FileDown, Phone, Mail, User, Send, Clock, History, FileCheck, Sparkles, Building2, ChevronDown, CreditCard, Users, Home } from 'lucide-react';
 import { useVendors } from './useVendors';
 import { useSubscription } from './useSubscription';
 import { UploadModal } from './UploadModal';
@@ -12,8 +12,14 @@ import { extractCOIFromPDF } from './extractCOI';
 import { exportPDFReport } from './exportPDFReport';
 import { Logo } from './Logo';
 import Properties from './Properties';
+import { TenantsView } from './TenantsView';
+import { UnitsManager } from './UnitsManager';
 
 function ComplyApp({ user, onSignOut, onShowPricing }) {
+  // Active tab state
+  const [activeTab, setActiveTab] = useState('vendors'); // 'vendors' or 'tenants'
+  const [showUnitsManager, setShowUnitsManager] = useState(false);
+
   // Properties state
   const [properties, setProperties] = useState([]);
   const [selectedProperty, setSelectedProperty] = useState(null);
@@ -920,8 +926,53 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
         </div>
       </header>
 
+      {/* Tab Navigation */}
+      <div className="relative bg-white border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between">
+            <nav className="flex space-x-1" aria-label="Tabs">
+              <button
+                onClick={() => setActiveTab('vendors')}
+                className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${
+                  activeTab === 'vendors'
+                    ? 'border-emerald-500 text-emerald-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <FileCheck size={18} />
+                Vendors
+              </button>
+              <button
+                onClick={() => setActiveTab('tenants')}
+                className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${
+                  activeTab === 'tenants'
+                    ? 'border-emerald-500 text-emerald-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <Users size={18} />
+                Tenants
+              </button>
+            </nav>
+            {activeTab === 'tenants' && (
+              <button
+                onClick={() => setShowUnitsManager(true)}
+                className="px-3 py-1.5 text-sm font-medium text-gray-600 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors flex items-center gap-1.5"
+              >
+                <Home size={16} />
+                Manage Units
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
       {/* Main Content */}
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+      {/* Vendors Tab Content */}
+      {activeTab === 'vendors' && (
+        <>
         {/* Overview Section - Pie Chart & Upcoming Expirations */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
           {/* Pie Chart Card */}
@@ -1940,6 +1991,21 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
           </div>
         </div>
       )}
+      </>
+      )}
+
+      {/* Tenants Tab Content */}
+      {activeTab === 'tenants' && (
+        <TenantsView properties={properties} />
+      )}
+      </div>
+
+      {/* Units Manager Modal */}
+      <UnitsManager
+        isOpen={showUnitsManager}
+        onClose={() => setShowUnitsManager(false)}
+        properties={properties}
+      />
 
       {/* Upload Modal */}
       <UploadModal
