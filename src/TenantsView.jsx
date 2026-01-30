@@ -622,63 +622,244 @@ export function TenantsView({ properties }) {
 
   return (
     <div className="space-y-6">
+      {/* Overview Section - Pie Chart & Upcoming Expirations */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Pie Chart Card */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+          <h3 className="text-lg font-bold text-gray-900 mb-4">Tenant Compliance Overview</h3>
+          <div className="flex items-center justify-center">
+            <div className="relative">
+              {/* SVG Pie Chart */}
+              <svg width="180" height="180" viewBox="0 0 180 180" className="transform -rotate-90">
+                {stats.total === 0 ? (
+                  <circle cx="90" cy="90" r="70" fill="none" stroke="#e5e7eb" strokeWidth="24" />
+                ) : (
+                  <>
+                    {/* Compliant slice (green) */}
+                    <circle
+                      cx="90" cy="90" r="70"
+                      fill="none"
+                      stroke="#10b981"
+                      strokeWidth="24"
+                      strokeDasharray={`${(stats.compliant / stats.total) * 439.82} 439.82`}
+                      strokeDashoffset="0"
+                    />
+                    {/* Non-compliant slice (orange) */}
+                    <circle
+                      cx="90" cy="90" r="70"
+                      fill="none"
+                      stroke="#f97316"
+                      strokeWidth="24"
+                      strokeDasharray={`${(stats.nonCompliant / stats.total) * 439.82} 439.82`}
+                      strokeDashoffset={`${-(stats.compliant / stats.total) * 439.82}`}
+                    />
+                    {/* Expired slice (red) */}
+                    <circle
+                      cx="90" cy="90" r="70"
+                      fill="none"
+                      stroke="#ef4444"
+                      strokeWidth="24"
+                      strokeDasharray={`${(stats.expired / stats.total) * 439.82} 439.82`}
+                      strokeDashoffset={`${-((stats.compliant + stats.nonCompliant) / stats.total) * 439.82}`}
+                    />
+                    {/* Expiring slice (amber) */}
+                    <circle
+                      cx="90" cy="90" r="70"
+                      fill="none"
+                      stroke="#f59e0b"
+                      strokeWidth="24"
+                      strokeDasharray={`${(stats.expiring / stats.total) * 439.82} 439.82`}
+                      strokeDashoffset={`${-((stats.compliant + stats.nonCompliant + stats.expired) / stats.total) * 439.82}`}
+                    />
+                    {/* Pending slice (gray) */}
+                    <circle
+                      cx="90" cy="90" r="70"
+                      fill="none"
+                      stroke="#9ca3af"
+                      strokeWidth="24"
+                      strokeDasharray={`${(stats.pending / stats.total) * 439.82} 439.82`}
+                      strokeDashoffset={`${-((stats.compliant + stats.nonCompliant + stats.expired + stats.expiring) / stats.total) * 439.82}`}
+                    />
+                  </>
+                )}
+              </svg>
+              {/* Center text - Compliance Percentage */}
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                {stats.total === 0 ? (
+                  <>
+                    <span className="text-3xl font-bold text-gray-400">0%</span>
+                    <span className="text-xs text-gray-500 font-medium">Compliant</span>
+                  </>
+                ) : (
+                  <>
+                    <span className={`text-3xl font-bold ${
+                      Math.round((stats.compliant / stats.total) * 100) >= 80
+                        ? 'text-emerald-600'
+                        : Math.round((stats.compliant / stats.total) * 100) >= 50
+                          ? 'text-amber-500'
+                          : 'text-red-500'
+                    }`}>
+                      {Math.round((stats.compliant / stats.total) * 100)}%
+                    </span>
+                    <span className="text-xs text-gray-500 font-medium">Compliant</span>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Legend */}
+            <div className="ml-8 space-y-2">
+              <div className="flex items-center space-x-3">
+                <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">{stats.compliant} Compliant</p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-3">
+                <div className="w-3 h-3 rounded-full bg-orange-500"></div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">{stats.nonCompliant} Non-Compliant</p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-3">
+                <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">{stats.expired} Expired</p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-3">
+                <div className="w-3 h-3 rounded-full bg-amber-500"></div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">{stats.expiring} Expiring Soon</p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-3">
+                <div className="w-3 h-3 rounded-full bg-gray-400"></div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">{stats.pending} Pending</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Upcoming Expirations Card */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-bold text-gray-900">Upcoming Policy Expirations</h3>
+            <span className="text-xs bg-amber-100 text-amber-700 px-2.5 py-1 rounded-full font-semibold">Next 30 Days</span>
+          </div>
+          <div className="space-y-3 max-h-[220px] overflow-y-auto">
+            {tenants
+              .filter(t => {
+                if (!t.policy_expiration_date) return false;
+                const today = new Date();
+                const expDate = new Date(t.policy_expiration_date);
+                const daysUntil = Math.floor((expDate - today) / (1000 * 60 * 60 * 24));
+                return daysUntil >= 0 && daysUntil <= 30;
+              })
+              .sort((a, b) => new Date(a.policy_expiration_date) - new Date(b.policy_expiration_date))
+              .slice(0, 5)
+              .map((tenant) => {
+                const today = new Date();
+                const expDate = new Date(tenant.policy_expiration_date);
+                const daysUntil = Math.floor((expDate - today) / (1000 * 60 * 60 * 24));
+                return (
+                  <div key={tenant.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors cursor-pointer" onClick={() => setSelectedTenant(tenant)}>
+                    <div className="flex items-center space-x-3">
+                      <div className={`w-2 h-2 rounded-full ${daysUntil <= 7 ? 'bg-red-500' : daysUntil <= 14 ? 'bg-amber-500' : 'bg-yellow-400'}`}></div>
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900 truncate max-w-[180px]">{tenant.name}</p>
+                        <p className="text-xs text-gray-500">{tenant.property?.name} {tenant.unit?.unit_number && `• Unit ${tenant.unit.unit_number}`}</p>
+                      </div>
+                    </div>
+                    <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${
+                      daysUntil <= 7 ? 'bg-red-100 text-red-700' :
+                      daysUntil <= 14 ? 'bg-amber-100 text-amber-700' :
+                      'bg-yellow-100 text-yellow-700'
+                    }`}>
+                      {daysUntil === 0 ? 'Today' : daysUntil === 1 ? '1 day' : `${daysUntil} days`}
+                    </span>
+                  </div>
+                );
+              })}
+            {tenants.filter(t => {
+              if (!t.policy_expiration_date) return false;
+              const today = new Date();
+              const expDate = new Date(t.policy_expiration_date);
+              const daysUntil = Math.floor((expDate - today) / (1000 * 60 * 60 * 24));
+              return daysUntil >= 0 && daysUntil <= 30;
+            }).length === 0 && (
+              <div className="text-center py-8">
+                <CheckCircle className="mx-auto text-emerald-400 mb-2" size={32} />
+                <p className="text-sm text-gray-500 font-medium">No policy expirations in the next 30 days</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
-              <Users className="text-gray-600" size={20} />
-            </div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <button
+          onClick={() => setStatusFilter('all')}
+          className={`bg-white rounded-2xl shadow-sm border p-5 hover:shadow-md transition-all text-left ${statusFilter === 'all' ? 'border-gray-900 ring-2 ring-gray-900' : 'border-gray-200'}`}
+        >
+          <div className="flex items-center justify-between">
             <div>
-              <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
-              <p className="text-xs text-gray-500">Total Tenants</p>
+              <p className="text-sm text-gray-500 font-medium">Total Tenants</p>
+              <p className="text-3xl font-bold text-gray-900 mt-1">{stats.total}</p>
+            </div>
+            <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center">
+              <Users className="text-gray-500" size={24} />
             </div>
           </div>
-        </div>
-        <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
-              <CheckCircle className="text-emerald-600" size={20} />
-            </div>
+        </button>
+
+        <button
+          onClick={() => setStatusFilter('expired')}
+          className={`bg-white rounded-2xl shadow-sm border p-5 hover:shadow-md transition-all text-left ${statusFilter === 'expired' ? 'border-red-500 ring-2 ring-red-500' : 'border-gray-200'}`}
+        >
+          <div className="flex items-center justify-between">
             <div>
-              <p className="text-2xl font-bold text-emerald-600">{stats.compliant}</p>
-              <p className="text-xs text-gray-500">Compliant</p>
+              <p className="text-sm text-gray-500 font-medium">Expired</p>
+              <p className="text-3xl font-bold text-red-600 mt-1">{stats.expired}</p>
+            </div>
+            <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center">
+              <XCircle className="text-red-500" size={24} />
             </div>
           </div>
-        </div>
-        <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
-              <XCircle className="text-red-600" size={20} />
-            </div>
+        </button>
+
+        <button
+          onClick={() => setStatusFilter('non-compliant')}
+          className={`bg-white rounded-2xl shadow-sm border p-5 hover:shadow-md transition-all text-left ${statusFilter === 'non-compliant' ? 'border-orange-500 ring-2 ring-orange-500' : 'border-gray-200'}`}
+        >
+          <div className="flex items-center justify-between">
             <div>
-              <p className="text-2xl font-bold text-red-600">{stats.nonCompliant + stats.expired}</p>
-              <p className="text-xs text-gray-500">Non-Compliant</p>
+              <p className="text-sm text-gray-500 font-medium">Non-Compliant</p>
+              <p className="text-3xl font-bold text-orange-600 mt-1">{stats.nonCompliant}</p>
+            </div>
+            <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center">
+              <AlertCircle className="text-orange-500" size={24} />
             </div>
           </div>
-        </div>
-        <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
-              <AlertCircle className="text-amber-600" size={20} />
-            </div>
+        </button>
+
+        <button
+          onClick={() => setStatusFilter('compliant')}
+          className={`bg-white rounded-2xl shadow-sm border p-5 hover:shadow-md transition-all text-left ${statusFilter === 'compliant' ? 'border-emerald-500 ring-2 ring-emerald-500' : 'border-gray-200'}`}
+        >
+          <div className="flex items-center justify-between">
             <div>
-              <p className="text-2xl font-bold text-amber-600">{stats.expiring}</p>
-              <p className="text-xs text-gray-500">Expiring</p>
+              <p className="text-sm text-gray-500 font-medium">Compliant</p>
+              <p className="text-3xl font-bold text-emerald-600 mt-1">{stats.compliant}</p>
+            </div>
+            <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center">
+              <CheckCircle className="text-emerald-500" size={24} />
             </div>
           </div>
-        </div>
-        <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
-              <Clock className="text-gray-600" size={20} />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-gray-600">{stats.pending}</p>
-              <p className="text-xs text-gray-500">Pending</p>
-            </div>
-          </div>
-        </div>
+        </button>
       </div>
 
       {/* Search and Filters */}
