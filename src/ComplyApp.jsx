@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { Upload, CheckCircle, XCircle, AlertCircle, FileText, Calendar, X, Search, Download, Settings as SettingsIcon, Eye, Bell, FileDown, Phone, Mail, User, Send, Clock, History, FileCheck, Sparkles, Building2, ChevronDown, CreditCard, Users, Home } from 'lucide-react';
+import { Upload, CheckCircle, XCircle, AlertCircle, FileText, Calendar, X, Search, Download, Settings as SettingsIcon, Eye, Bell, FileDown, Phone, Mail, User, Send, Clock, History, FileCheck, Sparkles, Building2, ChevronDown, CreditCard, Users, Home, LayoutDashboard } from 'lucide-react';
 import { useVendors } from './useVendors';
+import { useTenants } from './useTenants';
 import { useSubscription } from './useSubscription';
 import { UploadModal } from './UploadModal';
+import { SmartUploadModal } from './SmartUploadModal';
 import { Settings } from './Settings';
 import { NotificationSettings } from './NotificationSettings';
 import { OnboardingTutorial } from './OnboardingTutorial';
@@ -14,11 +16,13 @@ import { Logo } from './Logo';
 import Properties from './Properties';
 import { TenantsView } from './TenantsView';
 import { UnitsManager } from './UnitsManager';
+import { Dashboard } from './Dashboard';
 
 function ComplyApp({ user, onSignOut, onShowPricing }) {
   // Active tab state
-  const [activeTab, setActiveTab] = useState('vendors'); // 'vendors' or 'tenants'
+  const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard', 'vendors', or 'tenants'
   const [showUnitsManager, setShowUnitsManager] = useState(false);
+  const [showSmartUpload, setShowSmartUpload] = useState(false);
 
   // Properties state
   const [properties, setProperties] = useState([]);
@@ -29,6 +33,9 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
 
   // Use database hook instead of local state - filter by selected property
   const { vendors: dbVendors, loading, loadingMore, error, hasMore, totalCount, addVendor, updateVendor, deleteVendor, loadMore, refreshVendors } = useVendors(selectedProperty?.id);
+
+  // Tenants hook for dashboard
+  const { tenants: dbTenants, refreshTenants } = useTenants();
 
   // Convert database format (snake_case) to app format (camelCase)
   const vendors = dbVendors.map(v => ({
@@ -932,6 +939,17 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
           <div className="flex items-center justify-between">
             <nav className="flex space-x-1" aria-label="Tabs">
               <button
+                onClick={() => setActiveTab('dashboard')}
+                className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${
+                  activeTab === 'dashboard'
+                    ? 'border-emerald-500 text-emerald-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <LayoutDashboard size={18} />
+                Dashboard
+              </button>
+              <button
                 onClick={() => setActiveTab('vendors')}
                 className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${
                   activeTab === 'vendors'
@@ -969,6 +987,24 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
 
       {/* Main Content */}
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+      {/* Dashboard Tab Content */}
+      {activeTab === 'dashboard' && (
+        <Dashboard
+          vendors={vendors}
+          tenants={dbTenants}
+          onUploadClick={() => setShowSmartUpload(true)}
+          onViewVendors={() => setActiveTab('vendors')}
+          onViewTenants={() => setActiveTab('tenants')}
+          onSelectVendor={(vendor) => {
+            setActiveTab('vendors');
+            setSelectedVendor(vendor);
+          }}
+          onSelectTenant={(tenant) => {
+            setActiveTab('tenants');
+          }}
+        />
+      )}
 
       {/* Vendors Tab Content */}
       {activeTab === 'vendors' && (
@@ -2017,6 +2053,23 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
         selectedProperty={selectedProperty}
         properties={properties}
         onPropertyChange={setSelectedProperty}
+      />
+
+      {/* Smart Upload Modal - for Dashboard */}
+      <SmartUploadModal
+        isOpen={showSmartUpload}
+        onClose={() => setShowSmartUpload(false)}
+        onUploadComplete={(result) => {
+          setShowSmartUpload(false);
+          if (result.type === 'vendor') {
+            refreshVendors();
+          } else {
+            refreshTenants();
+          }
+        }}
+        properties={properties}
+        selectedProperty={selectedProperty}
+        userRequirements={userRequirements}
       />
 
       {/* Settings Modal */}
