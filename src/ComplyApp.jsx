@@ -1418,7 +1418,6 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
               </div>
             )}
           </div>
-          )}
         </div>
       </div>
 
