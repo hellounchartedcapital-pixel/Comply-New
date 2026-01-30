@@ -118,8 +118,12 @@ serve(async (req) => {
         const subscriptionId = session.subscription as string;
         const customerId = session.customer as string;
 
+        console.log('Processing checkout.session.completed:', { subscriptionId, customerId });
+
         // Get the subscription details from Stripe API
         const subscription = await stripeRequest(`/subscriptions/${subscriptionId}`);
+        console.log('Subscription data:', JSON.stringify(subscription, null, 2));
+
         const plan = subscription.metadata?.plan || 'starter';
         const userId = subscription.metadata?.supabase_user_id;
 
@@ -127,6 +131,14 @@ serve(async (req) => {
           console.error('No user ID in subscription metadata');
           break;
         }
+
+        // Safely convert timestamps
+        const currentPeriodStart = subscription.current_period_start
+          ? new Date(subscription.current_period_start * 1000).toISOString()
+          : new Date().toISOString();
+        const currentPeriodEnd = subscription.current_period_end
+          ? new Date(subscription.current_period_end * 1000).toISOString()
+          : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(); // Default 30 days
 
         // Upsert subscription record
         const { error } = await supabase
@@ -136,11 +148,11 @@ serve(async (req) => {
             stripe_customer_id: customerId,
             stripe_subscription_id: subscriptionId,
             plan: plan,
-            status: subscription.status,
+            status: subscription.status || 'active',
             vendor_limit: PLAN_LIMITS[plan] || PLAN_LIMITS.free,
-            current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
-            current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
-            cancel_at_period_end: subscription.cancel_at_period_end,
+            current_period_start: currentPeriodStart,
+            current_period_end: currentPeriodEnd,
+            cancel_at_period_end: subscription.cancel_at_period_end || false,
             updated_at: new Date().toISOString(),
           }, {
             onConflict: 'user_id'
@@ -164,15 +176,23 @@ serve(async (req) => {
           break;
         }
 
+        // Safely convert timestamps
+        const currentPeriodStart = subscription.current_period_start
+          ? new Date(subscription.current_period_start * 1000).toISOString()
+          : new Date().toISOString();
+        const currentPeriodEnd = subscription.current_period_end
+          ? new Date(subscription.current_period_end * 1000).toISOString()
+          : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
         const { error } = await supabase
           .from('subscriptions')
           .update({
             plan: plan,
-            status: subscription.status,
+            status: subscription.status || 'active',
             vendor_limit: PLAN_LIMITS[plan] || PLAN_LIMITS.free,
-            current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
-            current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
-            cancel_at_period_end: subscription.cancel_at_period_end,
+            current_period_start: currentPeriodStart,
+            current_period_end: currentPeriodEnd,
+            cancel_at_period_end: subscription.cancel_at_period_end || false,
             updated_at: new Date().toISOString(),
           })
           .eq('user_id', userId);
