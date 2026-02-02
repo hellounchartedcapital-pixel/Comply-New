@@ -541,7 +541,7 @@ export function LandingPage({ onLogin, onSignUp, onPrivacy, onTerms, onPricing }
       price: "Free",
       period: "forever",
       description: "Perfect for getting started",
-      vendors: "Up to 10 vendors & tenants",
+      vendors: "Up to 10 certificates",
       features: [
         "AI-powered COI extraction",
         "Compliance dashboard",
@@ -556,7 +556,7 @@ export function LandingPage({ onLogin, onSignUp, onPrivacy, onTerms, onPricing }
       price: "$79",
       period: "/month",
       description: "For small property managers",
-      vendors: "Up to 25 vendors & tenants",
+      vendors: "Up to 25 certificates",
       features: [
         "Everything in Free",
         "CSV export",
@@ -570,7 +570,7 @@ export function LandingPage({ onLogin, onSignUp, onPrivacy, onTerms, onPricing }
       price: "$149",
       period: "/month",
       description: "For growing companies",
-      vendors: "Up to 100 vendors & tenants",
+      vendors: "Up to 100 certificates",
       features: [
         "Everything in Starter",
         "Analytics & reports",
@@ -584,7 +584,7 @@ export function LandingPage({ onLogin, onSignUp, onPrivacy, onTerms, onPricing }
       price: "$299",
       period: "/month",
       description: "For large-scale operations",
-      vendors: "Up to 500 vendors & tenants",
+      vendors: "Up to 500 certificates",
       features: [
         "Everything in Professional",
         "API access",
@@ -606,7 +606,7 @@ export function LandingPage({ onLogin, onSignUp, onPrivacy, onTerms, onPricing }
     },
     {
       question: "Is there really a free plan?",
-      answer: "Yes! Our Free plan is free forever and includes up to 10 vendors & tenants with full AI extraction capabilities. No credit card required to get started.",
+      answer: "Yes! Our Free plan is free forever and includes up to 10 certificates with full AI extraction capabilities. No credit card required to get started.",
     },
     {
       question: "How do expiration alerts work?",

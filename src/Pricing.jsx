@@ -17,7 +17,7 @@ const plans = [
     gradient: 'from-gray-400 to-gray-500',
     shadowColor: 'shadow-gray-400/20',
     features: [
-      { text: 'Up to 10 vendors & tenants', included: true },
+      { text: 'Up to 10 certificates', included: true },
       { text: 'AI-powered COI extraction', included: true },
       { text: 'Email COI requests', included: true },
       { text: 'Compliance dashboard', included: true },
@@ -37,7 +37,7 @@ const plans = [
     gradient: 'from-slate-500 to-slate-600',
     shadowColor: 'shadow-slate-500/20',
     features: [
-      { text: 'Up to 25 vendors & tenants', included: true },
+      { text: 'Up to 25 certificates', included: true },
       { text: 'AI-powered COI extraction', included: true },
       { text: 'Email COI requests', included: true },
       { text: 'Compliance dashboard', included: true },
@@ -58,7 +58,7 @@ const plans = [
     gradient: 'from-emerald-600 via-emerald-500 to-teal-500',
     shadowColor: 'shadow-emerald-500/25',
     features: [
-      { text: 'Up to 100 vendors & tenants', included: true },
+      { text: 'Up to 100 certificates', included: true },
       { text: 'AI-powered COI extraction', included: true },
       { text: 'Email COI requests', included: true },
       { text: 'Compliance dashboard', included: true },
@@ -78,7 +78,7 @@ const plans = [
     gradient: 'from-violet-500 to-purple-600',
     shadowColor: 'shadow-violet-500/25',
     features: [
-      { text: 'Up to 500 vendors & tenants', included: true },
+      { text: 'Up to 500 certificates', included: true },
       { text: 'AI-powered COI extraction', included: true },
       { text: 'Email COI requests', included: true },
       { text: 'Compliance dashboard', included: true },
@@ -404,7 +404,7 @@ export function Pricing({ onBack, onSignUp, user }) {
 
                     {/* Vendor Count */}
                     <p className="text-center text-sm text-gray-500 mt-4">
-                      Up to <span className="font-semibold text-gray-700">{plan.vendors}</span> vendors & tenants
+                      Up to <span className="font-semibold text-gray-700">{plan.vendors}</span> certificates
                     </p>
                   </div>
 
@@ -448,10 +448,10 @@ export function Pricing({ onBack, onSignUp, user }) {
             <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:40px_40px]" />
             <div className="relative p-12 text-center">
               <h2 className="text-3xl font-bold text-white mb-4">
-                Need more than 500 vendors & tenants?
+                Need more than 500 certificates?
               </h2>
               <p className="text-gray-400 mb-8 max-w-xl mx-auto">
-                Contact us for custom enterprise pricing with unlimited vendors & tenants, SSO, dedicated support, and custom integrations.
+                Contact us for custom enterprise pricing with unlimited certificates, SSO, dedicated support, and custom integrations.
               </p>
               <a
                 href="mailto:sales@smartcoi.io"
