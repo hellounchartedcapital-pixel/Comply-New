@@ -5,6 +5,7 @@ import {
   Building2, Home, FileCheck, Users, Shield
 } from 'lucide-react';
 import { supabase } from './supabaseClient';
+import logger from './logger';
 
 // Format currency for display
 function formatCurrency(amount) {
@@ -88,7 +89,7 @@ export function SmartUploadModal({
 
       setUnits(data || []);
     } catch (err) {
-      console.error('Error loading units:', err);
+      logger.error('Error loading units', err);
     } finally {
       setLoadingUnits(false);
     }
@@ -189,7 +190,7 @@ export function SmartUploadModal({
       });
 
       if (extractionError) {
-        console.error('Extraction error:', extractionError);
+        logger.error('Extraction error', extractionError);
         throw new Error('Failed to analyze document');
       }
 
@@ -203,7 +204,7 @@ export function SmartUploadModal({
       }
 
     } catch (err) {
-      console.error('Upload error:', err);
+      logger.error('Upload error', err);
       setError(err.message || 'Failed to process upload');
     } finally {
       setUploading(false);

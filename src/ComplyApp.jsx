@@ -15,6 +15,8 @@ import Properties from './Properties';
 import { TenantsView } from './TenantsView';
 import { UnitsManager } from './UnitsManager';
 import { Dashboard } from './Dashboard';
+import { isValidEmail } from './validation';
+import logger from './logger';
 
 function ComplyApp({ user, onSignOut, onShowPricing }) {
   // Active tab state
@@ -66,7 +68,9 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
   const [quickFilter, setQuickFilter] = useState('all'); // Quick filter for button interface
   const [sortBy, setSortBy] = useState('name');
   const [editingVendor, setEditingVendor] = useState(null);
+  const [savingVendor, setSavingVendor] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [deletingVendor, setDeletingVendor] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -94,7 +98,7 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
         .order('created_at', { ascending: true });
 
       if (error) {
-        console.error('Error loading properties:', error);
+        logger.error('Error loading properties', error);
         return;
       }
 
@@ -102,7 +106,7 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
       // If no property is selected and we have properties, select the first one
       // Or if "All Properties" mode (selectedProperty = null), keep it
     } catch (err) {
-      console.error('Error loading properties:', err);
+      logger.error('Error loading properties', err);
     } finally {
       setLoadingProperties(false);
     }
@@ -127,7 +131,7 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
         .single();
 
       if (error && error.code !== 'PGRST116') {
-        console.error('Error loading requirements:', error);
+        logger.error('Error loading requirements', error);
         return;
       }
 
@@ -143,7 +147,7 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
                 const coverage = JSON.parse(item.substring(12));
                 customCoverages.push(coverage);
               } catch (e) {
-                console.error('Failed to parse coverage:', e);
+                logger.error('Failed to parse coverage', e);
               }
             }
           });
@@ -161,7 +165,7 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
         });
       }
     } catch (err) {
-      console.error('Error loading user requirements:', err);
+      logger.error('Error loading user requirements', err);
     }
   };
 
@@ -177,7 +181,7 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
         .single();
 
       if (error && error.code !== 'PGRST116') {
-        console.error('Error checking onboarding status:', error);
+        logger.error('Error checking onboarding status', error);
         setOnboardingChecked(true);
         return;
       }
@@ -189,7 +193,7 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
 
       setOnboardingChecked(true);
     } catch (err) {
-      console.error('Error checking onboarding status:', err);
+      logger.error('Error checking onboarding status', err);
       setOnboardingChecked(true);
     }
   };
@@ -210,12 +214,12 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
         });
 
       if (error) {
-        console.error('Error saving onboarding status:', error);
+        logger.error('Error saving onboarding status', error);
       }
 
       setShowOnboarding(false);
     } catch (err) {
-      console.error('Error completing onboarding:', err);
+      logger.error('Error completing onboarding', err);
       setShowOnboarding(false);
     }
   };
@@ -333,7 +337,7 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (err) {
-      console.error('Error downloading COI:', err);
+      logger.error('Error downloading COI', err);
       showAlert({
         type: 'error',
         title: 'Download Failed',
@@ -401,21 +405,26 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
   };
 
   const saveEdit = async () => {
-    const result = await updateVendor(editingVendor.id, editingVendor);
-    if (result.success) {
-      setEditingVendor(null);
-      showAlert({
-        type: 'success',
-        title: 'Vendor Updated',
-        message: 'The vendor information has been saved successfully.'
-      });
-    } else {
-      showAlert({
-        type: 'error',
-        title: 'Update Failed',
-        message: 'Failed to update vendor.',
-        details: result.error
-      });
+    setSavingVendor(true);
+    try {
+      const result = await updateVendor(editingVendor.id, editingVendor);
+      if (result.success) {
+        setEditingVendor(null);
+        showAlert({
+          type: 'success',
+          title: 'Vendor Updated',
+          message: 'The vendor information has been saved successfully.'
+        });
+      } else {
+        showAlert({
+          type: 'error',
+          title: 'Update Failed',
+          message: 'Failed to update vendor.',
+          details: result.error
+        });
+      }
+    } finally {
+      setSavingVendor(false);
     }
   };
 
@@ -425,25 +434,30 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
   };
 
   const confirmDelete = async () => {
+    setDeletingVendor(true);
     const vendorName = deleteConfirm.name;
-    const result = await deleteVendor(deleteConfirm.id);
-    if (result.success) {
-      setDeleteConfirm(null);
-      if (selectedVendor?.id === deleteConfirm.id) {
-        setSelectedVendor(null);
+    try {
+      const result = await deleteVendor(deleteConfirm.id);
+      if (result.success) {
+        setDeleteConfirm(null);
+        if (selectedVendor?.id === deleteConfirm.id) {
+          setSelectedVendor(null);
+        }
+        showAlert({
+          type: 'success',
+          title: 'Vendor Deleted',
+          message: `"${vendorName}" has been permanently removed.`
+        });
+      } else {
+        showAlert({
+          type: 'error',
+          title: 'Delete Failed',
+          message: 'Failed to delete vendor.',
+          details: result.error
+        });
       }
-      showAlert({
-        type: 'success',
-        title: 'Vendor Deleted',
-        message: `"${vendorName}" has been permanently removed.`
-      });
-    } else {
-      showAlert({
-        type: 'error',
-        title: 'Delete Failed',
-        message: 'Failed to delete vendor.',
-        details: result.error
-      });
+    } finally {
+      setDeletingVendor(false);
     }
   };
 
@@ -461,7 +475,7 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
       if (error) throw error;
       setVendorActivity(data || []);
     } catch (err) {
-      console.error('Error loading activity:', err);
+      logger.error('Error loading activity', err);
       setVendorActivity([]);
     } finally {
       setLoadingActivity(false);
@@ -489,6 +503,15 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
         type: 'warning',
         title: 'Email Required',
         message: 'Please enter an email address to send the COI request.'
+      });
+      return;
+    }
+
+    if (!isValidEmail(requestCOIEmail)) {
+      showAlert({
+        type: 'warning',
+        title: 'Invalid Email',
+        message: 'Please enter a valid email address.'
       });
       return;
     }
@@ -561,7 +584,7 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
       });
 
       if (fnError) {
-        console.error('Edge Function error:', fnError);
+        logger.error('Edge Function error', fnError);
         // Try to get more details from the error
         const errorMsg = fnError.message || fnError.context?.body || JSON.stringify(fnError);
         throw new Error(errorMsg);
@@ -589,7 +612,7 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
       setRequestCOIEmail('');
       refreshVendors();
     } catch (error) {
-      console.error('Failed to send email:', error);
+      logger.error('Failed to send email', error);
       showAlert({
         type: 'error',
         title: 'Email Failed',
@@ -1161,11 +1184,11 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
 
         {/* Edit Modal */}
       {editingVendor && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4" role="dialog" aria-modal="true" aria-labelledby="edit-vendor-title">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
             <div className="flex items-center justify-between mb-5">
-              <h3 className="text-xl font-bold text-gray-900">Edit Vendor</h3>
-              <button onClick={() => setEditingVendor(null)} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-all">
+              <h3 id="edit-vendor-title" className="text-xl font-bold text-gray-900">Edit Vendor</h3>
+              <button onClick={() => setEditingVendor(null)} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-all" aria-label="Close edit vendor modal">
                 <X size={20} />
               </button>
             </div>
@@ -1255,13 +1278,15 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
             <div className="flex space-x-3 mt-6">
               <button
                 onClick={saveEdit}
-                className="flex-1 px-4 py-3 bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 text-white rounded-xl hover:shadow-lg hover:shadow-emerald-500/25 font-semibold transition-all"
+                disabled={savingVendor}
+                className="flex-1 px-4 py-3 bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 text-white rounded-xl hover:shadow-lg hover:shadow-emerald-500/25 font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Save Changes
+                {savingVendor ? 'Saving...' : 'Save Changes'}
               </button>
               <button
                 onClick={() => setEditingVendor(null)}
-                className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 font-semibold transition-all"
+                disabled={savingVendor}
+                className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 font-semibold transition-all disabled:opacity-50"
               >
                 Cancel
               </button>
@@ -1272,29 +1297,31 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
 
       {/* Delete Confirmation Modal */}
       {deleteConfirm && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4" role="alertdialog" aria-modal="true" aria-labelledby="delete-confirm-title" aria-describedby="delete-confirm-desc">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-bold text-red-600">Confirm Delete</h3>
-              <button onClick={() => setDeleteConfirm(null)} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-all">
+              <h3 id="delete-confirm-title" className="text-xl font-bold text-red-600">Confirm Delete</h3>
+              <button onClick={() => setDeleteConfirm(null)} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-all" aria-label="Cancel deletion">
                 <X size={20} />
               </button>
             </div>
 
-            <p className="text-gray-600 mb-6">
+            <p id="delete-confirm-desc" className="text-gray-600 mb-6">
               Are you sure you want to delete <strong>{deleteConfirm.name}</strong>? This action cannot be undone.
             </p>
 
             <div className="flex space-x-3">
               <button
                 onClick={confirmDelete}
-                className="flex-1 px-4 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 font-semibold transition-all"
+                disabled={deletingVendor}
+                className="flex-1 px-4 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Delete
+                {deletingVendor ? 'Deleting...' : 'Delete'}
               </button>
               <button
                 onClick={() => setDeleteConfirm(null)}
-                className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 font-semibold transition-all"
+                disabled={deletingVendor}
+                className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 font-semibold transition-all disabled:opacity-50"
               >
                 Cancel
               </button>

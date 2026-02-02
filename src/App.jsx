@@ -13,6 +13,7 @@ import { VendorUploadPortal } from './VendorUploadPortal'
 import { TenantUploadPortal } from './TenantUploadPortal'
 import { Pricing } from './Pricing'
 import { Loader2 } from 'lucide-react'
+import ErrorBoundary from './ErrorBoundary'
 
 function AppContent() {
   const { user, loading, signOut } = useAuth()
@@ -140,8 +141,10 @@ function AppContent() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </ErrorBoundary>
   )
 }
