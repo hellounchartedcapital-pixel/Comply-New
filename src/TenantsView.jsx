@@ -2,11 +2,10 @@ import React, { useState, useEffect } from 'react';
 import {
   Users, Plus, Search, CheckCircle, XCircle, AlertCircle, Clock,
   Mail, Phone, Calendar, Building2, Edit2, Trash2, X, Send,
-  ExternalLink, Shield, Upload
+  ExternalLink, Shield
 } from 'lucide-react';
 import { useTenants } from './useTenants';
 import { supabase } from './supabaseClient';
-import { TenantUploadModal } from './TenantUploadModal';
 
 // Status badge component
 function StatusBadge({ status }) {
@@ -554,7 +553,6 @@ export function TenantsView({ properties }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [showModal, setShowModal] = useState(false);
-  const [showUploadModal, setShowUploadModal] = useState(false);
   const [editingTenant, setEditingTenant] = useState(null);
   const [units, setUnits] = useState([]);
   const [selectedTenant, setSelectedTenant] = useState(null);
@@ -624,183 +622,6 @@ export function TenantsView({ properties }) {
 
   return (
     <div className="space-y-6">
-      {/* Overview Section - Pie Chart & Upcoming Expirations */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Pie Chart Card */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-          <h3 className="text-lg font-bold text-gray-900 mb-4">Tenant Compliance Overview</h3>
-          <div className="flex items-center justify-center">
-            <div className="relative">
-              {/* SVG Pie Chart */}
-              <svg width="180" height="180" viewBox="0 0 180 180" className="transform -rotate-90">
-                {stats.total === 0 ? (
-                  <circle cx="90" cy="90" r="70" fill="none" stroke="#e5e7eb" strokeWidth="24" />
-                ) : (
-                  <>
-                    {/* Compliant slice (green) */}
-                    <circle
-                      cx="90" cy="90" r="70"
-                      fill="none"
-                      stroke="#10b981"
-                      strokeWidth="24"
-                      strokeDasharray={`${(stats.compliant / stats.total) * 439.82} 439.82`}
-                      strokeDashoffset="0"
-                    />
-                    {/* Non-compliant slice (orange) */}
-                    <circle
-                      cx="90" cy="90" r="70"
-                      fill="none"
-                      stroke="#f97316"
-                      strokeWidth="24"
-                      strokeDasharray={`${(stats.nonCompliant / stats.total) * 439.82} 439.82`}
-                      strokeDashoffset={`${-(stats.compliant / stats.total) * 439.82}`}
-                    />
-                    {/* Expired slice (red) */}
-                    <circle
-                      cx="90" cy="90" r="70"
-                      fill="none"
-                      stroke="#ef4444"
-                      strokeWidth="24"
-                      strokeDasharray={`${(stats.expired / stats.total) * 439.82} 439.82`}
-                      strokeDashoffset={`${-((stats.compliant + stats.nonCompliant) / stats.total) * 439.82}`}
-                    />
-                    {/* Expiring slice (amber) */}
-                    <circle
-                      cx="90" cy="90" r="70"
-                      fill="none"
-                      stroke="#f59e0b"
-                      strokeWidth="24"
-                      strokeDasharray={`${(stats.expiring / stats.total) * 439.82} 439.82`}
-                      strokeDashoffset={`${-((stats.compliant + stats.nonCompliant + stats.expired) / stats.total) * 439.82}`}
-                    />
-                    {/* Pending slice (gray) */}
-                    <circle
-                      cx="90" cy="90" r="70"
-                      fill="none"
-                      stroke="#9ca3af"
-                      strokeWidth="24"
-                      strokeDasharray={`${(stats.pending / stats.total) * 439.82} 439.82`}
-                      strokeDashoffset={`${-((stats.compliant + stats.nonCompliant + stats.expired + stats.expiring) / stats.total) * 439.82}`}
-                    />
-                  </>
-                )}
-              </svg>
-              {/* Center text - Compliance Percentage */}
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                {stats.total === 0 ? (
-                  <>
-                    <span className="text-3xl font-bold text-gray-400">0%</span>
-                    <span className="text-xs text-gray-500 font-medium">Compliant</span>
-                  </>
-                ) : (
-                  <>
-                    <span className={`text-3xl font-bold ${
-                      Math.round((stats.compliant / stats.total) * 100) >= 80
-                        ? 'text-emerald-600'
-                        : Math.round((stats.compliant / stats.total) * 100) >= 50
-                          ? 'text-amber-500'
-                          : 'text-red-500'
-                    }`}>
-                      {Math.round((stats.compliant / stats.total) * 100)}%
-                    </span>
-                    <span className="text-xs text-gray-500 font-medium">Compliant</span>
-                  </>
-                )}
-              </div>
-            </div>
-
-            {/* Legend */}
-            <div className="ml-8 space-y-2">
-              <div className="flex items-center space-x-3">
-                <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
-                <div>
-                  <p className="text-sm font-semibold text-gray-900">{stats.compliant} Compliant</p>
-                </div>
-              </div>
-              <div className="flex items-center space-x-3">
-                <div className="w-3 h-3 rounded-full bg-orange-500"></div>
-                <div>
-                  <p className="text-sm font-semibold text-gray-900">{stats.nonCompliant} Non-Compliant</p>
-                </div>
-              </div>
-              <div className="flex items-center space-x-3">
-                <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                <div>
-                  <p className="text-sm font-semibold text-gray-900">{stats.expired} Expired</p>
-                </div>
-              </div>
-              <div className="flex items-center space-x-3">
-                <div className="w-3 h-3 rounded-full bg-amber-500"></div>
-                <div>
-                  <p className="text-sm font-semibold text-gray-900">{stats.expiring} Expiring Soon</p>
-                </div>
-              </div>
-              <div className="flex items-center space-x-3">
-                <div className="w-3 h-3 rounded-full bg-gray-400"></div>
-                <div>
-                  <p className="text-sm font-semibold text-gray-900">{stats.pending} Pending</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Upcoming Expirations Card */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-bold text-gray-900">Upcoming Policy Expirations</h3>
-            <span className="text-xs bg-amber-100 text-amber-700 px-2.5 py-1 rounded-full font-semibold">Next 30 Days</span>
-          </div>
-          <div className="space-y-3 max-h-[220px] overflow-y-auto">
-            {tenants
-              .filter(t => {
-                if (!t.policy_expiration_date) return false;
-                const today = new Date();
-                const expDate = new Date(t.policy_expiration_date);
-                const daysUntil = Math.floor((expDate - today) / (1000 * 60 * 60 * 24));
-                return daysUntil >= 0 && daysUntil <= 30;
-              })
-              .sort((a, b) => new Date(a.policy_expiration_date) - new Date(b.policy_expiration_date))
-              .slice(0, 5)
-              .map((tenant) => {
-                const today = new Date();
-                const expDate = new Date(tenant.policy_expiration_date);
-                const daysUntil = Math.floor((expDate - today) / (1000 * 60 * 60 * 24));
-                return (
-                  <div key={tenant.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors cursor-pointer" onClick={() => setSelectedTenant(tenant)}>
-                    <div className="flex items-center space-x-3">
-                      <div className={`w-2 h-2 rounded-full ${daysUntil <= 7 ? 'bg-red-500' : daysUntil <= 14 ? 'bg-amber-500' : 'bg-yellow-400'}`}></div>
-                      <div>
-                        <p className="text-sm font-semibold text-gray-900 truncate max-w-[180px]">{tenant.name}</p>
-                        <p className="text-xs text-gray-500">{tenant.property?.name} {tenant.unit?.unit_number && `• Unit ${tenant.unit.unit_number}`}</p>
-                      </div>
-                    </div>
-                    <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${
-                      daysUntil <= 7 ? 'bg-red-100 text-red-700' :
-                      daysUntil <= 14 ? 'bg-amber-100 text-amber-700' :
-                      'bg-yellow-100 text-yellow-700'
-                    }`}>
-                      {daysUntil === 0 ? 'Today' : daysUntil === 1 ? '1 day' : `${daysUntil} days`}
-                    </span>
-                  </div>
-                );
-              })}
-            {tenants.filter(t => {
-              if (!t.policy_expiration_date) return false;
-              const today = new Date();
-              const expDate = new Date(t.policy_expiration_date);
-              const daysUntil = Math.floor((expDate - today) / (1000 * 60 * 60 * 24));
-              return daysUntil >= 0 && daysUntil <= 30;
-            }).length === 0 && (
-              <div className="text-center py-8">
-                <CheckCircle className="mx-auto text-emerald-400 mb-2" size={32} />
-                <p className="text-sm text-gray-500 font-medium">No policy expirations in the next 30 days</p>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
       {/* Stats Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <button
@@ -889,13 +710,6 @@ export function TenantsView({ properties }) {
             <option value="expired">Expired</option>
             <option value="pending">Pending</option>
           </select>
-          <button
-            onClick={() => setShowUploadModal(true)}
-            className="px-4 py-2.5 bg-blue-500 text-white rounded-xl hover:bg-blue-600 font-medium flex items-center gap-2"
-          >
-            <Upload size={20} />
-            <span className="hidden sm:inline">Upload COI</span>
-          </button>
           <button
             onClick={() => { setEditingTenant(null); setShowModal(true); }}
             className="px-4 py-2.5 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 font-medium flex items-center gap-2"
@@ -1043,17 +857,6 @@ export function TenantsView({ properties }) {
         tenant={editingTenant}
         properties={properties}
         units={units}
-      />
-
-      {/* Upload COI Modal */}
-      <TenantUploadModal
-        isOpen={showUploadModal}
-        onClose={() => setShowUploadModal(false)}
-        onUploadComplete={() => {
-          refreshTenants();
-          setShowUploadModal(false);
-        }}
-        properties={properties}
       />
 
       {/* Delete Confirmation */}
