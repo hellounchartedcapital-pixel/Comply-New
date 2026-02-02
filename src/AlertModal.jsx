@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { CheckCircle, XCircle, AlertCircle, Info, X } from 'lucide-react';
 
 /**
@@ -21,6 +21,31 @@ export function AlertModal({
   details,
   buttonText = 'OK'
 }) {
+  const closeButtonRef = useRef(null);
+  const previousFocusRef = useRef(null);
+
+  // Handle keyboard events and focus management
+  useEffect(() => {
+    if (isOpen) {
+      // Save current focus
+      previousFocusRef.current = document.activeElement;
+      // Focus the close button when modal opens
+      setTimeout(() => closeButtonRef.current?.focus(), 0);
+
+      // Handle Escape key
+      const handleKeyDown = (e) => {
+        if (e.key === 'Escape') {
+          onClose();
+        }
+      };
+      document.addEventListener('keydown', handleKeyDown);
+      return () => document.removeEventListener('keydown', handleKeyDown);
+    } else {
+      // Restore focus when modal closes
+      previousFocusRef.current?.focus();
+    }
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const typeConfig = {
@@ -61,31 +86,45 @@ export function AlertModal({
   const config = typeConfig[type] || typeConfig.info;
   const Icon = config.icon;
 
+  const titleId = `alert-modal-title-${type}`;
+  const descId = `alert-modal-desc-${type}`;
+
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[70] p-4">
-      <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+    <div
+      className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[70] p-4"
+      role="presentation"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={descId}
+        className="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200"
+      >
         {/* Header */}
         <div className={`p-6 border-b ${config.borderColor} bg-gray-50`}>
           <div className="flex items-start space-x-4">
             <div className={`w-12 h-12 ${config.iconBg} rounded-xl flex items-center justify-center flex-shrink-0`}>
-              <Icon className={config.iconColor} size={24} />
+              <Icon className={config.iconColor} size={24} aria-hidden="true" />
             </div>
             <div className="flex-1 min-w-0">
-              <h3 className={`text-lg font-bold ${config.titleColor}`}>
+              <h2 id={titleId} className={`text-lg font-bold ${config.titleColor}`}>
                 {title}
-              </h3>
+              </h2>
             </div>
             <button
               onClick={onClose}
               className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-200 rounded-lg transition-all flex-shrink-0"
+              aria-label="Close dialog"
             >
-              <X size={18} />
+              <X size={18} aria-hidden="true" />
             </button>
           </div>
         </div>
 
         {/* Body */}
-        <div className="p-6">
+        <div className="p-6" id={descId}>
           <p className="text-gray-700 whitespace-pre-line">
             {message}
           </p>
@@ -101,6 +140,7 @@ export function AlertModal({
         {/* Footer */}
         <div className="px-6 pb-6">
           <button
+            ref={closeButtonRef}
             onClick={onClose}
             className={`w-full px-4 py-3 ${config.buttonBg} text-white rounded-xl font-semibold transition-all`}
           >

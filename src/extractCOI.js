@@ -1,5 +1,6 @@
 import { supabase } from './supabaseClient';
 import logger from './logger';
+import { checkCoverageExpiration } from './utils/complianceUtils';
 
 const MAX_RETRIES = 3;
 const INITIAL_DELAY_MS = 1000;
@@ -90,44 +91,32 @@ export async function extractCOIFromPDF(file, userRequirements = null) {
       throw new Error(data.error || 'Extraction failed');
     }
 
-    // Add coverage expiration checks
+    // Add coverage expiration checks using shared utility
     const vendorData = data.data;
-    const today = new Date();
 
-    const parseLocalDate = (dateString) => {
-      if (!dateString) return null;
-      const [year, month, day] = dateString.split('-').map(Number);
-      return new Date(year, month - 1, day);
-    };
-
-    const checkCoverageExpiration = (coverage, name) => {
+    const updateCoverageFlags = (coverage, name) => {
       if (coverage && coverage.expirationDate) {
-        const expDate = parseLocalDate(coverage.expirationDate);
-        if (expDate) {
-          const todayLocal = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-          const daysUntil = Math.floor((expDate - todayLocal) / (1000 * 60 * 60 * 24));
-          logger.debug(`${name} expires ${coverage.expirationDate}, days until expiration: ${daysUntil}`);
-          if (daysUntil < 0) {
-            coverage.expired = true;
-          } else if (daysUntil <= 30) {
-            coverage.expiringSoon = true;
-          }
+        const result = checkCoverageExpiration(coverage);
+        coverage.expired = result.expired;
+        coverage.expiringSoon = result.expiringSoon;
+        if (result.daysUntil !== null) {
+          logger.debug(`${name} expires ${coverage.expirationDate}, days until expiration: ${result.daysUntil}`);
         }
       }
     };
 
     // Check standard coverages
     if (vendorData.coverage) {
-      checkCoverageExpiration(vendorData.coverage.generalLiability, 'General Liability');
-      checkCoverageExpiration(vendorData.coverage.autoLiability, 'Auto Liability');
-      checkCoverageExpiration(vendorData.coverage.workersComp, 'Workers Comp');
-      checkCoverageExpiration(vendorData.coverage.employersLiability, 'Employers Liability');
+      updateCoverageFlags(vendorData.coverage.generalLiability, 'General Liability');
+      updateCoverageFlags(vendorData.coverage.autoLiability, 'Auto Liability');
+      updateCoverageFlags(vendorData.coverage.workersComp, 'Workers Comp');
+      updateCoverageFlags(vendorData.coverage.employersLiability, 'Employers Liability');
     }
 
     // Check additional coverage expirations
     if (vendorData.additionalCoverages) {
       vendorData.additionalCoverages.forEach(cov => {
-        checkCoverageExpiration(cov, cov.type || 'Additional Coverage');
+        updateCoverageFlags(cov, cov.type || 'Additional Coverage');
       });
     }
 

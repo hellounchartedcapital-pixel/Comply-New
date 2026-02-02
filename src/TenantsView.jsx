@@ -6,71 +6,30 @@ import {
 } from 'lucide-react';
 import { useTenants } from './useTenants';
 import { supabase } from './supabaseClient';
+import { formatCurrency, formatDate, formatRelativeDate, getStatusConfig } from './utils/complianceUtils';
 
 // Status icon component (matches vendor style)
 function getStatusIcon(status) {
-  const configs = {
-    compliant: { bg: 'bg-emerald-100', icon: CheckCircle, color: 'text-emerald-600' },
-    'non-compliant': { bg: 'bg-orange-100', icon: AlertCircle, color: 'text-orange-600' },
-    expiring: { bg: 'bg-amber-100', icon: AlertCircle, color: 'text-amber-600' },
-    expired: { bg: 'bg-red-100', icon: XCircle, color: 'text-red-600' },
-    pending: { bg: 'bg-gray-100', icon: Clock, color: 'text-gray-500' },
-  };
-
-  const config = configs[status] || configs.pending;
-  const Icon = config.icon;
+  const config = getStatusConfig(status);
+  const icons = { CheckCircle, XCircle, AlertCircle, Clock };
+  const Icon = icons[config.icon] || Clock;
 
   return (
-    <div className={`w-10 h-10 ${config.bg} rounded-xl flex items-center justify-center`}>
-      <Icon size={20} className={config.color} />
+    <div className={`w-10 h-10 ${config.iconBg} rounded-xl flex items-center justify-center`} role="img" aria-label={config.label}>
+      <Icon size={20} className={config.iconColor} aria-hidden="true" />
     </div>
   );
 }
 
 // Status badge component (matches vendor style)
 function getStatusBadge(status) {
-  const configs = {
-    compliant: { bg: 'bg-emerald-100', text: 'text-emerald-700', label: 'Compliant' },
-    'non-compliant': { bg: 'bg-orange-100', text: 'text-orange-700', label: 'Non-Compliant' },
-    expiring: { bg: 'bg-amber-100', text: 'text-amber-700', label: 'Expiring Soon' },
-    expired: { bg: 'bg-red-100', text: 'text-red-700', label: 'Expired' },
-    pending: { bg: 'bg-gray-100', text: 'text-gray-600', label: 'Pending' },
-  };
-
-  const config = configs[status] || configs.pending;
+  const config = getStatusConfig(status);
 
   return (
-    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${config.bg} ${config.text}`}>
+    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${config.bg} ${config.text}`} role="status">
       {config.label}
     </span>
   );
-}
-
-// Format currency
-function formatCurrency(amount) {
-  if (!amount) return 'N/A';
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(amount);
-}
-
-// Format date
-function formatDate(date) {
-  if (!date) return 'N/A';
-  return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
-
-// Format relative date
-function formatRelativeDate(date) {
-  if (!date) return '';
-  const now = new Date();
-  const d = new Date(date);
-  const diffMs = now - d;
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-  if (diffDays === 0) return 'today';
-  if (diffDays === 1) return 'yesterday';
-  if (diffDays < 7) return `${diffDays} days ago`;
-  if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
-  return `${Math.floor(diffDays / 30)} months ago`;
 }
 
 // Add/Edit Tenant Modal
@@ -431,6 +390,13 @@ export function TenantsView({ properties, userRequirements }) {
   const [copySuccess, setCopySuccess] = useState(null);
   const [sendingRequest, setSendingRequest] = useState(null);
   const [requestSuccess, setRequestSuccess] = useState(null);
+  const [bulkRequesting, setBulkRequesting] = useState(false);
+  const [bulkResults, setBulkResults] = useState(null);
+
+  // Calculate tenants that need attention (non-compliant with email)
+  const tenantsNeedingAttention = tenants.filter(t =>
+    ['expired', 'non-compliant', 'expiring', 'pending'].includes(t.insurance_status) && t.email
+  );
 
   // Filter and sort tenants
   const filteredTenants = tenants
@@ -601,6 +567,15 @@ export function TenantsView({ properties, userRequirements }) {
         .update({ last_contacted_at: new Date().toISOString() })
         .eq('id', tenant.id);
 
+      // Log activity
+      await supabase.from('tenant_activity').insert({
+        tenant_id: tenant.id,
+        user_id: user.id,
+        activity_type: 'email_sent',
+        description: `COI request email sent to ${tenant.email}`,
+        metadata: { email: tenant.email, status: tenant.insurance_status }
+      });
+
       setRequestSuccess(tenant.id);
       setTimeout(() => setRequestSuccess(null), 3000);
       refreshTenants();
@@ -610,6 +585,130 @@ export function TenantsView({ properties, userRequirements }) {
       alert(`Failed to send request: ${error.message}`);
     } finally {
       setSendingRequest(null);
+    }
+  };
+
+  // Bulk send COI requests to all tenants needing attention
+  const handleBulkRequest = async () => {
+    if (tenantsNeedingAttention.length === 0) return;
+
+    const confirmed = window.confirm(
+      `Send COI requests to ${tenantsNeedingAttention.length} tenants?\n\nThis will email all tenants who need updated insurance certificates and have an email address on file.`
+    );
+
+    if (!confirmed) return;
+
+    setBulkRequesting(true);
+    setBulkResults(null);
+    let successCount = 0;
+    let failCount = 0;
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const companyName = userRequirements?.company_name || 'Our Company';
+      const appUrl = window.location.origin;
+
+      for (const tenant of tenantsNeedingAttention) {
+        try {
+          // Generate upload token
+          const uploadToken = crypto.randomUUID();
+          const tokenExpiresAt = new Date();
+          tokenExpiresAt.setDate(tokenExpiresAt.getDate() + 30);
+
+          await supabase
+            .from('tenants')
+            .update({
+              upload_token: uploadToken,
+              upload_token_expires_at: tokenExpiresAt.toISOString()
+            })
+            .eq('id', tenant.id);
+
+          // Get tenant's property
+          const tenantProperty = properties?.find(p => p.id === tenant.property_id);
+
+          // Build requirements
+          const requirements = {
+            generalLiability: tenant.required_liability_min || tenantProperty?.general_liability || 100000,
+            autoLiability: tenant.required_auto_liability_min || null,
+            workersComp: tenant.required_workers_comp || false,
+            employersLiability: tenant.required_employers_liability_min || null,
+            additionalInsured: tenant.requires_additional_insured !== false,
+          };
+
+          // Determine issues
+          const issues = [];
+          if (tenant.insurance_status === 'expired') {
+            issues.push('Certificate has expired');
+          } else if (tenant.insurance_status === 'non-compliant') {
+            issues.push('Certificate does not meet requirements');
+          } else if (tenant.insurance_status === 'pending') {
+            issues.push('No certificate on file');
+          }
+
+          // Send email
+          const { data: result, error: fnError } = await supabase.functions.invoke('send-coi-request', {
+            body: {
+              to: tenant.email,
+              vendorName: tenant.name,
+              vendorStatus: tenant.insurance_status,
+              issues: issues,
+              companyName: companyName,
+              replyTo: user.email,
+              uploadToken: uploadToken,
+              appUrl: appUrl,
+              requirements: requirements,
+              propertyName: tenantProperty?.name || null,
+              isTenant: true,
+            },
+          });
+
+          if (fnError || (result && !result.success)) {
+            failCount++;
+            continue;
+          }
+
+          // Update last contacted timestamp
+          await supabase
+            .from('tenants')
+            .update({ last_contacted_at: new Date().toISOString() })
+            .eq('id', tenant.id);
+
+          // Log activity
+          await supabase.from('tenant_activity').insert({
+            tenant_id: tenant.id,
+            user_id: user.id,
+            activity_type: 'email_sent',
+            description: `COI request email sent to ${tenant.email} (bulk)`,
+            metadata: { email: tenant.email, status: tenant.insurance_status, bulk: true }
+          });
+
+          successCount++;
+        } catch (err) {
+          console.error(`Failed to send to ${tenant.email}:`, err);
+          failCount++;
+        }
+      }
+
+      // Log bulk request completion
+      await supabase.from('tenant_activity').insert({
+        tenant_id: null,
+        user_id: user.id,
+        activity_type: 'bulk_request',
+        description: `Bulk COI request completed: ${successCount} sent, ${failCount} failed`,
+        metadata: { success: successCount, failed: failCount, total: tenantsNeedingAttention.length }
+      });
+
+      setBulkResults({ success: successCount, failed: failCount });
+      setTimeout(() => setBulkResults(null), 5000);
+      refreshTenants();
+
+    } catch (error) {
+      console.error('Bulk request failed:', error);
+      alert(`Bulk request failed: ${error.message}`);
+    } finally {
+      setBulkRequesting(false);
     }
   };
 
@@ -710,10 +809,42 @@ export function TenantsView({ properties, userRequirements }) {
           <button
             onClick={() => { setEditingTenant(null); setShowModal(true); }}
             className="px-4 py-2.5 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 font-medium flex items-center gap-2"
+            aria-label="Add new tenant"
           >
-            <Plus size={18} />
+            <Plus size={18} aria-hidden="true" />
             <span className="hidden sm:inline">Add Tenant</span>
           </button>
+
+          {/* Bulk Request Button */}
+          {tenantsNeedingAttention.length > 0 && (
+            <button
+              onClick={handleBulkRequest}
+              disabled={bulkRequesting}
+              className="px-4 py-2.5 bg-orange-500 text-white rounded-xl hover:bg-orange-600 font-semibold flex items-center gap-2 disabled:opacity-50 transition-all"
+              aria-label={`Send COI requests to ${tenantsNeedingAttention.length} tenants`}
+            >
+              {bulkRequesting ? (
+                <>
+                  <Loader2 size={18} className="animate-spin" aria-hidden="true" />
+                  <span className="hidden sm:inline">Sending...</span>
+                </>
+              ) : (
+                <>
+                  <Send size={18} aria-hidden="true" />
+                  <span className="hidden sm:inline">Request COIs ({tenantsNeedingAttention.length})</span>
+                  <span className="sm:hidden">{tenantsNeedingAttention.length}</span>
+                </>
+              )}
+            </button>
+          )}
+
+          {/* Bulk Results Feedback */}
+          {bulkResults && (
+            <div className="px-4 py-2.5 bg-emerald-100 text-emerald-700 rounded-xl font-medium flex items-center gap-2" role="status">
+              <CheckCircle size={18} aria-hidden="true" />
+              <span>Sent: {bulkResults.success}{bulkResults.failed > 0 && `, Failed: ${bulkResults.failed}`}</span>
+            </div>
+          )}
 
           {/* Clear */}
           {(searchQuery || statusFilter !== 'all' || sortBy !== 'name') && (

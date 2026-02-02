@@ -16,6 +16,7 @@ import { TenantsView } from './TenantsView';
 import { Dashboard } from './Dashboard';
 import { isValidEmail } from './validation';
 import logger from './logger';
+import { formatDate, formatRelativeDate, formatCurrency } from './utils/complianceUtils';
 
 function ComplyApp({ user, onSignOut, onShowPricing }) {
   // Active tab state
@@ -253,40 +254,7 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
     );
   };
 
-  // Format date string (YYYY-MM-DD) to local date without timezone issues
-  const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    // Parse as local date to avoid timezone shifting
-    const [year, month, day] = dateString.split('-').map(Number);
-    const date = new Date(year, month - 1, day);
-    return date.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' });
-  };
-
-  // Format date as relative time (e.g., "2 days ago", "1 week ago")
-  const formatRelativeDate = (dateString) => {
-    if (!dateString) return '';
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now - date;
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-    if (diffDays === 0) return 'today';
-    if (diffDays === 1) return 'yesterday';
-    if (diffDays < 7) return `${diffDays} days ago`;
-    if (diffDays < 14) return '1 week ago';
-    if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
-    if (diffDays < 60) return '1 month ago';
-    return `${Math.floor(diffDays / 30)} months ago`;
-  };
-
-  const formatCurrency = (amount) => {
-    if (typeof amount === 'string') return amount;
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0
-    }).format(amount);
-  };
+  // formatDate, formatRelativeDate, and formatCurrency imported from utils/complianceUtils
 
   // Get public URL for COI document
   const getCOIDocumentUrl = async (documentPath) => {

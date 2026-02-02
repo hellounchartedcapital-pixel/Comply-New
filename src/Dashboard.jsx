@@ -4,14 +4,7 @@ import {
   CheckCircle, XCircle, AlertCircle, Clock,
   FileText, Users, ChevronRight, TrendingUp
 } from 'lucide-react';
-
-// Format date string (YYYY-MM-DD) to local date
-const formatDate = (dateString) => {
-  if (!dateString) return 'N/A';
-  const [year, month, day] = dateString.split('-').map(Number);
-  const date = new Date(year, month - 1, day);
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-};
+import { formatDate } from './utils/complianceUtils';
 
 export function Dashboard({
   vendors = [],
@@ -168,9 +161,9 @@ export function Dashboard({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" role="main" aria-label="Compliance Dashboard">
       {/* Welcome Banner */}
-      <div className="bg-gradient-to-r from-emerald-600 to-teal-600 rounded-2xl p-6 text-white">
+      <header className="bg-gradient-to-r from-emerald-600 to-teal-600 rounded-2xl p-6 text-white">
         <div>
           <h1 className="text-2xl font-bold mb-2">Compliance Dashboard</h1>
           <p className="text-emerald-100">
@@ -180,70 +173,73 @@ export function Dashboard({
             }
           </p>
         </div>
-      </div>
+      </header>
 
       {/* Combined Stats Row */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500 font-medium">Total Tracked</p>
-              <p className="text-3xl font-bold text-gray-900 mt-1">{combinedStats.total}</p>
-            </div>
-            <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center">
-              <TrendingUp className="text-gray-500" size={24} />
+      <section aria-label="Compliance Statistics">
+        <h2 className="sr-only">Compliance Statistics Summary</h2>
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4" role="list">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5" role="listitem" aria-label={`Total tracked: ${combinedStats.total}`}>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500 font-medium">Total Tracked</p>
+                <p className="text-3xl font-bold text-gray-900 mt-1" aria-live="polite">{combinedStats.total}</p>
+              </div>
+              <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center" aria-hidden="true">
+                <TrendingUp className="text-gray-500" size={24} />
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500 font-medium">Compliant</p>
-              <p className="text-3xl font-bold text-emerald-600 mt-1">{combinedStats.compliant}</p>
-            </div>
-            <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center">
-              <CheckCircle className="text-emerald-500" size={24} />
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5 status-compliant" role="listitem" aria-label={`Compliant: ${combinedStats.compliant}`}>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500 font-medium">Compliant</p>
+                <p className="text-3xl font-bold text-emerald-600 mt-1" aria-live="polite">{combinedStats.compliant}</p>
+              </div>
+              <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center" aria-hidden="true">
+                <CheckCircle className="text-emerald-500" size={24} />
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500 font-medium">Expired</p>
-              <p className="text-3xl font-bold text-red-600 mt-1">{combinedStats.expired}</p>
-            </div>
-            <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center">
-              <XCircle className="text-red-500" size={24} />
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5 status-expired" role="listitem" aria-label={`Expired: ${combinedStats.expired}`}>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500 font-medium">Expired</p>
+                <p className="text-3xl font-bold text-red-600 mt-1" aria-live="polite">{combinedStats.expired}</p>
+              </div>
+              <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center" aria-hidden="true">
+                <XCircle className="text-red-500" size={24} />
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500 font-medium">Non-Compliant</p>
-              <p className="text-3xl font-bold text-orange-600 mt-1">{combinedStats.nonCompliant}</p>
-            </div>
-            <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center">
-              <AlertCircle className="text-orange-500" size={24} />
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5 status-non-compliant" role="listitem" aria-label={`Non-compliant: ${combinedStats.nonCompliant}`}>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500 font-medium">Non-Compliant</p>
+                <p className="text-3xl font-bold text-orange-600 mt-1" aria-live="polite">{combinedStats.nonCompliant}</p>
+              </div>
+              <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center" aria-hidden="true">
+                <AlertCircle className="text-orange-500" size={24} />
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500 font-medium">Expiring Soon</p>
-              <p className="text-3xl font-bold text-amber-600 mt-1">{combinedStats.expiring}</p>
-            </div>
-            <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center">
-              <Clock className="text-amber-500" size={24} />
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5 status-expiring" role="listitem" aria-label={`Expiring soon: ${combinedStats.expiring}`}>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500 font-medium">Expiring Soon</p>
+                <p className="text-3xl font-bold text-amber-600 mt-1" aria-live="polite">{combinedStats.expiring}</p>
+              </div>
+              <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center" aria-hidden="true">
+                <Clock className="text-amber-500" size={24} />
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
       {/* Two Column Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

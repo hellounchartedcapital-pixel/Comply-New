@@ -6,36 +6,7 @@ import { Upload, CheckCircle, AlertCircle, FileText, Loader2, Shield } from 'luc
 import { supabase } from './supabaseClient';
 import { Logo } from './Logo';
 import { AlertModal, useAlertModal } from './AlertModal';
-
-// Helper to determine vendor status from extracted data
-function determineVendorStatus(vendorData) {
-  const coverage = vendorData.coverage || {};
-
-  // Check for expired coverages
-  const hasExpired =
-    coverage.generalLiability?.expired ||
-    coverage.autoLiability?.expired ||
-    coverage.workersComp?.expired ||
-    coverage.employersLiability?.expired;
-
-  if (hasExpired) return 'expired';
-
-  // Check for expiring soon
-  const hasExpiringSoon =
-    coverage.generalLiability?.expiringSoon ||
-    coverage.autoLiability?.expiringSoon ||
-    coverage.workersComp?.expiringSoon ||
-    coverage.employersLiability?.expiringSoon;
-
-  if (hasExpiringSoon) return 'expiring';
-
-  // Check compliance issues
-  if (vendorData.issues && vendorData.issues.length > 0) {
-    return 'non-compliant';
-  }
-
-  return 'compliant';
-}
+import { determineVendorStatus, checkCoverageExpiration as checkExpiration } from './utils/complianceUtils';
 
 export function VendorUploadPortal({ token, onBack }) {
   const [loading, setLoading] = useState(true);
@@ -216,35 +187,21 @@ export function VendorUploadPortal({ token, onBack }) {
       } else if (extractionResult?.success && extractionResult?.data) {
         extractedData = extractionResult.data;
 
-        // Add expiration checks
-        const today = new Date();
-        const parseLocalDate = (dateString) => {
-          if (!dateString) return null;
-          const [year, month, day] = dateString.split('-').map(Number);
-          return new Date(year, month - 1, day);
-        };
-
-        const checkCoverageExpiration = (coverage) => {
+        // Add expiration checks using shared utility
+        const updateCoverageFlags = (coverage) => {
           if (coverage && coverage.expirationDate) {
-            const expDate = parseLocalDate(coverage.expirationDate);
-            if (expDate) {
-              const todayLocal = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-              const daysUntil = Math.floor((expDate - todayLocal) / (1000 * 60 * 60 * 24));
-              if (daysUntil < 0) {
-                coverage.expired = true;
-              } else if (daysUntil <= 30) {
-                coverage.expiringSoon = true;
-              }
-            }
+            const result = checkExpiration(coverage);
+            coverage.expired = result.expired;
+            coverage.expiringSoon = result.expiringSoon;
           }
         };
 
         // Check standard coverages
         if (extractedData.coverage) {
-          checkCoverageExpiration(extractedData.coverage.generalLiability);
-          checkCoverageExpiration(extractedData.coverage.autoLiability);
-          checkCoverageExpiration(extractedData.coverage.workersComp);
-          checkCoverageExpiration(extractedData.coverage.employersLiability);
+          updateCoverageFlags(extractedData.coverage.generalLiability);
+          updateCoverageFlags(extractedData.coverage.autoLiability);
+          updateCoverageFlags(extractedData.coverage.workersComp);
+          updateCoverageFlags(extractedData.coverage.employersLiability);
         }
 
         // Check for additional insured / waiver of subrogation requirements

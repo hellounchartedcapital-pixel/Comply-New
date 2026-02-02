@@ -6,12 +6,7 @@ import { Upload, CheckCircle, AlertCircle, FileText, Loader2, Home } from 'lucid
 import { supabase } from './supabaseClient';
 import { Logo } from './Logo';
 import { AlertModal, useAlertModal } from './AlertModal';
-
-// Format currency for display
-function formatCurrency(amount) {
-  if (!amount) return '$0';
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(amount);
-}
+import { formatCurrency, checkCoverageExpiration as checkExpiration } from './utils/complianceUtils';
 
 export function TenantUploadPortal({ token, onBack }) {
   const [loading, setLoading] = useState(true);
@@ -178,33 +173,18 @@ export function TenantUploadPortal({ token, onBack }) {
       } else if (extractionResult?.success && extractionResult?.data) {
         extractedData = extractionResult.data;
 
-        // Check expiration
-        const today = new Date();
-        const parseLocalDate = (dateString) => {
-          if (!dateString) return null;
-          const [year, month, day] = dateString.split('-').map(Number);
-          return new Date(year, month - 1, day);
-        };
-
-        // Check coverage expiration and compliance
-        const checkCoverageExpiration = (coverage) => {
+        // Check coverage expiration and compliance using shared utility
+        const updateCoverageFlags = (coverage) => {
           if (coverage && coverage.expirationDate) {
-            const expDate = parseLocalDate(coverage.expirationDate);
-            if (expDate) {
-              const todayLocal = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-              const daysUntil = Math.floor((expDate - todayLocal) / (1000 * 60 * 60 * 24));
-              if (daysUntil < 0) {
-                coverage.expired = true;
-              } else if (daysUntil <= 30) {
-                coverage.expiringSoon = true;
-              }
-            }
+            const result = checkExpiration(coverage);
+            coverage.expired = result.expired;
+            coverage.expiringSoon = result.expiringSoon;
           }
         };
 
         if (extractedData.coverage) {
-          checkCoverageExpiration(extractedData.coverage.generalLiability);
-          checkCoverageExpiration(extractedData.coverage.autoLiability);
+          updateCoverageFlags(extractedData.coverage.generalLiability);
+          updateCoverageFlags(extractedData.coverage.autoLiability);
         }
 
         // Check liability coverage meets lease requirement
@@ -301,6 +281,20 @@ export function TenantUploadPortal({ token, onBack }) {
         .eq('id', tenant.id);
 
       if (updateError) throw updateError;
+
+      // Log activity (using tenant's user_id since this is public portal)
+      await supabase.from('tenant_activity').insert({
+        tenant_id: tenant.id,
+        user_id: tenant.user_id,
+        activity_type: 'document_uploaded',
+        description: `Insurance document uploaded via portal`,
+        metadata: {
+          status: insuranceStatus,
+          issues: issues.length,
+          hasAdditionalInsured: extractedData.hasAdditionalInsured || false,
+          expirationDate: extractedData.expirationDate || null
+        }
+      });
 
       // Save result for display
       setUploadResult({

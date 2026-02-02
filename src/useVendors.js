@@ -1,84 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from './supabaseClient';
 import logger from './logger';
+import { recalculateVendorStatus } from './utils/complianceUtils';
 
 const PAGE_SIZE = 50;
-
-// Helper to recalculate vendor status based on current date
-function recalculateVendorStatus(vendor) {
-  const today = new Date();
-  const todayLocal = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-
-  // Parse date string to local date
-  const parseLocalDate = (dateString) => {
-    if (!dateString) return null;
-    const [year, month, day] = dateString.split('-').map(Number);
-    return new Date(year, month - 1, day);
-  };
-
-  // Check if any coverage is expired or expiring
-  let hasExpired = false;
-  let hasExpiringSoon = false;
-
-  const checkCoverage = (coverage) => {
-    if (!coverage || !coverage.expirationDate) return;
-    const expDate = parseLocalDate(coverage.expirationDate);
-    if (!expDate) return;
-
-    const daysUntil = Math.floor((expDate - todayLocal) / (1000 * 60 * 60 * 24));
-    if (daysUntil < 0) {
-      hasExpired = true;
-      coverage.expired = true;
-    } else if (daysUntil <= 30) {
-      hasExpiringSoon = true;
-      coverage.expiringSoon = true;
-    }
-  };
-
-  // Check all coverage types
-  if (vendor.coverage) {
-    checkCoverage(vendor.coverage.generalLiability);
-    checkCoverage(vendor.coverage.autoLiability);
-    checkCoverage(vendor.coverage.workersComp);
-    checkCoverage(vendor.coverage.employersLiability);
-  }
-
-  // Check additional coverages
-  if (vendor.additional_coverages && Array.isArray(vendor.additional_coverages)) {
-    vendor.additional_coverages.forEach(cov => checkCoverage(cov));
-  }
-
-  // Normalize issues to expected format {type, message}
-  let normalizedIssues = [];
-  if (vendor.issues && Array.isArray(vendor.issues)) {
-    normalizedIssues = vendor.issues.map(issue => {
-      if (typeof issue === 'string') {
-        // Convert string to object format
-        const isCritical = issue.toLowerCase().includes('expired') ||
-                          issue.toLowerCase().includes('missing') ||
-                          issue.toLowerCase().includes('below');
-        return { type: isCritical ? 'critical' : 'warning', message: issue };
-      }
-      // Already an object, ensure it has required properties
-      return {
-        type: issue.type || 'warning',
-        message: issue.message || String(issue)
-      };
-    });
-  }
-
-  // Determine new status
-  let newStatus = vendor.status;
-  if (hasExpired) {
-    newStatus = 'expired';
-  } else if (hasExpiringSoon && vendor.status === 'compliant') {
-    newStatus = 'expiring';
-  } else if (normalizedIssues.length > 0 && vendor.status === 'compliant') {
-    newStatus = 'non-compliant';
-  }
-
-  return { ...vendor, status: newStatus, issues: normalizedIssues };
-}
 
 export function useVendors(propertyId = null) {
   const [vendors, setVendors] = useState([]);

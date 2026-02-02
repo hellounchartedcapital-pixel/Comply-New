@@ -98,3 +98,147 @@
     animation-delay: 500ms;
   }
 }
+
+/* ============================================
+   ACCESSIBILITY STYLES
+   ============================================ */
+
+/* Screen reader only content */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Make screen reader content visible when focused */
+.sr-only-focusable:focus,
+.sr-only-focusable:active {
+  position: static;
+  width: auto;
+  height: auto;
+  padding: inherit;
+  margin: inherit;
+  overflow: visible;
+  clip: auto;
+  white-space: normal;
+}
+
+/* Skip to main content link */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  background: #10b981;
+  color: white;
+  padding: 8px 16px;
+  z-index: 100;
+  transition: top 0.3s;
+}
+
+.skip-link:focus {
+  top: 0;
+}
+
+/* Focus visible styles */
+@layer utilities {
+  /* Enhanced focus ring for keyboard navigation */
+  .focus-visible-ring:focus-visible {
+    outline: 2px solid #10b981;
+    outline-offset: 2px;
+  }
+
+  /* Remove default focus outline for mouse users but keep for keyboard */
+  .focus-visible-only:focus:not(:focus-visible) {
+    outline: none;
+  }
+
+  .focus-visible-only:focus-visible {
+    outline: 2px solid #10b981;
+    outline-offset: 2px;
+  }
+}
+
+/* Ensure all interactive elements have visible focus */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid #10b981;
+  outline-offset: 2px;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .status-compliant { border: 2px solid #059669 !important; }
+  .status-non-compliant { border: 2px solid #ea580c !important; }
+  .status-expiring { border: 2px solid #d97706 !important; }
+  .status-expired { border: 2px solid #dc2626 !important; }
+  .status-pending { border: 2px solid #6b7280 !important; }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Status indicators with patterns for colorblind users */
+.status-indicator {
+  position: relative;
+}
+
+.status-indicator::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: -12px;
+  transform: translateY(-50%);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.status-indicator.compliant::before {
+  background: #10b981;
+  /* Solid circle for compliant */
+}
+
+.status-indicator.non-compliant::before {
+  background: #f97316;
+  /* Add warning pattern */
+  clip-path: polygon(50% 0%, 100% 100%, 0% 100%);
+  border-radius: 0;
+}
+
+.status-indicator.expired::before {
+  background: #ef4444;
+  /* X pattern for expired */
+  clip-path: polygon(20% 0%, 0% 20%, 30% 50%, 0% 80%, 20% 100%, 50% 70%, 80% 100%, 100% 80%, 70% 50%, 100% 20%, 80% 0%, 50% 30%);
+  border-radius: 0;
+}
+
+.status-indicator.expiring::before {
+  background: #f59e0b;
+  /* Diamond for expiring */
+  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+  border-radius: 0;
+}
+
+.status-indicator.pending::before {
+  background: #6b7280;
+  border: 2px dashed currentColor;
+  /* Dashed circle for pending */
+}
