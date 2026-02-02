@@ -579,6 +579,17 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
       // Get the app URL (current origin)
       const appUrl = window.location.origin;
 
+      // Get property requirements for this vendor
+      const vendorProperty = properties.find(p => p.id === requestCOIVendor.propertyId);
+      const requirements = {
+        generalLiability: vendorProperty?.general_liability || userRequirements?.general_liability || 1000000,
+        autoLiability: vendorProperty?.auto_liability_required ? (vendorProperty?.auto_liability || userRequirements?.auto_liability || 1000000) : null,
+        workersComp: vendorProperty?.workers_comp_required || false,
+        employersLiability: vendorProperty?.workers_comp_required ? (vendorProperty?.employers_liability || userRequirements?.employers_liability || 500000) : null,
+        additionalInsured: vendorProperty?.require_additional_insured !== false,
+        waiverOfSubrogation: vendorProperty?.require_waiver_of_subrogation || userRequirements?.require_waiver_of_subrogation || false,
+      };
+
       const { data: result, error: fnError } = await supabase.functions.invoke('send-coi-request', {
         body: {
           to: requestCOIEmail,
@@ -589,6 +600,8 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
           replyTo: user?.email,
           uploadToken: uploadToken,
           appUrl: appUrl,
+          requirements: requirements,
+          propertyName: vendorProperty?.name || null,
         },
       });
 
@@ -674,8 +687,18 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
             })
             .eq('id', vendor.id);
 
-          // Send email
+          // Send email with requirements
           const issues = vendor.issues.map(i => i.message);
+          const vendorProperty = properties.find(p => p.id === vendor.propertyId);
+          const requirements = {
+            generalLiability: vendorProperty?.general_liability || userRequirements?.general_liability || 1000000,
+            autoLiability: vendorProperty?.auto_liability_required ? (vendorProperty?.auto_liability || userRequirements?.auto_liability || 1000000) : null,
+            workersComp: vendorProperty?.workers_comp_required || false,
+            employersLiability: vendorProperty?.workers_comp_required ? (vendorProperty?.employers_liability || userRequirements?.employers_liability || 500000) : null,
+            additionalInsured: vendorProperty?.require_additional_insured !== false,
+            waiverOfSubrogation: vendorProperty?.require_waiver_of_subrogation || userRequirements?.require_waiver_of_subrogation || false,
+          };
+
           const { data: result, error: fnError } = await supabase.functions.invoke('send-coi-request', {
             body: {
               to: vendor.email,
@@ -686,6 +709,8 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
               replyTo: user?.email,
               uploadToken: uploadToken,
               appUrl: appUrl,
+              requirements: requirements,
+              propertyName: vendorProperty?.name || null,
             },
           });
 

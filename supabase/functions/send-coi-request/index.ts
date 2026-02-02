@@ -39,6 +39,20 @@ function checkRateLimit(key: string): { allowed: boolean; remaining: number; res
   return { allowed: true, remaining: MAX_REQUESTS_PER_WINDOW - record.count, resetIn: record.resetTime - now };
 }
 
+// Format currency
+function formatCurrency(amount: number): string {
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(amount);
+}
+
+interface Requirements {
+  generalLiability?: number;
+  autoLiability?: number;
+  workersComp?: boolean;
+  employersLiability?: number;
+  additionalInsured?: boolean;
+  waiverOfSubrogation?: boolean;
+}
+
 interface EmailRequest {
   to: string;
   vendorName: string;
@@ -49,6 +63,9 @@ interface EmailRequest {
   replyTo?: string;
   uploadToken?: string;
   appUrl?: string;
+  requirements?: Requirements;
+  propertyName?: string;
+  isTenant?: boolean;
 }
 
 serve(async (req) => {
@@ -91,22 +108,65 @@ serve(async (req) => {
 
     const FROM_EMAIL = Deno.env.get('FROM_EMAIL') || 'SmartCOI <noreply@resend.dev>';
 
-    const { to, vendorName, vendorStatus, issues, companyName, replyTo, uploadToken, appUrl }: EmailRequest = await req.json();
+    const {
+      to,
+      vendorName,
+      vendorStatus,
+      issues,
+      companyName,
+      replyTo,
+      uploadToken,
+      appUrl,
+      requirements,
+      propertyName,
+      isTenant
+    }: EmailRequest = await req.json();
 
     if (!to || !vendorName) {
       throw new Error('Missing required fields: to, vendorName');
     }
 
-    // Build email content
-    const issuesList = issues && issues.length > 0
-      ? issues.map(i => `• ${i}`).join('\n')
-      : '• COI needs to be updated';
+    const entityType = isTenant ? 'tenant' : 'vendor';
+    const displayCompanyName = companyName || 'Our Company';
 
-    const subject = `Updated Certificate of Insurance Required - ${vendorName}`;
+    // Build issues list
+    const issuesList = issues && issues.length > 0
+      ? issues.map(i => `<li style="margin: 8px 0; color: #dc2626;">${i}</li>`).join('')
+      : '<li style="margin: 8px 0; color: #dc2626;">Certificate needs to be updated</li>';
+
+    // Build requirements list
+    let requirementsList = '';
+    if (requirements) {
+      const reqs: string[] = [];
+      if (requirements.generalLiability) {
+        reqs.push(`General Liability: ${formatCurrency(requirements.generalLiability)} minimum`);
+      }
+      if (requirements.autoLiability) {
+        reqs.push(`Auto Liability: ${formatCurrency(requirements.autoLiability)} minimum`);
+      }
+      if (requirements.workersComp) {
+        reqs.push(`Workers' Compensation: Statutory limits required`);
+      }
+      if (requirements.employersLiability) {
+        reqs.push(`Employers' Liability: ${formatCurrency(requirements.employersLiability)} minimum`);
+      }
+      if (requirements.additionalInsured) {
+        reqs.push(`Additional Insured: ${displayCompanyName} must be listed as additional insured`);
+      }
+      if (requirements.waiverOfSubrogation) {
+        reqs.push(`Waiver of Subrogation: Required in favor of ${displayCompanyName}`);
+      }
+
+      if (reqs.length > 0) {
+        requirementsList = reqs.map(r => `<li style="margin: 8px 0; color: #059669;">${r}</li>`).join('');
+      }
+    }
+
+    const subject = `Action Required: Updated Certificate of Insurance Needed - ${vendorName}`;
 
     // Build upload link if token is provided
     const baseUrl = appUrl || 'https://smartcoi.io';
-    const uploadLink = uploadToken ? `${baseUrl}?upload=${uploadToken}` : null;
+    const uploadLink = uploadToken ? `${baseUrl}/upload/${uploadToken}` : null;
 
     const htmlContent = `
 <!DOCTYPE html>
@@ -115,69 +175,151 @@ serve(async (req) => {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-  <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 30px; border-radius: 10px 10px 0 0;">
-    <h1 style="color: white; margin: 0; font-size: 24px;">Certificate of Insurance Request</h1>
-  </div>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f3f4f6;">
+  <div style="background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
 
-  <div style="background: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 10px 10px;">
-    <p style="margin-top: 0;">Hello,</p>
-
-    <p>We are reaching out regarding the Certificate of Insurance (COI) on file for <strong>${vendorName}</strong>.</p>
-
-    <div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 8px; padding: 15px; margin: 20px 0;">
-      <p style="margin: 0; font-weight: 600; color: #92400e;">Current Status: ${vendorStatus.toUpperCase().replace('-', ' ')}</p>
+    <!-- Header with Company Name -->
+    <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 30px; text-align: center;">
+      <h1 style="color: white; margin: 0 0 8px 0; font-size: 24px;">Certificate of Insurance Request</h1>
+      <p style="color: rgba(255,255,255,0.9); margin: 0; font-size: 16px;">From <strong>${displayCompanyName}</strong></p>
     </div>
 
-    <p><strong>Issues identified:</strong></p>
-    <div style="background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 15px; margin: 10px 0;">
-      <pre style="margin: 0; white-space: pre-wrap; font-family: inherit;">${issuesList}</pre>
+    <div style="padding: 30px;">
+      <!-- Greeting -->
+      <p style="margin-top: 0; font-size: 16px;">Hello,</p>
+
+      <p style="font-size: 16px;">
+        <strong>${displayCompanyName}</strong> is requesting an updated Certificate of Insurance for
+        <strong>${vendorName}</strong>${propertyName ? ` at <strong>${propertyName}</strong>` : ''}.
+      </p>
+
+      <!-- Current Status -->
+      <div style="background: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 0 8px 8px 0; padding: 15px; margin: 20px 0;">
+        <p style="margin: 0; font-weight: 600; color: #92400e; font-size: 14px;">
+          CURRENT STATUS: <span style="text-transform: uppercase;">${vendorStatus.replace('-', ' ')}</span>
+        </p>
+      </div>
+
+      <!-- Issues Found -->
+      <div style="margin: 25px 0;">
+        <h3 style="color: #dc2626; margin: 0 0 12px 0; font-size: 16px; display: flex; align-items: center;">
+          <span style="margin-right: 8px;">⚠️</span> Issues Found
+        </h3>
+        <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 15px;">
+          <ul style="margin: 0; padding-left: 20px;">
+            ${issuesList}
+          </ul>
+        </div>
+      </div>
+
+      ${requirementsList ? `
+      <!-- Requirements -->
+      <div style="margin: 25px 0;">
+        <h3 style="color: #059669; margin: 0 0 12px 0; font-size: 16px; display: flex; align-items: center;">
+          <span style="margin-right: 8px;">✓</span> Our Requirements
+        </h3>
+        <div style="background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 8px; padding: 15px;">
+          <p style="margin: 0 0 10px 0; font-size: 14px; color: #065f46;">
+            To be compliant, your certificate must meet these requirements:
+          </p>
+          <ul style="margin: 0; padding-left: 20px;">
+            ${requirementsList}
+          </ul>
+        </div>
+      </div>
+      ` : ''}
+
+      <!-- Upload Button -->
+      ${uploadLink ? `
+      <div style="text-align: center; margin: 35px 0;">
+        <a href="${uploadLink}" style="display: inline-block; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 16px 40px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px; box-shadow: 0 4px 14px rgba(16, 185, 129, 0.4);">
+          Upload Your Certificate
+        </a>
+      </div>
+      <p style="text-align: center; font-size: 13px; color: #6b7280; margin-top: -10px;">
+        Or copy this link: <a href="${uploadLink}" style="color: #10b981; word-break: break-all;">${uploadLink}</a>
+      </p>
+      ` : `
+      <div style="background: #f3f4f6; border-radius: 8px; padding: 20px; text-align: center; margin: 25px 0;">
+        <p style="margin: 0; color: #4b5563;">Please reply to this email with your updated Certificate of Insurance attached.</p>
+      </div>
+      `}
+
+      <!-- Contact Info -->
+      <div style="border-top: 1px solid #e5e7eb; padding-top: 20px; margin-top: 25px;">
+        <p style="margin: 0 0 10px 0; font-size: 14px; color: #6b7280;">
+          If you have any questions about these requirements, please contact us by replying to this email.
+        </p>
+        <p style="margin: 0; font-size: 16px;">
+          Thank you,<br>
+          <strong>${displayCompanyName}</strong>
+        </p>
+      </div>
     </div>
 
-    <p>Please provide an updated COI that meets our insurance requirements at your earliest convenience.</p>
-
-    ${uploadLink ? `
-    <div style="text-align: center; margin: 30px 0;">
-      <a href="${uploadLink}" style="display: inline-block; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 15px 30px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px;">
-        Upload Your COI Now
-      </a>
+    <!-- Footer -->
+    <div style="background: #f9fafb; padding: 20px; text-align: center; border-top: 1px solid #e5e7eb;">
+      <p style="margin: 0; color: #9ca3af; font-size: 12px;">
+        This email was sent via <a href="https://smartcoi.io" style="color: #10b981; text-decoration: none;">SmartCOI</a> - Automated Certificate of Insurance Management
+      </p>
     </div>
-    <p style="text-align: center; font-size: 12px; color: #6b7280;">
-      Or copy this link: <a href="${uploadLink}" style="color: #10b981;">${uploadLink}</a>
-    </p>
-    ` : '<p>Please reply to this email with your updated COI attached.</p>'}
-
-    <p>If you have any questions about our requirements, please don't hesitate to reach out.</p>
-
-    <p style="margin-bottom: 0;">Thank you,<br><strong>${companyName || 'The Team'}</strong></p>
-  </div>
-
-  <div style="text-align: center; padding: 20px; color: #6b7280; font-size: 12px;">
-    <p style="margin: 0;">This email was sent via SmartCOI</p>
   </div>
 </body>
 </html>`;
 
-    const textContent = `Hello,
+    // Build plain text requirements
+    let textRequirements = '';
+    if (requirements) {
+      const reqs: string[] = [];
+      if (requirements.generalLiability) {
+        reqs.push(`• General Liability: ${formatCurrency(requirements.generalLiability)} minimum`);
+      }
+      if (requirements.autoLiability) {
+        reqs.push(`• Auto Liability: ${formatCurrency(requirements.autoLiability)} minimum`);
+      }
+      if (requirements.workersComp) {
+        reqs.push(`• Workers' Compensation: Statutory limits required`);
+      }
+      if (requirements.employersLiability) {
+        reqs.push(`• Employers' Liability: ${formatCurrency(requirements.employersLiability)} minimum`);
+      }
+      if (requirements.additionalInsured) {
+        reqs.push(`• Additional Insured: ${displayCompanyName} must be listed as additional insured`);
+      }
+      if (requirements.waiverOfSubrogation) {
+        reqs.push(`• Waiver of Subrogation: Required in favor of ${displayCompanyName}`);
+      }
 
-We are reaching out regarding the Certificate of Insurance (COI) on file for ${vendorName}.
+      if (reqs.length > 0) {
+        textRequirements = `\nOUR REQUIREMENTS:\nTo be compliant, your certificate must meet these requirements:\n${reqs.join('\n')}\n`;
+      }
+    }
 
-Current Status: ${vendorStatus.toUpperCase().replace('-', ' ')}
+    const textIssuesList = issues && issues.length > 0
+      ? issues.map(i => `• ${i}`).join('\n')
+      : '• Certificate needs to be updated';
 
-Issues identified:
-${issuesList}
+    const textContent = `CERTIFICATE OF INSURANCE REQUEST
+From ${displayCompanyName}
 
-Please provide an updated COI that meets our insurance requirements at your earliest convenience.
+Hello,
 
-${uploadLink ? `Upload your COI here: ${uploadLink}` : 'Please reply to this email with your updated COI attached.'}
+${displayCompanyName} is requesting an updated Certificate of Insurance for ${vendorName}${propertyName ? ` at ${propertyName}` : ''}.
 
-If you have any questions about our requirements, please don't hesitate to reach out.
+CURRENT STATUS: ${vendorStatus.toUpperCase().replace('-', ' ')}
+
+ISSUES FOUND:
+${textIssuesList}
+${textRequirements}
+${uploadLink ? `UPLOAD YOUR CERTIFICATE:\n${uploadLink}` : 'Please reply to this email with your updated Certificate of Insurance attached.'}
+
+If you have any questions about these requirements, please contact us by replying to this email.
 
 Thank you,
-${companyName || 'The Team'}
+${displayCompanyName}
 
 ---
-This email was sent via SmartCOI`;
+This email was sent via SmartCOI - https://smartcoi.io`;
 
     // Send email via Resend API
     const resendResponse = await fetch('https://api.resend.com/emails', {
