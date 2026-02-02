@@ -2,10 +2,13 @@
 import React, { useState, useEffect } from 'react';
 import {
   X, Upload, Loader2, CheckCircle, AlertCircle,
-  Building2, Home, FileCheck, Users, Shield
+  Building2, Home, FileCheck, Users, Mail
 } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import logger from './logger';
+
+// Local storage key for persisting property selection
+const LAST_PROPERTY_KEY = 'smartcoi_last_property';
 
 // Format currency for display
 function formatCurrency(amount) {
@@ -21,7 +24,7 @@ export function SmartUploadModal({
   selectedProperty: initialProperty,
   userRequirements
 }) {
-  // Step: 1 = select type/property, 2 = tenant requirements (if tenant), 3 = upload, 4 = result
+  // Simplified: Step 1 = select type/property/name/email, Step 2 = upload, Step 3 = result
   const [step, setStep] = useState(1);
   const [documentType, setDocumentType] = useState(null); // 'vendor' or 'tenant'
   const [selectedPropertyId, setSelectedPropertyId] = useState('');
@@ -29,13 +32,15 @@ export function SmartUploadModal({
   const [units, setUnits] = useState([]);
   const [loadingUnits, setLoadingUnits] = useState(false);
 
-  // Tenant lease requirements
-  const [tenantRequirements, setTenantRequirements] = useState({
+  // Contact info (for both vendors and tenants)
+  const [contactName, setContactName] = useState('');
+  const [contactEmail, setContactEmail] = useState('');
+
+  // Tenant defaults (loaded from settings)
+  const [tenantDefaults, setTenantDefaults] = useState({
     liabilityMin: 100000,
     requiresAdditionalInsured: true,
-    additionalInsuredText: '',
-    tenantName: '',
-    tenantEmail: ''
+    additionalInsuredText: ''
   });
 
   // Upload state
@@ -45,24 +50,64 @@ export function SmartUploadModal({
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
 
+  // Load tenant defaults from settings
+  const loadTenantDefaults = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data } = await supabase
+        .from('settings')
+        .select('tenant_default_liability_min, tenant_default_requires_additional_insured, tenant_default_additional_insured_text')
+        .eq('user_id', user.id)
+        .single();
+
+      if (data) {
+        setTenantDefaults({
+          liabilityMin: data.tenant_default_liability_min || 100000,
+          requiresAdditionalInsured: data.tenant_default_requires_additional_insured !== false,
+          additionalInsuredText: data.tenant_default_additional_insured_text || ''
+        });
+      }
+    } catch (err) {
+      logger.error('Error loading tenant defaults', err);
+    }
+  };
+
   // Reset when modal opens
   useEffect(() => {
     if (isOpen) {
       setStep(1);
       setDocumentType(null);
-      setSelectedPropertyId(initialProperty?.id || '');
-      setSelectedUnitId('');
-      setTenantRequirements({
-        liabilityMin: 100000,
-        requiresAdditionalInsured: true,
-        additionalInsuredText: '',
-        tenantName: '',
-        tenantEmail: ''
-      });
+      setContactName('');
+      setContactEmail('');
       setResult(null);
       setError(null);
+
+      // Try to restore last selected property from localStorage
+      const lastPropertyId = localStorage.getItem(LAST_PROPERTY_KEY);
+      if (initialProperty?.id) {
+        setSelectedPropertyId(initialProperty.id);
+      } else if (lastPropertyId && properties.some(p => p.id === lastPropertyId)) {
+        setSelectedPropertyId(lastPropertyId);
+      } else if (properties.length === 1) {
+        // Auto-select if only one property
+        setSelectedPropertyId(properties[0].id);
+      } else {
+        setSelectedPropertyId('');
+      }
+
+      setSelectedUnitId('');
+      loadTenantDefaults();
     }
-  }, [isOpen, initialProperty]);
+  }, [isOpen, initialProperty, properties]);
+
+  // Save property selection to localStorage
+  useEffect(() => {
+    if (selectedPropertyId) {
+      localStorage.setItem(LAST_PROPERTY_KEY, selectedPropertyId);
+    }
+  }, [selectedPropertyId]);
 
   // Load units when property changes
   useEffect(() => {
@@ -175,8 +220,8 @@ export function SmartUploadModal({
         };
       } else {
         requirements = {
-          general_liability: tenantRequirements.liabilityMin,
-          require_additional_insured: tenantRequirements.requiresAdditionalInsured,
+          general_liability: tenantDefaults.liabilityMin,
+          require_additional_insured: tenantDefaults.requiresAdditionalInsured,
           is_tenant_policy: true
         };
       }
@@ -256,12 +301,15 @@ export function SmartUploadModal({
       const tokenExpiry = new Date();
       tokenExpiry.setDate(tokenExpiry.getDate() + 30);
 
-      // Create vendor record
+      // Create vendor record - use extracted name or provided name
+      const vendorName = data.name || data.companyName || contactName || 'New Vendor';
+
       const vendorData = {
         user_id: user.id,
         property_id: selectedPropertyId || null,
-        name: data.name || data.companyName || 'New Vendor',
+        name: vendorName,
         dba: data.dba || null,
+        email: contactEmail || null,  // Save email from upload form
         status: status,
         expiration_date: data.expirationDate || null,
         coverage: data.coverage || {},
@@ -296,7 +344,7 @@ export function SmartUploadModal({
         issues: issues,
         data: newVendor
       });
-      setStep(4);
+      setStep(3);
 
       if (onUploadComplete) {
         onUploadComplete({ type: 'vendor', data: newVendor });
@@ -319,11 +367,11 @@ export function SmartUploadModal({
       let insuranceStatus = 'compliant';
 
       const liabilityAmount = data.coverage?.generalLiability?.amount || 0;
-      if (liabilityAmount < tenantRequirements.liabilityMin) {
-        issues.push(`Personal Liability ${formatCurrency(liabilityAmount)} is below required ${formatCurrency(tenantRequirements.liabilityMin)}`);
+      if (liabilityAmount < tenantDefaults.liabilityMin) {
+        issues.push(`Personal Liability ${formatCurrency(liabilityAmount)} is below required ${formatCurrency(tenantDefaults.liabilityMin)}`);
       }
 
-      if (tenantRequirements.requiresAdditionalInsured && !data.additionalInsured) {
+      if (tenantDefaults.requiresAdditionalInsured && !data.additionalInsured) {
         issues.push('Additional Insured endorsement not found');
       }
 
@@ -348,20 +396,23 @@ export function SmartUploadModal({
       const tokenExpiry = new Date();
       tokenExpiry.setDate(tokenExpiry.getDate() + 30);
 
+      // Use extracted name or provided name
+      const tenantName = contactName || data.name || data.companyName || 'New Tenant';
+
       // Create tenant record
       const tenantData = {
         user_id: user.id,
-        name: tenantRequirements.tenantName || data.name || data.companyName || 'New Tenant',
-        email: tenantRequirements.tenantEmail || '',
+        name: tenantName,
+        email: contactEmail || '',
         phone: '',
         property_id: selectedPropertyId || null,
         unit_id: selectedUnitId || null,
         status: 'active',
         insurance_status: insuranceStatus,
-        // Lease requirements
-        required_liability_min: tenantRequirements.liabilityMin,
-        requires_additional_insured: tenantRequirements.requiresAdditionalInsured,
-        additional_insured_text: tenantRequirements.additionalInsuredText,
+        // Lease requirements (from defaults)
+        required_liability_min: tenantDefaults.liabilityMin,
+        requires_additional_insured: tenantDefaults.requiresAdditionalInsured,
+        additional_insured_text: tenantDefaults.additionalInsuredText,
         // Policy data
         policy_expiration_date: data.expirationDate || null,
         policy_liability_amount: liabilityAmount,
@@ -396,7 +447,7 @@ export function SmartUploadModal({
         issues: issues,
         data: newTenant
       });
-      setStep(4);
+      setStep(3);
 
       if (onUploadComplete) {
         onUploadComplete({ type: 'tenant', data: newTenant });
@@ -416,22 +467,13 @@ export function SmartUploadModal({
       setError('Please select a property');
       return;
     }
-    setError(null);
-
-    if (documentType === 'tenant') {
-      setStep(2); // Go to tenant requirements
-    } else {
-      setStep(3); // Go directly to upload
-    }
-  };
-
-  const handleTenantRequirementsContinue = () => {
-    if (!tenantRequirements.tenantName.trim()) {
+    // Require name for tenants
+    if (documentType === 'tenant' && !contactName.trim()) {
       setError('Please enter the tenant name');
       return;
     }
     setError(null);
-    setStep(3);
+    setStep(2); // Go directly to upload
   };
 
   if (!isOpen) return null;
@@ -446,10 +488,9 @@ export function SmartUploadModal({
           <div>
             <h2 className="text-xl font-bold text-gray-900">Upload COI</h2>
             <p className="text-sm text-gray-500 mt-1">
-              {step === 1 && 'Select type and property'}
-              {step === 2 && 'Enter tenant lease requirements'}
-              {step === 3 && 'Upload insurance document'}
-              {step === 4 && 'Upload complete'}
+              {step === 1 && 'Select type and enter details'}
+              {step === 2 && 'Upload insurance document'}
+              {step === 3 && 'Upload complete'}
             </p>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg">
@@ -459,9 +500,9 @@ export function SmartUploadModal({
 
         {/* Content */}
         <div className="p-6">
-          {/* Step 1: Select Type and Property */}
+          {/* Step 1: Select Type, Property, and Contact Info */}
           {step === 1 && (
-            <div className="space-y-6">
+            <div className="space-y-5">
               {error && (
                 <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
                   <AlertCircle size={20} className="text-red-500 flex-shrink-0" />
@@ -492,7 +533,7 @@ export function SmartUploadModal({
                       Vendor COI
                     </p>
                     <p className="text-xs text-gray-500 mt-1">
-                      Commercial certificate of insurance
+                      Commercial certificate
                     </p>
                   </button>
 
@@ -513,7 +554,7 @@ export function SmartUploadModal({
                       Tenant Insurance
                     </p>
                     <p className="text-xs text-gray-500 mt-1">
-                      Renter's insurance policy
+                      Renter's policy
                     </p>
                   </button>
                 </div>
@@ -523,7 +564,7 @@ export function SmartUploadModal({
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   <Building2 size={16} className="inline mr-2" />
-                  Assign to Property
+                  Property
                 </label>
                 <select
                   value={selectedPropertyId}
@@ -564,6 +605,45 @@ export function SmartUploadModal({
                 </div>
               )}
 
+              {/* Name Field (for tenants it's required, for vendors optional) */}
+              {documentType && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    {documentType === 'tenant' ? 'Tenant Name *' : 'Vendor Name (Optional)'}
+                  </label>
+                  <input
+                    type="text"
+                    value={contactName}
+                    onChange={(e) => setContactName(e.target.value)}
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                    placeholder={documentType === 'tenant' ? 'John Smith' : 'Auto-extracted from COI'}
+                  />
+                  {documentType === 'vendor' && (
+                    <p className="text-xs text-gray-500 mt-1">Leave blank to use name from certificate</p>
+                  )}
+                </div>
+              )}
+
+              {/* Email Field */}
+              {documentType && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <Mail size={16} className="inline mr-2" />
+                    Email {documentType === 'vendor' && <span className="text-amber-600">(recommended for follow-ups)</span>}
+                  </label>
+                  <input
+                    type="email"
+                    value={contactEmail}
+                    onChange={(e) => setContactEmail(e.target.value)}
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                    placeholder={`${documentType}@email.com`}
+                  />
+                  {documentType === 'vendor' && (
+                    <p className="text-xs text-gray-500 mt-1">Required for automatic follow-up emails</p>
+                  )}
+                </div>
+              )}
+
               {/* Property Requirements Preview (for vendors) */}
               {documentType === 'vendor' && selectedProp && (
                 <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
@@ -583,133 +663,31 @@ export function SmartUploadModal({
                 </div>
               )}
 
+              {/* Tenant Requirements Preview */}
+              {documentType === 'tenant' && selectedProp && (
+                <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
+                  <h4 className="text-sm font-semibold text-purple-900 mb-2">Tenant Requirements (from Settings)</h4>
+                  <ul className="text-sm text-purple-800 space-y-1">
+                    <li>• Personal Liability: {formatCurrency(tenantDefaults.liabilityMin)} min</li>
+                    {tenantDefaults.requiresAdditionalInsured && (
+                      <li>• Additional Insured: Required</li>
+                    )}
+                  </ul>
+                </div>
+              )}
+
               <button
                 onClick={handleContinue}
                 disabled={!documentType || !selectedPropertyId}
                 className="w-full py-3 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Continue
+                Continue to Upload
               </button>
             </div>
           )}
 
-          {/* Step 2: Tenant Requirements */}
+          {/* Step 2: Upload */}
           {step === 2 && (
-            <div className="space-y-5">
-              {error && (
-                <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
-                  <AlertCircle size={20} className="text-red-500 flex-shrink-0" />
-                  <p className="text-red-800">{error}</p>
-                </div>
-              )}
-
-              <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
-                <div className="flex items-center gap-2 mb-2">
-                  <Shield size={18} className="text-purple-600" />
-                  <h4 className="font-semibold text-purple-900">Lease Insurance Requirements</h4>
-                </div>
-                <p className="text-sm text-purple-700">
-                  Enter the insurance requirements from this tenant's lease agreement.
-                </p>
-              </div>
-
-              {/* Tenant Name */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Tenant Name *
-                </label>
-                <input
-                  type="text"
-                  value={tenantRequirements.tenantName}
-                  onChange={(e) => setTenantRequirements({...tenantRequirements, tenantName: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  placeholder="John Smith"
-                />
-              </div>
-
-              {/* Tenant Email */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Tenant Email (Optional)
-                </label>
-                <input
-                  type="email"
-                  value={tenantRequirements.tenantEmail}
-                  onChange={(e) => setTenantRequirements({...tenantRequirements, tenantEmail: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  placeholder="tenant@email.com"
-                />
-              </div>
-
-              {/* Liability Minimum */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Minimum Personal Liability
-                </label>
-                <select
-                  value={tenantRequirements.liabilityMin}
-                  onChange={(e) => setTenantRequirements({...tenantRequirements, liabilityMin: parseInt(e.target.value)})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                >
-                  <option value={50000}>$50,000</option>
-                  <option value={100000}>$100,000</option>
-                  <option value={200000}>$200,000</option>
-                  <option value={300000}>$300,000</option>
-                  <option value={500000}>$500,000</option>
-                </select>
-              </div>
-
-              {/* Additional Insured */}
-              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <div>
-                  <p className="font-medium text-gray-900">Require Additional Insured</p>
-                  <p className="text-xs text-gray-500">Landlord must be listed as additional insured</p>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={tenantRequirements.requiresAdditionalInsured}
-                    onChange={(e) => setTenantRequirements({...tenantRequirements, requiresAdditionalInsured: e.target.checked})}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-gray-300 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-500"></div>
-                </label>
-              </div>
-
-              {tenantRequirements.requiresAdditionalInsured && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Additional Insured Text (Optional)
-                  </label>
-                  <textarea
-                    value={tenantRequirements.additionalInsuredText}
-                    onChange={(e) => setTenantRequirements({...tenantRequirements, additionalInsuredText: e.target.value})}
-                    rows={2}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
-                    placeholder="Property Owner LLC, its managers, members..."
-                  />
-                </div>
-              )}
-
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setStep(1)}
-                  className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium"
-                >
-                  Back
-                </button>
-                <button
-                  onClick={handleTenantRequirementsContinue}
-                  className="flex-1 py-3 bg-purple-500 text-white rounded-lg hover:bg-purple-600 font-semibold"
-                >
-                  Continue to Upload
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Step 3: Upload */}
-          {step === 3 && (
             <div>
               {error && (
                 <div className="p-4 bg-red-50 border border-red-200 rounded-lg mb-4 flex items-start gap-3">
@@ -733,9 +711,14 @@ export function SmartUploadModal({
                 </div>
                 <p className={`text-sm ${documentType === 'vendor' ? 'text-blue-700' : 'text-purple-700'}`}>
                   {selectedProp?.name}
-                  {documentType === 'tenant' && tenantRequirements.tenantName && ` • ${tenantRequirements.tenantName}`}
+                  {contactName && ` • ${contactName}`}
                   {selectedUnitId && units.find(u => u.id === selectedUnitId) && ` • Unit ${units.find(u => u.id === selectedUnitId).unit_number}`}
                 </p>
+                {contactEmail && (
+                  <p className={`text-xs mt-1 ${documentType === 'vendor' ? 'text-blue-600' : 'text-purple-600'}`}>
+                    <Mail size={12} className="inline mr-1" />{contactEmail}
+                  </p>
+                )}
               </div>
 
               <div
@@ -775,7 +758,7 @@ export function SmartUploadModal({
               </div>
 
               <button
-                onClick={() => setStep(documentType === 'tenant' ? 2 : 1)}
+                onClick={() => setStep(1)}
                 className="w-full py-2 text-gray-600 hover:text-gray-900 font-medium mt-4"
                 disabled={uploading}
               >
@@ -784,8 +767,8 @@ export function SmartUploadModal({
             </div>
           )}
 
-          {/* Step 4: Result */}
-          {step === 4 && result && (
+          {/* Step 3: Result */}
+          {step === 3 && result && (
             <div className="text-center">
               <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${
                 result.status === 'compliant' ? 'bg-emerald-100' :

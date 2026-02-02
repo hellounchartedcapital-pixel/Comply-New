@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Upload, CheckCircle, XCircle, AlertCircle, FileText, Calendar, X, Search, Download, Settings as SettingsIcon, Eye, Bell, FileDown, Phone, Mail, User, Send, Clock, History, FileCheck, Building2, ChevronDown, CreditCard, Users, Home, LayoutDashboard } from 'lucide-react';
+import { Upload, CheckCircle, XCircle, AlertCircle, FileText, Calendar, X, Search, Download, Settings as SettingsIcon, Eye, Bell, FileDown, Phone, Mail, User, Send, Clock, History, FileCheck, Building2, ChevronDown, CreditCard, Users, Home, LayoutDashboard, Loader2 } from 'lucide-react';
 import { useVendors } from './useVendors';
 import { useTenants } from './useTenants';
 import { useSubscription } from './useSubscription';
@@ -81,6 +81,7 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
   const [vendorDetailsTab, setVendorDetailsTab] = useState('details');
   const [vendorActivity, setVendorActivity] = useState([]);
   const [loadingActivity, setLoadingActivity] = useState(false);
+  const [bulkRequesting, setBulkRequesting] = useState(false);
   const { alertModal, showAlert, hideAlert } = useAlertModal();
   const { subscription, isFreePlan } = useSubscription();
 
@@ -261,6 +262,23 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
     const [year, month, day] = dateString.split('-').map(Number);
     const date = new Date(year, month - 1, day);
     return date.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' });
+  };
+
+  // Format date as relative time (e.g., "2 days ago", "1 week ago")
+  const formatRelativeDate = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) return 'today';
+    if (diffDays === 1) return 'yesterday';
+    if (diffDays < 7) return `${diffDays} days ago`;
+    if (diffDays < 14) return '1 week ago';
+    if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
+    if (diffDays < 60) return '1 month ago';
+    return `${Math.floor(diffDays / 30)} months ago`;
   };
 
   const formatCurrency = (amount) => {
@@ -621,6 +639,108 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
       });
     } finally {
       setSendingEmail(false);
+    }
+  };
+
+  // Bulk Request COIs from multiple vendors
+  const handleBulkRequest = async (vendorsToContact) => {
+    if (!vendorsToContact || vendorsToContact.length === 0) return;
+
+    const confirmed = window.confirm(
+      `Send COI requests to ${vendorsToContact.length} vendors?\n\nThis will email all vendors who need updated certificates and have an email address on file.`
+    );
+
+    if (!confirmed) return;
+
+    setBulkRequesting(true);
+    let successCount = 0;
+    let failCount = 0;
+    const companyName = userRequirements?.company_name || 'Our Company';
+    const appUrl = window.location.origin;
+
+    try {
+      for (const vendor of vendorsToContact) {
+        try {
+          // Generate/refresh upload token
+          const uploadToken = crypto.randomUUID();
+          const tokenExpiresAt = new Date();
+          tokenExpiresAt.setDate(tokenExpiresAt.getDate() + 30);
+
+          await supabase
+            .from('vendors')
+            .update({
+              upload_token: uploadToken,
+              upload_token_expires_at: tokenExpiresAt.toISOString()
+            })
+            .eq('id', vendor.id);
+
+          // Send email
+          const issues = vendor.issues.map(i => i.message);
+          const { data: result, error: fnError } = await supabase.functions.invoke('send-coi-request', {
+            body: {
+              to: vendor.email,
+              vendorName: vendor.name,
+              vendorStatus: vendor.status,
+              issues: issues,
+              companyName: companyName,
+              replyTo: user?.email,
+              uploadToken: uploadToken,
+              appUrl: appUrl,
+            },
+          });
+
+          if (fnError || (result && !result.success)) {
+            failCount++;
+            continue;
+          }
+
+          // Log activity and update last contacted
+          await supabase.from('vendor_activity').insert({
+            vendor_id: vendor.id,
+            user_id: user?.id,
+            activity_type: 'email_sent',
+            description: `COI request email sent to ${vendor.email} (bulk)`,
+            metadata: { email: vendor.email, bulk: true }
+          });
+
+          await supabase
+            .from('vendors')
+            .update({ last_contacted_at: new Date().toISOString() })
+            .eq('id', vendor.id);
+
+          successCount++;
+        } catch (err) {
+          logger.error(`Failed to send to ${vendor.name}`, err);
+          failCount++;
+        }
+      }
+
+      refreshVendors();
+
+      if (failCount === 0) {
+        showAlert({
+          type: 'success',
+          title: 'All Emails Sent',
+          message: `Successfully sent COI requests to ${successCount} vendors.`
+        });
+      } else {
+        showAlert({
+          type: 'warning',
+          title: 'Partial Success',
+          message: `Sent ${successCount} emails, ${failCount} failed.`,
+          details: 'Check vendor email addresses and try again for failed vendors.'
+        });
+      }
+    } catch (error) {
+      logger.error('Bulk request error', error);
+      showAlert({
+        type: 'error',
+        title: 'Bulk Request Failed',
+        message: 'An error occurred while sending bulk requests.',
+        details: error.message
+      });
+    } finally {
+      setBulkRequesting(false);
     }
   };
 
@@ -1010,6 +1130,36 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
               <span className="hidden sm:inline">Export CSV</span>
             </button>
 
+            {/* Bulk Request COIs - only show if there are non-compliant vendors with emails */}
+            {(() => {
+              const needsAttention = filteredVendors.filter(v =>
+                (v.status === 'expired' || v.status === 'non-compliant' || v.status === 'expiring') && v.email
+              );
+              if (needsAttention.length > 0) {
+                return (
+                  <button
+                    onClick={() => handleBulkRequest(needsAttention)}
+                    disabled={bulkRequesting}
+                    className="px-4 py-2.5 bg-orange-500 text-white rounded-xl hover:bg-orange-600 flex items-center space-x-2 text-sm font-semibold transition-all disabled:opacity-50"
+                    title={`Send COI requests to ${needsAttention.length} vendors`}
+                  >
+                    {bulkRequesting ? (
+                      <>
+                        <Loader2 size={16} className="animate-spin" />
+                        <span className="hidden sm:inline">Sending...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Send size={16} />
+                        <span className="hidden sm:inline">Request COIs ({needsAttention.length})</span>
+                      </>
+                    )}
+                  </button>
+                );
+              }
+              return null;
+            })()}
+
             {/* Clear */}
             {(searchQuery || quickFilter !== 'all' || sortBy !== 'name') && (
               <button
@@ -1122,6 +1272,12 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
                         <Calendar size={14} className="mr-1.5" />
                         {formatDate(vendor.expirationDate)}
                       </div>
+                      {vendor.lastContactedAt && (
+                        <div className="flex items-center text-xs text-gray-500" title={`Last contacted: ${formatDate(vendor.lastContactedAt)}`}>
+                          <Mail size={12} className="mr-1" />
+                          <span>Contacted {formatRelativeDate(vendor.lastContactedAt)}</span>
+                        </div>
+                      )}
                       <div className="flex items-center space-x-2">
                         <button
                           onClick={() => handleEdit(vendor)}
