@@ -1,85 +1,104 @@
 import React, { useState, useEffect } from 'react';
 import {
   Users, Plus, Search, CheckCircle, XCircle, AlertCircle, Clock,
-  Mail, Phone, Calendar, Building2, Edit2, Trash2, X, Send,
-  ExternalLink, Shield
+  Mail, Phone, Calendar, Building2, Edit2, X, Send,
+  ExternalLink, Shield, Loader2
 } from 'lucide-react';
 import { useTenants } from './useTenants';
 import { supabase } from './supabaseClient';
 
-// Status badge component
-function StatusBadge({ status }) {
+// Status icon component (matches vendor style)
+function getStatusIcon(status) {
   const configs = {
-    compliant: { bg: 'bg-emerald-100', text: 'text-emerald-700', icon: CheckCircle, label: 'Compliant' },
-    'non-compliant': { bg: 'bg-red-100', text: 'text-red-700', icon: XCircle, label: 'Non-Compliant' },
-    expiring: { bg: 'bg-amber-100', text: 'text-amber-700', icon: AlertCircle, label: 'Expiring Soon' },
-    expired: { bg: 'bg-red-100', text: 'text-red-700', icon: XCircle, label: 'Expired' },
-    pending: { bg: 'bg-gray-100', text: 'text-gray-600', icon: Clock, label: 'Pending' },
+    compliant: { bg: 'bg-emerald-100', icon: CheckCircle, color: 'text-emerald-600' },
+    'non-compliant': { bg: 'bg-orange-100', icon: AlertCircle, color: 'text-orange-600' },
+    expiring: { bg: 'bg-amber-100', icon: AlertCircle, color: 'text-amber-600' },
+    expired: { bg: 'bg-red-100', icon: XCircle, color: 'text-red-600' },
+    pending: { bg: 'bg-gray-100', icon: Clock, color: 'text-gray-500' },
   };
 
   const config = configs[status] || configs.pending;
   const Icon = config.icon;
 
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${config.bg} ${config.text}`}>
-      <Icon size={12} />
+    <div className={`w-10 h-10 ${config.bg} rounded-xl flex items-center justify-center`}>
+      <Icon size={20} className={config.color} />
+    </div>
+  );
+}
+
+// Status badge component (matches vendor style)
+function getStatusBadge(status) {
+  const configs = {
+    compliant: { bg: 'bg-emerald-100', text: 'text-emerald-700', label: 'Compliant' },
+    'non-compliant': { bg: 'bg-orange-100', text: 'text-orange-700', label: 'Non-Compliant' },
+    expiring: { bg: 'bg-amber-100', text: 'text-amber-700', label: 'Expiring Soon' },
+    expired: { bg: 'bg-red-100', text: 'text-red-700', label: 'Expired' },
+    pending: { bg: 'bg-gray-100', text: 'text-gray-600', label: 'Pending' },
+  };
+
+  const config = configs[status] || configs.pending;
+
+  return (
+    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${config.bg} ${config.text}`}>
       {config.label}
     </span>
   );
 }
 
-// Tenant status badge
-function TenantStatusBadge({ status }) {
-  const configs = {
-    active: { bg: 'bg-emerald-100', text: 'text-emerald-700', label: 'Active' },
-    pending: { bg: 'bg-amber-100', text: 'text-amber-700', label: 'Pending' },
-    moved_out: { bg: 'bg-gray-100', text: 'text-gray-600', label: 'Moved Out' },
-    evicted: { bg: 'bg-red-100', text: 'text-red-700', label: 'Evicted' },
-  };
+// Format currency
+function formatCurrency(amount) {
+  if (!amount) return 'N/A';
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(amount);
+}
 
-  const config = configs[status] || configs.active;
+// Format date
+function formatDate(date) {
+  if (!date) return 'N/A';
+  return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
 
-  return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${config.bg} ${config.text}`}>
-      {config.label}
-    </span>
-  );
+// Format relative date
+function formatRelativeDate(date) {
+  if (!date) return '';
+  const now = new Date();
+  const d = new Date(date);
+  const diffMs = now - d;
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffDays === 0) return 'today';
+  if (diffDays === 1) return 'yesterday';
+  if (diffDays < 7) return `${diffDays} days ago`;
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
+  return `${Math.floor(diffDays / 30)} months ago`;
 }
 
 // Add/Edit Tenant Modal
-function TenantModal({ isOpen, onClose, onSave, tenant, properties, units }) {
+function TenantModal({ isOpen, onClose, onSave, tenant, properties }) {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     phone: '',
     property_id: '',
-    unit_id: '',
+    unit_number: '', // Changed from unit_id to unit_number
     lease_start: '',
     lease_end: '',
     status: 'active',
-    // General Liability
     required_liability_min: 100000,
     required_property_damage_min: 0,
-    // Business Auto Liability
     required_auto_liability_min: 0,
-    // Workers Compensation
     required_workers_comp: false,
     workers_comp_exempt: false,
-    // Employer's Liability
     required_employers_liability_min: 0,
-    // Additional Insured
     requires_additional_insured: true,
     additional_insured_text: '',
-    // Certificate Holder
     certificate_holder_name: '',
     certificate_holder_address: '',
-    // Other requirements
     cancellation_notice_days: 30,
     requires_declarations_page: true,
     requires_endorsement_pages: true,
   });
   const [saving, setSaving] = useState(false);
-  const [filteredUnits, setFilteredUnits] = useState([]);
 
   useEffect(() => {
     if (tenant) {
@@ -88,7 +107,7 @@ function TenantModal({ isOpen, onClose, onSave, tenant, properties, units }) {
         email: tenant.email || '',
         phone: tenant.phone || '',
         property_id: tenant.property_id || '',
-        unit_id: tenant.unit_id || '',
+        unit_number: tenant.unit?.unit_number || '',
         lease_start: tenant.lease_start || '',
         lease_end: tenant.lease_end || '',
         status: tenant.status || 'active',
@@ -112,7 +131,7 @@ function TenantModal({ isOpen, onClose, onSave, tenant, properties, units }) {
         email: '',
         phone: '',
         property_id: '',
-        unit_id: '',
+        unit_number: '',
         lease_start: '',
         lease_end: '',
         status: 'active',
@@ -132,14 +151,6 @@ function TenantModal({ isOpen, onClose, onSave, tenant, properties, units }) {
       });
     }
   }, [tenant, isOpen]);
-
-  useEffect(() => {
-    if (formData.property_id) {
-      setFilteredUnits(units.filter(u => u.property_id === formData.property_id));
-    } else {
-      setFilteredUnits([]);
-    }
-  }, [formData.property_id, units]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -232,7 +243,7 @@ function TenantModal({ isOpen, onClose, onSave, tenant, properties, units }) {
                   </label>
                   <select
                     value={formData.property_id}
-                    onChange={(e) => setFormData({ ...formData, property_id: e.target.value, unit_id: '' })}
+                    onChange={(e) => setFormData({ ...formData, property_id: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                   >
                     <option value="">Select property...</option>
@@ -243,22 +254,15 @@ function TenantModal({ isOpen, onClose, onSave, tenant, properties, units }) {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Unit
+                    Unit Number
                   </label>
-                  <select
-                    value={formData.unit_id}
-                    onChange={(e) => setFormData({ ...formData, unit_id: e.target.value })}
+                  <input
+                    type="text"
+                    value={formData.unit_number}
+                    onChange={(e) => setFormData({ ...formData, unit_number: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                    disabled={!formData.property_id}
-                  >
-                    <option value="">Select unit...</option>
-                    {filteredUnits.map(u => (
-                      <option key={u.id} value={u.id}>{u.unit_number}</option>
-                    ))}
-                  </select>
-                  {formData.property_id && filteredUnits.length === 0 && (
-                    <p className="text-xs text-amber-600 mt-1">No units found. Add units to this property first.</p>
-                  )}
+                    placeholder="e.g., 101, A, 2B"
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -314,7 +318,7 @@ function TenantModal({ isOpen, onClose, onSave, tenant, properties, units }) {
             <div>
               <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
                 <Shield size={16} className="text-emerald-600" />
-                Insurance Requirements (Per Lease)
+                Insurance Requirements
               </h3>
 
               {/* Coverage Limits */}
@@ -347,173 +351,40 @@ function TenantModal({ isOpen, onClose, onSave, tenant, properties, units }) {
                       onChange={(e) => setFormData({ ...formData, required_auto_liability_min: parseInt(e.target.value) })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                     >
-                      <option value={0}>Per Lease</option>
+                      <option value={0}>Not Required</option>
                       <option value={100000}>$100,000</option>
                       <option value={300000}>$300,000</option>
                       <option value={500000}>$500,000</option>
                       <option value={1000000}>$1,000,000</option>
                     </select>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Employer's Liability
-                    </label>
-                    <select
-                      value={formData.required_employers_liability_min}
-                      onChange={(e) => setFormData({ ...formData, required_employers_liability_min: parseInt(e.target.value) })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                    >
-                      <option value={0}>Per Lease</option>
-                      <option value={100000}>$100,000</option>
-                      <option value={500000}>$500,000</option>
-                      <option value={1000000}>$1,000,000</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Property Damage
-                    </label>
-                    <select
-                      value={formData.required_property_damage_min}
-                      onChange={(e) => setFormData({ ...formData, required_property_damage_min: parseInt(e.target.value) })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                    >
-                      <option value={0}>Not Required</option>
-                      <option value={25000}>$25,000</option>
-                      <option value={50000}>$50,000</option>
-                      <option value={100000}>$100,000</option>
-                    </select>
-                  </div>
                 </div>
 
                 {/* Workers Compensation */}
                 <div className="mt-4 pt-4 border-t border-gray-200">
-                  <div className="flex items-center gap-4">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={formData.required_workers_comp}
-                        onChange={(e) => setFormData({ ...formData, required_workers_comp: e.target.checked, workers_comp_exempt: false })}
-                        className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
-                      />
-                      <span className="text-sm text-gray-700">Workers' Compensation Required</span>
-                    </label>
-                    {formData.required_workers_comp && (
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={formData.workers_comp_exempt}
-                          onChange={(e) => setFormData({ ...formData, workers_comp_exempt: e.target.checked })}
-                          className="w-4 h-4 text-amber-600 border-gray-300 rounded focus:ring-amber-500"
-                        />
-                        <span className="text-sm text-gray-600">Exemption Allowed</span>
-                      </label>
-                    )}
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1">* Tenant must provide proof of insurance OR proof of exemption</p>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.required_workers_comp}
+                      onChange={(e) => setFormData({ ...formData, required_workers_comp: e.target.checked, workers_comp_exempt: false })}
+                      className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
+                    />
+                    <span className="text-sm text-gray-700">Workers' Compensation Required</span>
+                  </label>
                 </div>
               </div>
 
               {/* Additional Insured */}
-              <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                <h4 className="text-xs font-semibold text-gray-500 uppercase mb-3">Additional Insured</h4>
-                <div className="space-y-3">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={formData.requires_additional_insured}
-                      onChange={(e) => setFormData({ ...formData, requires_additional_insured: e.target.checked })}
-                      className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
-                    />
-                    <span className="text-sm text-gray-700">Require owner as additional insured</span>
-                  </label>
-                  {formData.requires_additional_insured && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Additional Insured Entities
-                      </label>
-                      <textarea
-                        value={formData.additional_insured_text}
-                        onChange={(e) => setFormData({ ...formData, additional_insured_text: e.target.value })}
-                        rows={3}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm"
-                        placeholder="A. Property Owner LLC&#10;B. Management Company LLC"
-                      />
-                      <p className="text-xs text-gray-500 mt-1">List each entity on a separate line</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Certificate Holder */}
-              <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                <h4 className="text-xs font-semibold text-gray-500 uppercase mb-3">Certificate Holder</h4>
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Certificate Holder Name
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.certificate_holder_name}
-                      onChange={(e) => setFormData({ ...formData, certificate_holder_name: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Certificate Holder Address
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.certificate_holder_address}
-                      onChange={(e) => setFormData({ ...formData, certificate_holder_address: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Other Requirements */}
               <div className="bg-gray-50 rounded-lg p-4">
-                <h4 className="text-xs font-semibold text-gray-500 uppercase mb-3">Other Requirements</h4>
-                <div className="space-y-3">
-                  <div className="flex items-center gap-4">
-                    <label className="block text-sm font-medium text-gray-700">
-                      Cancellation Notice
-                    </label>
-                    <select
-                      value={formData.cancellation_notice_days}
-                      onChange={(e) => setFormData({ ...formData, cancellation_notice_days: parseInt(e.target.value) })}
-                      className="px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm"
-                    >
-                      <option value={10}>10 days</option>
-                      <option value={30}>30 days</option>
-                      <option value={60}>60 days</option>
-                    </select>
-                    <span className="text-sm text-gray-500">minimum notice required</span>
-                  </div>
-                  <div className="flex flex-wrap gap-4">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={formData.requires_declarations_page}
-                        onChange={(e) => setFormData({ ...formData, requires_declarations_page: e.target.checked })}
-                        className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
-                      />
-                      <span className="text-sm text-gray-700">Require Declarations Page</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={formData.requires_endorsement_pages}
-                        onChange={(e) => setFormData({ ...formData, requires_endorsement_pages: e.target.checked })}
-                        className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
-                      />
-                      <span className="text-sm text-gray-700">Require Endorsement Pages</span>
-                    </label>
-                  </div>
-                </div>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.requires_additional_insured}
+                    onChange={(e) => setFormData({ ...formData, requires_additional_insured: e.target.checked })}
+                    className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
+                  />
+                  <span className="text-sm text-gray-700">Require owner as additional insured</span>
+                </label>
               </div>
             </div>
           </div>
@@ -548,51 +419,88 @@ function TenantModal({ isOpen, onClose, onSave, tenant, properties, units }) {
 }
 
 // Main TenantsView component
-export function TenantsView({ properties }) {
+export function TenantsView({ properties, onSendRequest }) {
   const { tenants, loading, stats, addTenant, updateTenant, deleteTenant } = useTenants();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [sortBy, setSortBy] = useState('name');
   const [showModal, setShowModal] = useState(false);
   const [editingTenant, setEditingTenant] = useState(null);
-  const [units, setUnits] = useState([]);
   const [selectedTenant, setSelectedTenant] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [copySuccess, setCopySuccess] = useState(null);
+  const [sendingRequest, setSendingRequest] = useState(null);
 
-  // Load units
-  useEffect(() => {
-    const loadUnits = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+  // Filter and sort tenants
+  const filteredTenants = tenants
+    .filter(tenant => {
+      const matchesSearch = !searchQuery ||
+        tenant.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        tenant.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        tenant.property?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        tenant.unit?.unit_number?.toLowerCase().includes(searchQuery.toLowerCase());
 
-      const { data } = await supabase
-        .from('units')
-        .select('*')
-        .eq('user_id', user.id);
+      const matchesStatus = statusFilter === 'all' || tenant.insurance_status === statusFilter;
 
-      setUnits(data || []);
-    };
-    loadUnits();
-  }, []);
-
-  // Filter tenants
-  const filteredTenants = tenants.filter(tenant => {
-    const matchesSearch = !searchQuery ||
-      tenant.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      tenant.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      tenant.property?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      tenant.unit?.unit_number?.toLowerCase().includes(searchQuery.toLowerCase());
-
-    const matchesStatus = statusFilter === 'all' || tenant.insurance_status === statusFilter;
-
-    return matchesSearch && matchesStatus;
-  });
+      return matchesSearch && matchesStatus;
+    })
+    .sort((a, b) => {
+      if (sortBy === 'name') {
+        return (a.name || '').localeCompare(b.name || '');
+      } else if (sortBy === 'expiration') {
+        const dateA = a.policy_expiration_date ? new Date(a.policy_expiration_date) : new Date('9999-12-31');
+        const dateB = b.policy_expiration_date ? new Date(b.policy_expiration_date) : new Date('9999-12-31');
+        return dateA - dateB;
+      } else if (sortBy === 'status') {
+        const order = { expired: 0, 'non-compliant': 1, expiring: 2, pending: 3, compliant: 4 };
+        return (order[a.insurance_status] || 5) - (order[b.insurance_status] || 5);
+      }
+      return 0;
+    });
 
   const handleSave = async (formData) => {
+    // Handle unit creation/lookup
+    let unitId = null;
+    if (formData.unit_number && formData.unit_number.trim() && formData.property_id) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        // Check if unit already exists
+        const { data: existingUnit } = await supabase
+          .from('units')
+          .select('id')
+          .eq('property_id', formData.property_id)
+          .eq('user_id', user.id)
+          .eq('unit_number', formData.unit_number.trim())
+          .single();
+
+        if (existingUnit) {
+          unitId = existingUnit.id;
+        } else {
+          // Create new unit
+          const { data: newUnit } = await supabase
+            .from('units')
+            .insert({
+              user_id: user.id,
+              property_id: formData.property_id,
+              unit_number: formData.unit_number.trim()
+            })
+            .select('id')
+            .single();
+
+          if (newUnit) {
+            unitId = newUnit.id;
+          }
+        }
+      }
+    }
+
+    const saveData = { ...formData, unit_id: unitId };
+    delete saveData.unit_number;
+
     if (editingTenant) {
-      await updateTenant(editingTenant.id, formData);
+      await updateTenant(editingTenant.id, saveData);
     } else {
-      await addTenant(formData);
+      await addTenant(saveData);
     }
     setEditingTenant(null);
   };
@@ -610,19 +518,19 @@ export function TenantsView({ properties }) {
     setTimeout(() => setCopySuccess(null), 2000);
   };
 
-  const formatCurrency = (amount) => {
-    if (!amount) return 'N/A';
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(amount);
-  };
-
-  const formatDate = (date) => {
-    if (!date) return 'N/A';
-    return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const handleSendRequest = async (tenant) => {
+    if (!tenant.email || !onSendRequest) return;
+    setSendingRequest(tenant.id);
+    try {
+      await onSendRequest(tenant);
+    } finally {
+      setSendingRequest(null);
+    }
   };
 
   return (
     <div className="space-y-6">
-      {/* Stats Cards */}
+      {/* Stats Cards - Same style as vendors */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <button
           onClick={() => setStatusFilter('all')}
@@ -685,169 +593,211 @@ export function TenantsView({ properties }) {
         </button>
       </div>
 
-      {/* Search and Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search tenants..."
-            className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-          />
-        </div>
-        <div className="flex gap-2">
+      {/* Filters - Same style as vendors */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5">
+        <div className="flex flex-wrap gap-3 items-center">
+          {/* Search */}
+          <div className="flex-1 min-w-[200px]">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+              <input
+                type="text"
+                placeholder="Search tenants..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent bg-gray-50 transition-all"
+              />
+            </div>
+          </div>
+
+          {/* Sort */}
           <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            className="px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent bg-gray-50 font-medium text-gray-700"
           >
-            <option value="all">All Status</option>
-            <option value="compliant">Compliant</option>
-            <option value="non-compliant">Non-Compliant</option>
-            <option value="expiring">Expiring</option>
-            <option value="expired">Expired</option>
-            <option value="pending">Pending</option>
+            <option value="name">Sort: Name (A-Z)</option>
+            <option value="expiration">Sort: Expiration Date</option>
+            <option value="status">Sort: Status</option>
           </select>
+
+          {/* Add Tenant Button */}
           <button
             onClick={() => { setEditingTenant(null); setShowModal(true); }}
             className="px-4 py-2.5 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 font-medium flex items-center gap-2"
           >
-            <Plus size={20} />
+            <Plus size={18} />
             <span className="hidden sm:inline">Add Tenant</span>
           </button>
-        </div>
-      </div>
 
-      {/* Tenants List */}
-      {loading ? (
-        <div className="bg-white rounded-xl p-12 text-center border border-gray-200">
-          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-emerald-500 mx-auto mb-4" />
-          <p className="text-gray-500">Loading tenants...</p>
-        </div>
-      ) : filteredTenants.length === 0 ? (
-        <div className="bg-white rounded-xl p-12 text-center border border-gray-200">
-          <Users size={48} className="mx-auto text-gray-300 mb-4" />
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">
-            {tenants.length === 0 ? 'No tenants yet' : 'No matching tenants'}
-          </h3>
-          <p className="text-gray-500 mb-4">
-            {tenants.length === 0
-              ? 'Add your first tenant to start tracking their insurance compliance.'
-              : 'Try adjusting your search or filters.'}
-          </p>
-          {tenants.length === 0 && (
+          {/* Clear */}
+          {(searchQuery || statusFilter !== 'all' || sortBy !== 'name') && (
             <button
-              onClick={() => { setEditingTenant(null); setShowModal(true); }}
-              className="px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 font-medium inline-flex items-center gap-2"
+              onClick={() => {
+                setSearchQuery('');
+                setStatusFilter('all');
+                setSortBy('name');
+              }}
+              className="px-4 py-2.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-xl font-medium transition-all"
             >
-              <Plus size={18} />
-              Add Tenant
+              Clear Filters
             </button>
           )}
         </div>
-      ) : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="bg-gray-50 border-b border-gray-200">
-                  <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Tenant</th>
-                  <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Property / Unit</th>
-                  <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Lease</th>
-                  <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Insurance Status</th>
-                  <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Policy Expires</th>
-                  <th className="text-right px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {filteredTenants.map((tenant) => (
-                  <tr
-                    key={tenant.id}
-                    className="hover:bg-gray-50 cursor-pointer transition-colors"
-                    onClick={() => setSelectedTenant(tenant)}
+
+        {filteredTenants.length > 0 && (
+          <p className="text-sm text-gray-500 mt-4">
+            Showing {filteredTenants.length} of {tenants.length} tenants
+          </p>
+        )}
+      </div>
+
+      {/* Tenants List - Card style like vendors */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+        {loading ? (
+          <div className="p-12 text-center">
+            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500 mb-4"></div>
+            <p className="text-gray-600">Loading tenants...</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-gray-100">
+            {filteredTenants.length === 0 ? (
+              <div className="p-8 text-center">
+                <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <Users className="text-gray-400" size={32} />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  {searchQuery || statusFilter !== 'all'
+                    ? 'No tenants found'
+                    : 'No tenants yet'}
+                </h3>
+                <p className="text-gray-600 mb-6">
+                  {searchQuery || statusFilter !== 'all'
+                    ? 'Try adjusting your search or filters'
+                    : 'Add your first tenant to start tracking their insurance compliance.'}
+                </p>
+                {!searchQuery && statusFilter === 'all' && (
+                  <button
+                    onClick={() => { setEditingTenant(null); setShowModal(true); }}
+                    className="px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 font-medium inline-flex items-center gap-2"
                   >
-                    <td className="px-6 py-4">
-                      <div>
-                        <p className="font-medium text-gray-900">{tenant.name}</p>
-                        <div className="flex items-center gap-3 mt-1 text-sm text-gray-500">
-                          {tenant.email && (
-                            <span className="flex items-center gap-1">
-                              <Mail size={12} />
-                              {tenant.email}
-                            </span>
-                          )}
-                        </div>
+                    <Plus size={18} />
+                    Add Tenant
+                  </button>
+                )}
+              </div>
+            ) : (
+              filteredTenants.map((tenant) => (
+                <div key={tenant.id} className="p-5 hover:bg-gray-50 transition-colors">
+                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between space-y-3 sm:space-y-0">
+                    <div className="flex items-start space-x-4 flex-1">
+                      <div className="flex-shrink-0 mt-0.5">
+                        {getStatusIcon(tenant.insurance_status)}
                       </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <Building2 size={16} className="text-gray-400" />
-                        <div>
-                          <p className="text-sm text-gray-900">{tenant.property?.name || 'No property'}</p>
-                          {tenant.unit && (
-                            <p className="text-xs text-gray-500">Unit {tenant.unit.unit_number}</p>
-                          )}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-col sm:flex-row sm:items-center space-y-1 sm:space-y-0 sm:space-x-3 mb-2">
+                          <h3 className="text-base font-semibold text-gray-900 truncate">{tenant.name}</h3>
+                          {getStatusBadge(tenant.insurance_status)}
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm">
-                        {tenant.lease_start && tenant.lease_end ? (
-                          <>
-                            <p className="text-gray-900">{formatDate(tenant.lease_start)}</p>
-                            <p className="text-gray-500">to {formatDate(tenant.lease_end)}</p>
-                          </>
-                        ) : (
-                          <span className="text-gray-400">No lease dates</span>
+
+                        {/* Property & Unit */}
+                        {(tenant.property || tenant.unit) && (
+                          <p className="text-sm text-gray-500 mb-2 flex items-center gap-1.5">
+                            <Building2 size={14} />
+                            {tenant.property?.name || 'No property'}
+                            {tenant.unit && ` • Unit ${tenant.unit.unit_number}`}
+                          </p>
                         )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <StatusBadge status={tenant.insurance_status} />
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="text-sm text-gray-600">
-                        {tenant.policy_expiration_date ? formatDate(tenant.policy_expiration_date) : 'No policy'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
-                        <button
-                          onClick={() => copyUploadLink(tenant)}
-                          className="p-2 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
-                          title="Copy upload link"
-                        >
-                          {copySuccess === tenant.id ? (
-                            <CheckCircle size={18} className="text-emerald-600" />
-                          ) : (
-                            <ExternalLink size={18} />
+
+                        {/* Issues */}
+                        {tenant.compliance_issues && tenant.compliance_issues.length > 0 && (
+                          <div className="space-y-1.5 mt-2">
+                            {tenant.compliance_issues.map((issue, idx) => (
+                              <div key={idx} className="flex items-start space-x-2 text-sm text-orange-700">
+                                <AlertCircle size={14} className="mt-0.5 flex-shrink-0" />
+                                <span className="break-words">{typeof issue === 'string' ? issue : issue.message}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Coverage Tags */}
+                        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-600">
+                          <div className="bg-gray-100 px-2 py-1 rounded-lg">
+                            <span className="font-medium">Liability:</span> {formatCurrency(tenant.policy_liability_amount || tenant.required_liability_min)}
+                          </div>
+                          {tenant.requires_additional_insured && (
+                            <div className="bg-gray-100 px-2 py-1 rounded-lg">
+                              <span className="font-medium">Add'l Insured:</span> {tenant.has_additional_insured ? 'Yes' : 'Required'}
+                            </div>
                           )}
-                        </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-start space-x-2 sm:space-x-0 sm:space-y-2 sm:ml-4 pt-2 sm:pt-0 border-t sm:border-t-0 border-gray-100">
+                      {/* Expiration Date */}
+                      <div className="flex items-center text-sm text-gray-500 bg-gray-100 px-2.5 py-1 rounded-lg">
+                        <Calendar size={14} className="mr-1.5" />
+                        {tenant.policy_expiration_date ? formatDate(tenant.policy_expiration_date) : 'No policy'}
+                      </div>
+
+                      {/* Last Contacted */}
+                      {tenant.last_contacted_at && (
+                        <div className="flex items-center text-xs text-gray-500" title={`Last contacted: ${formatDate(tenant.last_contacted_at)}`}>
+                          <Mail size={12} className="mr-1" />
+                          <span>Contacted {formatRelativeDate(tenant.last_contacted_at)}</span>
+                        </div>
+                      )}
+
+                      {/* Action Buttons */}
+                      <div className="flex items-center space-x-2">
                         <button
                           onClick={() => { setEditingTenant(tenant); setShowModal(true); }}
-                          className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                          title="Edit tenant"
+                          className="text-sm text-blue-600 hover:text-blue-700 font-medium"
                         >
-                          <Edit2 size={18} />
+                          Edit
                         </button>
+                        <span className="text-gray-300">|</span>
                         <button
                           onClick={() => setDeleteConfirm(tenant)}
-                          className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                          title="Delete tenant"
+                          className="text-sm text-red-600 hover:text-red-700 font-medium"
                         >
-                          <Trash2 size={18} />
+                          Delete
                         </button>
                       </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+
+                      <button
+                        onClick={() => setSelectedTenant(tenant)}
+                        className="text-sm text-emerald-600 hover:text-emerald-700 font-semibold whitespace-nowrap"
+                      >
+                        View Details
+                      </button>
+
+                      {/* Request COI Button */}
+                      {(tenant.insurance_status === 'expired' || tenant.insurance_status === 'non-compliant' || tenant.insurance_status === 'expiring' || tenant.insurance_status === 'pending') && tenant.email && (
+                        <button
+                          onClick={() => handleSendRequest(tenant)}
+                          disabled={sendingRequest === tenant.id}
+                          className="text-xs bg-gradient-to-r from-orange-500 to-orange-600 text-white px-3 py-1.5 rounded-lg hover:shadow-md font-semibold whitespace-nowrap flex items-center space-x-1.5 transition-all disabled:opacity-50"
+                        >
+                          {sendingRequest === tenant.id ? (
+                            <Loader2 size={12} className="animate-spin" />
+                          ) : (
+                            <Send size={12} />
+                          )}
+                          <span className="hidden sm:inline">Request COI</span>
+                          <span className="sm:hidden">Request</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Add/Edit Modal */}
       <TenantModal
@@ -856,7 +806,6 @@ export function TenantsView({ properties }) {
         onSave={handleSave}
         tenant={editingTenant}
         properties={properties}
-        units={units}
       />
 
       {/* Delete Confirmation */}
@@ -901,8 +850,7 @@ export function TenantsView({ properties }) {
             <div className="p-6 space-y-6">
               {/* Status */}
               <div className="flex items-center gap-3">
-                <StatusBadge status={selectedTenant.insurance_status} />
-                <TenantStatusBadge status={selectedTenant.status} />
+                {getStatusBadge(selectedTenant.insurance_status)}
               </div>
 
               {/* Contact Info */}
@@ -958,12 +906,6 @@ export function TenantsView({ properties }) {
                     <span className="text-gray-600">Min. Liability</span>
                     <span className="font-medium text-gray-900">{formatCurrency(selectedTenant.required_liability_min)}</span>
                   </div>
-                  {selectedTenant.required_property_damage_min > 0 && (
-                    <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                      <span className="text-gray-600">Property Damage</span>
-                      <span className="font-medium text-gray-900">{formatCurrency(selectedTenant.required_property_damage_min)}</span>
-                    </div>
-                  )}
                   <div className="flex justify-between items-center py-2 border-b border-gray-100">
                     <span className="text-gray-600">Additional Insured</span>
                     <span className={`font-medium ${selectedTenant.requires_additional_insured ? 'text-emerald-600' : 'text-gray-400'}`}>
@@ -974,23 +916,13 @@ export function TenantsView({ properties }) {
               </div>
 
               {/* Current Policy */}
-              {selectedTenant.carrier && (
+              {selectedTenant.policy_expiration_date && (
                 <div>
                   <h3 className="text-sm font-semibold text-gray-500 mb-2">Current Policy</h3>
                   <div className="bg-gray-50 rounded-lg p-3 space-y-2">
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Carrier</span>
-                      <span className="font-medium text-gray-900">{selectedTenant.carrier}</span>
-                    </div>
-                    {selectedTenant.policy_number && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Policy #</span>
-                        <span className="font-medium text-gray-900">{selectedTenant.policy_number}</span>
-                      </div>
-                    )}
-                    <div className="flex justify-between">
                       <span className="text-gray-600">Liability Coverage</span>
-                      <span className="font-medium text-gray-900">{formatCurrency(selectedTenant.liability_coverage)}</span>
+                      <span className="font-medium text-gray-900">{formatCurrency(selectedTenant.policy_liability_amount)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Expires</span>
@@ -1001,11 +933,11 @@ export function TenantsView({ properties }) {
               )}
 
               {/* Issues */}
-              {selectedTenant.issues && selectedTenant.issues.length > 0 && (
+              {selectedTenant.compliance_issues && selectedTenant.compliance_issues.length > 0 && (
                 <div>
                   <h3 className="text-sm font-semibold text-gray-500 mb-2">Compliance Issues</h3>
                   <div className="space-y-2">
-                    {selectedTenant.issues.map((issue, i) => (
+                    {selectedTenant.compliance_issues.map((issue, i) => (
                       <div key={i} className="flex items-start gap-2 p-2 bg-red-50 rounded-lg">
                         <XCircle size={16} className="text-red-500 mt-0.5 flex-shrink-0" />
                         <span className="text-sm text-red-700">{typeof issue === 'string' ? issue : issue.message}</span>
@@ -1026,9 +958,15 @@ export function TenantsView({ properties }) {
                 </button>
                 {selectedTenant.email && (
                   <button
-                    className="w-full px-4 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 font-medium flex items-center justify-center gap-2"
+                    onClick={() => handleSendRequest(selectedTenant)}
+                    disabled={sendingRequest === selectedTenant.id}
+                    className="w-full px-4 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 font-medium flex items-center justify-center gap-2 disabled:opacity-50"
                   >
-                    <Send size={18} />
+                    {sendingRequest === selectedTenant.id ? (
+                      <Loader2 size={18} className="animate-spin" />
+                    ) : (
+                      <Send size={18} />
+                    )}
                     Send Insurance Request
                   </button>
                 )}
