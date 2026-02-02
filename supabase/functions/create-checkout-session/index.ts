@@ -101,7 +101,7 @@ serve(async (req) => {
 
     const origin = req.headers.get('origin') || 'https://your-app.com';
 
-    // Create checkout session
+    // Create checkout session with 14-day free trial
     const session = await stripeRequest('/checkout/sessions', 'POST', {
       customer: customerId,
       'payment_method_types[0]': 'card',
@@ -112,6 +112,7 @@ serve(async (req) => {
       cancel_url: `${origin}/pricing?checkout=cancelled`,
       'subscription_data[metadata][supabase_user_id]': user.id,
       'subscription_data[metadata][plan]': plan,
+      'subscription_data[trial_period_days]': '14',
       allow_promotion_codes: 'true',
       billing_address_collection: 'required',
     });
