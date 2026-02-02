@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Upload, CheckCircle, XCircle, AlertCircle, FileText, Calendar, X, Search, Download, Settings as SettingsIcon, Eye, Bell, FileDown, Phone, Mail, User, Send, Clock, History, FileCheck, Building2, ChevronDown, CreditCard, Users, Home, LayoutDashboard, Loader2 } from 'lucide-react';
+import { Upload, CheckCircle, XCircle, AlertCircle, FileText, Calendar, X, Search, Download, Settings as SettingsIcon, Eye, Bell, FileDown, Phone, Mail, User, Send, Clock, History, FileCheck, Building2, ChevronDown, CreditCard, Users, LayoutDashboard, Loader2 } from 'lucide-react';
 import { useVendors } from './useVendors';
 import { useTenants } from './useTenants';
 import { useSubscription } from './useSubscription';
@@ -13,7 +13,6 @@ import { exportPDFReport } from './exportPDFReport';
 import { Logo } from './Logo';
 import Properties from './Properties';
 import { TenantsView } from './TenantsView';
-import { UnitsManager } from './UnitsManager';
 import { Dashboard } from './Dashboard';
 import { isValidEmail } from './validation';
 import logger from './logger';
@@ -21,7 +20,6 @@ import logger from './logger';
 function ComplyApp({ user, onSignOut, onShowPricing }) {
   // Active tab state
   const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard', 'vendors', or 'tenants'
-  const [showUnitsManager, setShowUnitsManager] = useState(false);
   const [showSmartUpload, setShowSmartUpload] = useState(false);
 
   // Properties state
@@ -1006,15 +1004,6 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
                 Tenants
               </button>
             </nav>
-            {activeTab === 'tenants' && (
-              <button
-                onClick={() => setShowUnitsManager(true)}
-                className="px-3 py-1.5 text-sm font-medium text-gray-600 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors flex items-center gap-1.5"
-              >
-                <Home size={16} />
-                Manage Units
-              </button>
-            )}
           </div>
         </div>
       </div>
@@ -1027,7 +1016,6 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
         <Dashboard
           vendors={vendors}
           tenants={dbTenants}
-          onUploadClick={() => setShowSmartUpload(true)}
           onViewVendors={() => setActiveTab('vendors')}
           onViewTenants={() => setActiveTab('tenants')}
           onSelectVendor={(vendor) => {
@@ -1944,13 +1932,6 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
         <TenantsView properties={properties} />
       )}
       </div>
-
-      {/* Units Manager Modal */}
-      <UnitsManager
-        isOpen={showUnitsManager}
-        onClose={() => setShowUnitsManager(false)}
-        properties={properties}
-      />
 
       {/* Upload Modal */}
       <SmartUploadModal

@@ -28,9 +28,7 @@ export function SmartUploadModal({
   const [step, setStep] = useState(1);
   const [documentType, setDocumentType] = useState(null); // 'vendor' or 'tenant'
   const [selectedPropertyId, setSelectedPropertyId] = useState('');
-  const [selectedUnitId, setSelectedUnitId] = useState('');
-  const [units, setUnits] = useState([]);
-  const [loadingUnits, setLoadingUnits] = useState(false);
+  const [unitNumber, setUnitNumber] = useState(''); // User enters unit number directly
 
   // Contact info (for both vendors and tenants)
   const [contactName, setContactName] = useState('');
@@ -97,7 +95,7 @@ export function SmartUploadModal({
         setSelectedPropertyId('');
       }
 
-      setSelectedUnitId('');
+      setUnitNumber('');
       loadTenantDefaults();
     }
   }, [isOpen, initialProperty, properties]);
@@ -108,37 +106,6 @@ export function SmartUploadModal({
       localStorage.setItem(LAST_PROPERTY_KEY, selectedPropertyId);
     }
   }, [selectedPropertyId]);
-
-  // Load units when property changes
-  useEffect(() => {
-    if (selectedPropertyId && documentType === 'tenant') {
-      loadUnits(selectedPropertyId);
-    } else {
-      setUnits([]);
-      setSelectedUnitId('');
-    }
-  }, [selectedPropertyId, documentType]);
-
-  const loadUnits = async (propertyId) => {
-    try {
-      setLoadingUnits(true);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data } = await supabase
-        .from('units')
-        .select('*')
-        .eq('property_id', propertyId)
-        .eq('user_id', user.id)
-        .order('unit_number', { ascending: true });
-
-      setUnits(data || []);
-    } catch (err) {
-      logger.error('Error loading units', err);
-    } finally {
-      setLoadingUnits(false);
-    }
-  };
 
   const handleDrag = (e) => {
     e.preventDefault();
@@ -399,6 +366,38 @@ export function SmartUploadModal({
       // Use extracted name or provided name
       const tenantName = contactName || data.name || data.companyName || 'New Tenant';
 
+      // Create unit if unit number was provided
+      let unitId = null;
+      if (unitNumber && unitNumber.trim() && selectedPropertyId) {
+        // Check if unit already exists
+        const { data: existingUnit } = await supabase
+          .from('units')
+          .select('id')
+          .eq('property_id', selectedPropertyId)
+          .eq('user_id', user.id)
+          .eq('unit_number', unitNumber.trim())
+          .single();
+
+        if (existingUnit) {
+          unitId = existingUnit.id;
+        } else {
+          // Create new unit
+          const { data: newUnit, error: unitError } = await supabase
+            .from('units')
+            .insert({
+              user_id: user.id,
+              property_id: selectedPropertyId,
+              unit_number: unitNumber.trim()
+            })
+            .select('id')
+            .single();
+
+          if (!unitError && newUnit) {
+            unitId = newUnit.id;
+          }
+        }
+      }
+
       // Create tenant record
       const tenantData = {
         user_id: user.id,
@@ -406,7 +405,7 @@ export function SmartUploadModal({
         email: contactEmail || '',
         phone: '',
         property_id: selectedPropertyId || null,
-        unit_id: selectedUnitId || null,
+        unit_id: unitId,
         status: 'active',
         insurance_status: insuranceStatus,
         // Lease requirements (from defaults)
@@ -578,30 +577,20 @@ export function SmartUploadModal({
                 </select>
               </div>
 
-              {/* Unit Selection (for tenants) */}
+              {/* Unit Number Input (for tenants) */}
               {documentType === 'tenant' && selectedPropertyId && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     <Home size={16} className="inline mr-2" />
-                    Unit (Optional)
+                    Unit Number (Optional)
                   </label>
-                  {loadingUnits ? (
-                    <div className="flex items-center gap-2 text-gray-500 py-2">
-                      <Loader2 size={16} className="animate-spin" />
-                      <span>Loading units...</span>
-                    </div>
-                  ) : (
-                    <select
-                      value={selectedUnitId}
-                      onChange={(e) => setSelectedUnitId(e.target.value)}
-                      className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                    >
-                      <option value="">Select a unit...</option>
-                      {units.map(u => (
-                        <option key={u.id} value={u.id}>{u.unit_number}</option>
-                      ))}
-                    </select>
-                  )}
+                  <input
+                    type="text"
+                    value={unitNumber}
+                    onChange={(e) => setUnitNumber(e.target.value)}
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                    placeholder="e.g., 101, A, 2B"
+                  />
                 </div>
               )}
 
@@ -712,7 +701,7 @@ export function SmartUploadModal({
                 <p className={`text-sm ${documentType === 'vendor' ? 'text-blue-700' : 'text-purple-700'}`}>
                   {selectedProp?.name}
                   {contactName && ` • ${contactName}`}
-                  {selectedUnitId && units.find(u => u.id === selectedUnitId) && ` • Unit ${units.find(u => u.id === selectedUnitId).unit_number}`}
+                  {unitNumber && unitNumber.trim() && ` • Unit ${unitNumber.trim()}`}
                 </p>
                 {contactEmail && (
                   <p className={`text-xs mt-1 ${documentType === 'vendor' ? 'text-blue-600' : 'text-purple-600'}`}>

@@ -1,7 +1,7 @@
 // Dashboard.jsx - Unified compliance dashboard for vendors and tenants
 import React, { useMemo } from 'react';
 import {
-  CheckCircle, XCircle, AlertCircle, Clock, Upload,
+  CheckCircle, XCircle, AlertCircle, Clock,
   FileText, Users, ChevronRight, TrendingUp
 } from 'lucide-react';
 
@@ -16,7 +16,6 @@ const formatDate = (dateString) => {
 export function Dashboard({
   vendors = [],
   tenants = [],
-  onUploadClick,
   onViewVendors,
   onViewTenants,
   onSelectVendor,
@@ -170,25 +169,16 @@ export function Dashboard({
 
   return (
     <div className="space-y-6">
-      {/* Welcome Banner with Upload CTA */}
+      {/* Welcome Banner */}
       <div className="bg-gradient-to-r from-emerald-600 to-teal-600 rounded-2xl p-6 text-white">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold mb-2">Compliance Dashboard</h1>
-            <p className="text-emerald-100">
-              {combinedStats.total === 0
-                ? 'Upload your first COI to get started'
-                : `Tracking ${combinedStats.total} certificates across vendors and tenants`
-              }
-            </p>
-          </div>
-          <button
-            onClick={onUploadClick}
-            className="px-6 py-3 bg-white text-emerald-700 rounded-xl font-semibold hover:bg-emerald-50 transition-colors flex items-center gap-2 shadow-lg"
-          >
-            <Upload size={20} />
-            Upload COI
-          </button>
+        <div>
+          <h1 className="text-2xl font-bold mb-2">Compliance Dashboard</h1>
+          <p className="text-emerald-100">
+            {combinedStats.total === 0
+              ? 'Upload your first COI to get started'
+              : `Tracking ${combinedStats.total} certificates across vendors and tenants`
+            }
+          </p>
         </div>
       </div>
 
