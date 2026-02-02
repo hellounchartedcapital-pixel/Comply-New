@@ -28,12 +28,32 @@ if (process.env.REACT_APP_SENTRY_DSN) {
     // Don't send PII
     sendDefaultPii: false,
   });
+}
 
-  // Expose test function for Sentry verification (can be removed after testing)
-  window.testSentry = () => {
-    Sentry.captureException(new Error('Test error from SmartCOI - Sentry is working!'));
-    console.log('Test error sent to Sentry!');
-  };
+// TEMPORARY: Sentry test button - REMOVE AFTER VERIFICATION
+function SentryTestButton() {
+  return (
+    <button
+      onClick={() => {
+        throw new Error('Test error from SmartCOI - Sentry is working!');
+      }}
+      style={{
+        position: 'fixed',
+        bottom: '20px',
+        right: '20px',
+        padding: '10px 20px',
+        background: '#dc2626',
+        color: 'white',
+        border: 'none',
+        borderRadius: '8px',
+        cursor: 'pointer',
+        zIndex: 9999,
+        fontSize: '14px',
+      }}
+    >
+      Test Sentry Error
+    </button>
+  );
 }
 
 function AppContent() {
@@ -166,6 +186,8 @@ export default function App() {
       <AuthProvider>
         <AppContent />
       </AuthProvider>
+      {/* TEMPORARY: Remove after Sentry verification */}
+      {process.env.REACT_APP_SENTRY_DSN && <SentryTestButton />}
     </ErrorBoundary>
   )
 }
