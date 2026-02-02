@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from './supabaseClient';
+import logger from './logger';
 
 const PAGE_SIZE = 50;
 
@@ -144,7 +145,7 @@ export function useVendors(propertyId = null) {
 
       setHasMore(newVendors.length === PAGE_SIZE);
     } catch (err) {
-      console.error('Error fetching vendors:', err);
+      logger.error('Error fetching vendors', err);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -211,7 +212,7 @@ export function useVendors(propertyId = null) {
       setTotalCount(prev => prev + 1);
       return { success: true, data };
     } catch (err) {
-      console.error('Error adding vendor:', err);
+      logger.error('Error adding vendor', err);
       return { success: false, error: err.message };
     }
   };
@@ -250,7 +251,7 @@ export function useVendors(propertyId = null) {
       setVendors(prev => prev.map(v => v.id === id ? data : v));
       return { success: true, data };
     } catch (err) {
-      console.error('Error updating vendor:', err);
+      logger.error('Error updating vendor', err);
       return { success: false, error: err.message };
     }
   };
@@ -276,14 +277,14 @@ export function useVendors(propertyId = null) {
         throw new Error('Vendor not found or already deleted');
       }
 
-      console.log('Successfully deleted vendor:', id);
+      logger.info('Successfully deleted vendor', id);
 
       // Remove from local state
       setVendors(prev => prev.filter(v => v.id !== id));
       setTotalCount(prev => prev - 1);
       return { success: true };
     } catch (err) {
-      console.error('Error deleting vendor:', err);
+      logger.error('Error deleting vendor', err);
       return { success: false, error: err.message };
     }
   };

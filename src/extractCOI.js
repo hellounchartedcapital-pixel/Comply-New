@@ -1,4 +1,5 @@
 import { supabase } from './supabaseClient';
+import logger from './logger';
 
 const MAX_RETRIES = 3;
 const INITIAL_DELAY_MS = 1000;
@@ -24,7 +25,7 @@ async function withRetry(fn, retries = MAX_RETRIES, delay = INITIAL_DELAY_MS) {
 
       if (attempt < retries) {
         const waitTime = delay * Math.pow(2, attempt);
-        console.log(`Attempt ${attempt + 1} failed, retrying in ${waitTime}ms...`);
+        logger.info(`Attempt ${attempt + 1} failed, retrying in ${waitTime}ms...`);
         await new Promise(resolve => setTimeout(resolve, waitTime));
       }
     }
@@ -40,7 +41,7 @@ async function withRetry(fn, retries = MAX_RETRIES, delay = INITIAL_DELAY_MS) {
  */
 export async function extractCOIFromPDF(file, userRequirements = null) {
   try {
-    console.log('Converting PDF to base64...');
+    logger.info('Converting PDF to base64...');
 
     // Set default requirements if not provided
     const requirements = userRequirements || {
@@ -62,7 +63,7 @@ export async function extractCOIFromPDF(file, userRequirements = null) {
       reader.readAsDataURL(file);
     });
 
-    console.log('Calling extraction service...');
+    logger.info('Calling extraction service...');
 
     // Call the Edge Function with retry logic
     const { data, error } = await withRetry(async () => {
@@ -105,7 +106,7 @@ export async function extractCOIFromPDF(file, userRequirements = null) {
         if (expDate) {
           const todayLocal = new Date(today.getFullYear(), today.getMonth(), today.getDate());
           const daysUntil = Math.floor((expDate - todayLocal) / (1000 * 60 * 60 * 24));
-          console.log(`${name} expires ${coverage.expirationDate}, days until expiration: ${daysUntil}`);
+          logger.debug(`${name} expires ${coverage.expirationDate}, days until expiration: ${daysUntil}`);
           if (daysUntil < 0) {
             coverage.expired = true;
           } else if (daysUntil <= 30) {
@@ -130,11 +131,11 @@ export async function extractCOIFromPDF(file, userRequirements = null) {
       });
     }
 
-    console.log('Extracted vendor data:', vendorData);
+    logger.info('Extracted vendor data:', vendorData);
     return { success: true, data: vendorData };
 
   } catch (error) {
-    console.error('PDF extraction error:', error);
+    logger.error('PDF extraction error', error);
     return {
       success: false,
       error: error.message || 'Failed to extract data from PDF'

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from './supabaseClient';
+import logger from './logger';
 
 export function useTenants(propertyId = null) {
   const [tenants, setTenants] = useState([]);
@@ -39,7 +40,7 @@ export function useTenants(propertyId = null) {
       setTenants(data || []);
       setTotalCount(count || 0);
     } catch (err) {
-      console.error('Error loading tenants:', err);
+      logger.error('Error loading tenants', err);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -81,7 +82,7 @@ export function useTenants(propertyId = null) {
       setTotalCount(prev => prev + 1);
       return data;
     } catch (err) {
-      console.error('Error adding tenant:', err);
+      logger.error('Error adding tenant', err);
       throw err;
     }
   }, []);
@@ -104,7 +105,7 @@ export function useTenants(propertyId = null) {
       setTenants(prev => prev.map(t => t.id === id ? data : t));
       return data;
     } catch (err) {
-      console.error('Error updating tenant:', err);
+      logger.error('Error updating tenant', err);
       throw err;
     }
   }, []);
@@ -121,7 +122,7 @@ export function useTenants(propertyId = null) {
       setTenants(prev => prev.filter(t => t.id !== id));
       setTotalCount(prev => prev - 1);
     } catch (err) {
-      console.error('Error deleting tenant:', err);
+      logger.error('Error deleting tenant', err);
       throw err;
     }
   }, []);
@@ -147,7 +148,7 @@ export function useTenants(propertyId = null) {
       setTenants(prev => prev.map(t => t.id === id ? { ...t, ...data } : t));
       return data;
     } catch (err) {
-      console.error('Error regenerating token:', err);
+      logger.error('Error regenerating token', err);
       throw err;
     }
   }, []);
