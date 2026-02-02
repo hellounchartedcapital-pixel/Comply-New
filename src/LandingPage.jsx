@@ -559,7 +559,7 @@ export function LandingPage({ onLogin, onSignUp, onPrivacy, onTerms, onPricing }
       vendors: "Up to 25 certificates",
       features: [
         "Everything in Free",
-        "CSV export",
+        "CSV & PDF export",
         "Automated follow-ups",
       ],
       cta: "Start Free Trial",
@@ -587,8 +587,8 @@ export function LandingPage({ onLogin, onSignUp, onPrivacy, onTerms, onPricing }
       vendors: "Up to 500 certificates",
       features: [
         "Everything in Professional",
-        "API access",
         "Dedicated support",
+        "Custom integrations",
       ],
       cta: "Start Free Trial",
       popular: false,
