@@ -1,0 +1,6 @@
+# SmartCOI robots.txt
+User-agent: *
+Allow: /
+
+# Sitemap location
+Sitemap: https://smartcoi.io/sitemap.xml
