@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from './supabaseClient';
 import logger from './logger';
 import { recalculateVendorStatus } from './utils/complianceUtils';
@@ -13,12 +13,16 @@ export function useVendors(propertyId = null) {
   const [hasMore, setHasMore] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
 
+  // Use ref to track current vendor count for pagination without causing re-renders
+  const vendorCountRef = useRef(0);
+
   // Fetch vendors with pagination
   const fetchVendors = useCallback(async (reset = true) => {
     try {
       if (reset) {
         setLoading(true);
         setVendors([]);
+        vendorCountRef.current = 0;
       } else {
         setLoadingMore(true);
       }
@@ -27,7 +31,7 @@ export function useVendors(propertyId = null) {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      const startIndex = reset ? 0 : vendors.length;
+      const startIndex = reset ? 0 : vendorCountRef.current;
       const endIndex = startIndex + PAGE_SIZE - 1;
 
       // Build query with optional property filter
@@ -64,8 +68,13 @@ export function useVendors(propertyId = null) {
 
       if (reset) {
         setVendors(newVendors);
+        vendorCountRef.current = newVendors.length;
       } else {
-        setVendors(prev => [...prev, ...newVendors]);
+        setVendors(prev => {
+          const updated = [...prev, ...newVendors];
+          vendorCountRef.current = updated.length;
+          return updated;
+        });
       }
 
       setHasMore(newVendors.length === PAGE_SIZE);
@@ -76,7 +85,7 @@ export function useVendors(propertyId = null) {
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [vendors.length, propertyId]);
+  }, [propertyId]); // Removed vendors.length to prevent infinite loop
 
   // Load more vendors
   const loadMore = useCallback(() => {
@@ -133,7 +142,11 @@ export function useVendors(propertyId = null) {
       if (error) throw error;
 
       // Add to local state at the beginning
-      setVendors(prev => [data, ...prev]);
+      setVendors(prev => {
+        const updated = [data, ...prev];
+        vendorCountRef.current = updated.length;
+        return updated;
+      });
       setTotalCount(prev => prev + 1);
       return { success: true, data };
     } catch (err) {
@@ -205,7 +218,11 @@ export function useVendors(propertyId = null) {
       logger.info('Successfully deleted vendor', id);
 
       // Remove from local state
-      setVendors(prev => prev.filter(v => v.id !== id));
+      setVendors(prev => {
+        const updated = prev.filter(v => v.id !== id);
+        vendorCountRef.current = updated.length;
+        return updated;
+      });
       setTotalCount(prev => prev - 1);
       return { success: true };
     } catch (err) {

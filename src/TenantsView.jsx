@@ -7,6 +7,7 @@ import {
 import { useTenants } from './useTenants';
 import { supabase } from './supabaseClient';
 import { formatCurrency, formatDate, formatRelativeDate, getStatusConfig } from './utils/complianceUtils';
+import { AlertModal, useAlertModal } from './AlertModal';
 
 // Status icon component (matches vendor style)
 function getStatusIcon(status) {
@@ -380,6 +381,7 @@ function TenantModal({ isOpen, onClose, onSave, tenant, properties }) {
 // Main TenantsView component
 export function TenantsView({ properties, userRequirements }) {
   const { tenants, loading, stats, addTenant, updateTenant, deleteTenant, refreshTenants } = useTenants();
+  const { alertModal, showAlert, hideAlert } = useAlertModal();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [sortBy, setSortBy] = useState('name');
@@ -582,7 +584,12 @@ export function TenantsView({ properties, userRequirements }) {
 
     } catch (error) {
       console.error('Failed to send tenant COI request:', error);
-      alert(`Failed to send request: ${error.message}`);
+      showAlert({
+        type: 'error',
+        title: 'Request Failed',
+        message: 'Failed to send the COI request email.',
+        details: error.message
+      });
     } finally {
       setSendingRequest(null);
     }
@@ -706,7 +713,12 @@ export function TenantsView({ properties, userRequirements }) {
 
     } catch (error) {
       console.error('Bulk request failed:', error);
-      alert(`Bulk request failed: ${error.message}`);
+      showAlert({
+        type: 'error',
+        title: 'Bulk Request Failed',
+        message: 'Failed to send bulk COI requests.',
+        details: error.message
+      });
     } finally {
       setBulkRequesting(false);
     }
@@ -1212,6 +1224,9 @@ export function TenantsView({ properties, userRequirements }) {
           </div>
         </div>
       )}
+
+      {/* Alert Modal */}
+      <AlertModal {...alertModal} onClose={hideAlert} />
     </div>
   );
 }

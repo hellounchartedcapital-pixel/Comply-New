@@ -148,6 +148,9 @@ export function SmartUploadModal({
     setUploadStatus('Uploading document...');
     setError(null);
 
+    // Track uploaded file path for cleanup on failure
+    let uploadedFilePath = null;
+
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
@@ -161,6 +164,7 @@ export function SmartUploadModal({
         .upload(fileName, file);
 
       if (uploadError) throw uploadError;
+      uploadedFilePath = fileName; // Track for cleanup on failure
 
       // Convert file to base64 for AI extraction
       setUploadStatus('Analyzing document...');
@@ -218,6 +222,16 @@ export function SmartUploadModal({
     } catch (err) {
       logger.error('Upload error', err);
       setError(err.message || 'Failed to process upload');
+
+      // Cleanup: Delete uploaded file if it exists and the processing failed
+      if (uploadedFilePath) {
+        try {
+          await supabase.storage.from('coi-documents').remove([uploadedFilePath]);
+          logger.info('Cleaned up orphaned file:', uploadedFilePath);
+        } catch (cleanupErr) {
+          logger.error('Failed to cleanup orphaned file', cleanupErr);
+        }
+      }
     } finally {
       setUploading(false);
       setUploadStatus('');
