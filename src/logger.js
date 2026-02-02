@@ -1,6 +1,7 @@
 // Production-safe logging utility
-// In production, logs are suppressed unless explicitly enabled
-// Can be extended to send errors to external services like Sentry
+// In production, logs are suppressed and errors are sent to Sentry
+
+import * as Sentry from '@sentry/react';
 
 const isDev = process.env.NODE_ENV !== 'production';
 const isDebugEnabled = process.env.REACT_APP_DEBUG === 'true';
@@ -29,18 +30,25 @@ export const logger = {
 
   /**
    * Log error messages
-   * In production, these could be sent to an error tracking service
+   * In production, errors are sent to Sentry
    */
   error: (message, error = null, context = {}) => {
     if (isDev || isDebugEnabled) {
       console.error('[ERROR]', message, error, context);
     }
 
-    // In production, send to error tracking service
-    if (!isDev && error) {
-      // TODO: Integrate with Sentry or similar
-      // Example:
-      // Sentry.captureException(error, { extra: { message, ...context } });
+    // In production, send to Sentry
+    if (!isDev && process.env.REACT_APP_SENTRY_DSN) {
+      if (error instanceof Error) {
+        Sentry.captureException(error, {
+          extra: { message, ...context }
+        });
+      } else {
+        Sentry.captureMessage(message, {
+          level: 'error',
+          extra: { error, ...context }
+        });
+      }
     }
   },
 
@@ -55,16 +63,11 @@ export const logger = {
 
   /**
    * Track an event for analytics
-   * Can be extended to send to analytics services
    */
   track: (eventName, properties = {}) => {
     if (isDev) {
       console.log('[TRACK]', eventName, properties);
     }
-
-    // In production, send to analytics
-    // Example:
-    // analytics.track(eventName, properties);
   }
 };
 
