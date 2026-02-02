@@ -165,8 +165,10 @@ serve(async (req) => {
     const subject = `Action Required: Updated Certificate of Insurance Needed - ${vendorName}`;
 
     // Build upload link if token is provided
+    // Use query params to match App.jsx routing: ?upload= for vendors, ?tenant_upload= for tenants
     const baseUrl = appUrl || 'https://smartcoi.io';
-    const uploadLink = uploadToken ? `${baseUrl}/upload/${uploadToken}` : null;
+    const uploadParam = isTenant ? 'tenant_upload' : 'upload';
+    const uploadLink = uploadToken ? `${baseUrl}?${uploadParam}=${uploadToken}` : null;
 
     const htmlContent = `
 <!DOCTYPE html>
