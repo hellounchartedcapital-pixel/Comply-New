@@ -1929,7 +1929,7 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
 
       {/* Tenants Tab Content */}
       {activeTab === 'tenants' && (
-        <TenantsView properties={properties} />
+        <TenantsView properties={properties} userRequirements={userRequirements} />
       )}
       </div>
 

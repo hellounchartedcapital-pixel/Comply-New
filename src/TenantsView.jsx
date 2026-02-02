@@ -419,8 +419,8 @@ function TenantModal({ isOpen, onClose, onSave, tenant, properties }) {
 }
 
 // Main TenantsView component
-export function TenantsView({ properties, onSendRequest }) {
-  const { tenants, loading, stats, addTenant, updateTenant, deleteTenant } = useTenants();
+export function TenantsView({ properties, userRequirements }) {
+  const { tenants, loading, stats, addTenant, updateTenant, deleteTenant, refreshTenants } = useTenants();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [sortBy, setSortBy] = useState('name');
@@ -430,6 +430,7 @@ export function TenantsView({ properties, onSendRequest }) {
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [copySuccess, setCopySuccess] = useState(null);
   const [sendingRequest, setSendingRequest] = useState(null);
+  const [requestSuccess, setRequestSuccess] = useState(null);
 
   // Filter and sort tenants
   const filteredTenants = tenants
@@ -519,10 +520,94 @@ export function TenantsView({ properties, onSendRequest }) {
   };
 
   const handleSendRequest = async (tenant) => {
-    if (!tenant.email || !onSendRequest) return;
+    if (!tenant.email) return;
     setSendingRequest(tenant.id);
+    setRequestSuccess(null);
+
     try {
-      await onSendRequest(tenant);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      // Generate upload token if needed
+      let uploadToken = tenant.upload_token;
+      if (!uploadToken) {
+        uploadToken = crypto.randomUUID();
+        const tokenExpiresAt = new Date();
+        tokenExpiresAt.setDate(tokenExpiresAt.getDate() + 30);
+
+        await supabase
+          .from('tenants')
+          .update({
+            upload_token: uploadToken,
+            upload_token_expires_at: tokenExpiresAt.toISOString()
+          })
+          .eq('id', tenant.id);
+      }
+
+      const appUrl = window.location.origin;
+      const companyName = userRequirements?.company_name || 'Our Company';
+
+      // Get tenant's property for requirements
+      const tenantProperty = properties?.find(p => p.id === tenant.property_id);
+
+      // Build requirements from tenant or property settings
+      const requirements = {
+        generalLiability: tenant.required_liability_min || tenantProperty?.general_liability || 100000,
+        autoLiability: tenant.required_auto_liability_min || null,
+        workersComp: tenant.required_workers_comp || false,
+        employersLiability: tenant.required_employers_liability_min || null,
+        additionalInsured: tenant.requires_additional_insured !== false,
+        waiverOfSubrogation: false,
+      };
+
+      // Determine issues based on status
+      const issues = [];
+      if (tenant.insurance_status === 'expired') {
+        issues.push('Certificate has expired');
+      } else if (tenant.insurance_status === 'non-compliant') {
+        issues.push('Certificate does not meet requirements');
+      } else if (tenant.insurance_status === 'pending') {
+        issues.push('No certificate on file');
+      }
+
+      // Call the edge function
+      const { data: result, error: fnError } = await supabase.functions.invoke('send-coi-request', {
+        body: {
+          to: tenant.email,
+          vendorName: tenant.name, // Reuse vendor template for now
+          vendorStatus: tenant.insurance_status,
+          issues: issues,
+          companyName: companyName,
+          replyTo: user.email,
+          uploadToken: uploadToken,
+          appUrl: appUrl,
+          requirements: requirements,
+          propertyName: tenantProperty?.name || null,
+          isTenant: true, // Flag for tenant-specific handling
+        },
+      });
+
+      if (fnError) {
+        throw new Error(fnError.message || 'Failed to send email');
+      }
+
+      if (result && !result.success) {
+        throw new Error(result.error || 'Failed to send email');
+      }
+
+      // Update last contacted timestamp
+      await supabase
+        .from('tenants')
+        .update({ last_contacted_at: new Date().toISOString() })
+        .eq('id', tenant.id);
+
+      setRequestSuccess(tenant.id);
+      setTimeout(() => setRequestSuccess(null), 3000);
+      refreshTenants();
+
+    } catch (error) {
+      console.error('Failed to send tenant COI request:', error);
+      alert(`Failed to send request: ${error.message}`);
     } finally {
       setSendingRequest(null);
     }
@@ -776,19 +861,26 @@ export function TenantsView({ properties, onSendRequest }) {
 
                       {/* Request COI Button */}
                       {(tenant.insurance_status === 'expired' || tenant.insurance_status === 'non-compliant' || tenant.insurance_status === 'expiring' || tenant.insurance_status === 'pending') && tenant.email && (
-                        <button
-                          onClick={() => handleSendRequest(tenant)}
-                          disabled={sendingRequest === tenant.id}
-                          className="text-xs bg-gradient-to-r from-orange-500 to-orange-600 text-white px-3 py-1.5 rounded-lg hover:shadow-md font-semibold whitespace-nowrap flex items-center space-x-1.5 transition-all disabled:opacity-50"
-                        >
-                          {sendingRequest === tenant.id ? (
-                            <Loader2 size={12} className="animate-spin" />
-                          ) : (
-                            <Send size={12} />
-                          )}
-                          <span className="hidden sm:inline">Request COI</span>
-                          <span className="sm:hidden">Request</span>
-                        </button>
+                        requestSuccess === tenant.id ? (
+                          <span className="text-xs bg-emerald-500 text-white px-3 py-1.5 rounded-lg font-semibold whitespace-nowrap flex items-center space-x-1.5">
+                            <CheckCircle size={12} />
+                            <span>Sent!</span>
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => handleSendRequest(tenant)}
+                            disabled={sendingRequest === tenant.id}
+                            className="text-xs bg-gradient-to-r from-orange-500 to-orange-600 text-white px-3 py-1.5 rounded-lg hover:shadow-md font-semibold whitespace-nowrap flex items-center space-x-1.5 transition-all disabled:opacity-50"
+                          >
+                            {sendingRequest === tenant.id ? (
+                              <Loader2 size={12} className="animate-spin" />
+                            ) : (
+                              <Send size={12} />
+                            )}
+                            <span className="hidden sm:inline">Request COI</span>
+                            <span className="sm:hidden">Request</span>
+                          </button>
+                        )
                       )}
                     </div>
                   </div>
@@ -957,18 +1049,25 @@ export function TenantsView({ properties, onSendRequest }) {
                   {copySuccess === selectedTenant.id ? 'Link Copied!' : 'Copy Upload Link'}
                 </button>
                 {selectedTenant.email && (
-                  <button
-                    onClick={() => handleSendRequest(selectedTenant)}
-                    disabled={sendingRequest === selectedTenant.id}
-                    className="w-full px-4 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 font-medium flex items-center justify-center gap-2 disabled:opacity-50"
-                  >
-                    {sendingRequest === selectedTenant.id ? (
-                      <Loader2 size={18} className="animate-spin" />
-                    ) : (
-                      <Send size={18} />
-                    )}
-                    Send Insurance Request
-                  </button>
+                  requestSuccess === selectedTenant.id ? (
+                    <div className="w-full px-4 py-2 bg-emerald-100 text-emerald-700 rounded-lg font-medium flex items-center justify-center gap-2">
+                      <CheckCircle size={18} />
+                      Request Sent!
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => handleSendRequest(selectedTenant)}
+                      disabled={sendingRequest === selectedTenant.id}
+                      className="w-full px-4 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 font-medium flex items-center justify-center gap-2 disabled:opacity-50"
+                    >
+                      {sendingRequest === selectedTenant.id ? (
+                        <Loader2 size={18} className="animate-spin" />
+                      ) : (
+                        <Send size={18} />
+                      )}
+                      Send Insurance Request
+                    </button>
+                  )
                 )}
                 <button
                   onClick={() => { setEditingTenant(selectedTenant); setShowModal(true); setSelectedTenant(null); }}
