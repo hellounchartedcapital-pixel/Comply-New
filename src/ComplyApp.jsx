@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Upload, CheckCircle, XCircle, AlertCircle, FileText, Calendar, X, Search, Download, Settings as SettingsIcon, Eye, Bell, FileDown, Phone, Mail, User, Send, Clock, History, FileCheck, Sparkles, Building2, ChevronDown, CreditCard, Users, Home, LayoutDashboard } from 'lucide-react';
+import { Upload, CheckCircle, XCircle, AlertCircle, FileText, Calendar, X, Search, Download, Settings as SettingsIcon, Eye, Bell, FileDown, Phone, Mail, User, Send, Clock, History, FileCheck, Building2, ChevronDown, CreditCard, Users, Home, LayoutDashboard } from 'lucide-react';
 import { useVendors } from './useVendors';
 import { useTenants } from './useTenants';
 import { useSubscription } from './useSubscription';
@@ -9,7 +9,6 @@ import { NotificationSettings } from './NotificationSettings';
 import { OnboardingTutorial } from './OnboardingTutorial';
 import { AlertModal, useAlertModal } from './AlertModal';
 import { supabase } from './supabaseClient';
-import { extractCOIFromPDF } from './extractCOI';
 import { exportPDFReport } from './exportPDFReport';
 import { Logo } from './Logo';
 import Properties from './Properties';
@@ -31,7 +30,7 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
   const [showPropertyDropdown, setShowPropertyDropdown] = useState(false);
 
   // Use database hook instead of local state - filter by selected property
-  const { vendors: dbVendors, loading, loadingMore, error, hasMore, totalCount, addVendor, updateVendor, deleteVendor, loadMore, refreshVendors } = useVendors(selectedProperty?.id);
+  const { vendors: dbVendors, loading, loadingMore, error, hasMore, totalCount, updateVendor, deleteVendor, loadMore, refreshVendors } = useVendors(selectedProperty?.id);
 
   // Tenants hook for dashboard
   const { tenants: dbTenants, refreshTenants } = useTenants();
@@ -78,10 +77,8 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
   const [vendorDetailsTab, setVendorDetailsTab] = useState('details');
   const [vendorActivity, setVendorActivity] = useState([]);
   const [loadingActivity, setLoadingActivity] = useState(false);
-  const [uploadingCOI, setUploadingCOI] = useState(false);
-  const [uploadStatus, setUploadStatus] = useState('');
   const { alertModal, showAlert, hideAlert } = useAlertModal();
-  const { subscription, isFreePlan, canAddVendor, getRemainingVendors } = useSubscription();
+  const { subscription, isFreePlan } = useSubscription();
 
   // Load properties
   const loadProperties = async () => {
@@ -601,135 +598,6 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
       });
     } finally {
       setSendingEmail(false);
-    }
-  };
-
-  // Handle file upload with AI extraction
-  const handleFileUpload = async (file, progressCallback, vendorEmail = null) => {
-    try {
-      // Check if a property is selected - require property for compliance checking
-      if (!selectedProperty && properties.length > 0) {
-        setUploadingCOI(false);
-        showAlert({
-          type: 'warning',
-          title: 'Select a Property',
-          message: 'Please select a property before uploading a COI.',
-          details: 'Each property has its own insurance requirements. Select a property from the dropdown in the header.'
-        });
-        return;
-      }
-
-      // If no properties exist, prompt to create one
-      if (properties.length === 0) {
-        setUploadingCOI(false);
-        showAlert({
-          type: 'warning',
-          title: 'Create a Property First',
-          message: 'You need to create a property before uploading COIs.',
-          details: 'Click "Add Property" in the header to create your first property with insurance requirements.'
-        });
-        setShowProperties(true);
-        return;
-      }
-
-      // Show full-screen loading overlay
-      setUploadingCOI(true);
-      setUploadStatus('Reading PDF...');
-      setShowSmartUpload(false); // Close the upload modal
-
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
-
-      // Use property-specific requirements
-      const requirementsToUse = {
-        general_liability: selectedProperty.general_liability || 1000000,
-        gl_aggregate: selectedProperty.gl_aggregate || 2000000,
-        auto_liability: selectedProperty.auto_liability || 1000000,
-        auto_liability_required: selectedProperty.auto_liability_required || false,
-        workers_comp: selectedProperty.workers_comp_required ? 'Statutory' : 'Not Required',
-        employers_liability: selectedProperty.employers_liability || 500000,
-        company_name: selectedProperty.company_name || userRequirements?.company_name || '',
-        require_additional_insured: selectedProperty.require_additional_insured !== false,
-        require_waiver_of_subrogation: selectedProperty.require_waiver_of_subrogation || false,
-        custom_coverages: selectedProperty.custom_coverages || []
-      };
-
-      // Step 1: Extract data using AI
-      setUploadStatus('AI analyzing certificate...');
-      if (progressCallback) progressCallback('AI extracting data...');
-      console.log('Extracting COI data with AI...');
-      const extractionResult = await extractCOIFromPDF(file, requirementsToUse);
-
-      if (!extractionResult.success) {
-        throw new Error(extractionResult.error);
-      }
-
-      const vendorData = extractionResult.data;
-      console.log('Extracted vendor data:', vendorData);
-
-      // Step 2: Upload file to Storage
-      setUploadStatus('Uploading document...');
-      if (progressCallback) progressCallback('Uploading to cloud...');
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
-
-      const { data: storageData, error: storageError } = await supabase.storage
-        .from('coi-documents')
-        .upload(fileName, file);
-
-      if (storageError) throw storageError;
-
-      // Generate upload token for vendor portal (valid for 30 days)
-      const uploadToken = crypto.randomUUID();
-      const tokenExpiresAt = new Date();
-      tokenExpiresAt.setDate(tokenExpiresAt.getDate() + 30);
-
-      // Step 3: Create vendor in database
-      setUploadStatus('Checking compliance...');
-      if (progressCallback) progressCallback('Saving vendor...');
-      const result = await addVendor({
-        ...vendorData,
-        propertyId: selectedProperty?.id || null, // Assign to selected property
-        contactEmail: vendorEmail, // Add vendor email for automated follow-ups
-        rawData: {
-          ...vendorData.rawData,
-          documentPath: fileName,
-          documentUrl: storageData.path,
-          uploadToken: uploadToken, // Store upload token for vendor portal
-          uploadTokenExpiresAt: tokenExpiresAt.toISOString()
-        }
-      });
-
-      if (!result.success) {
-        throw new Error(result.error);
-      }
-
-      // Step 4: Refresh vendor list
-      setUploadStatus('Finalizing...');
-      if (progressCallback) progressCallback('Complete!');
-      await refreshVendors();
-
-      // Hide overlay
-      setUploadingCOI(false);
-      setUploadStatus('');
-
-      // Success message with email info
-      const emailNote = vendorEmail
-        ? `\nContact Email: ${vendorEmail}\nAutomatic follow-ups enabled.`
-        : '\nTip: Add a contact email to enable automatic follow-ups.';
-
-      showAlert({
-        type: 'success',
-        title: 'COI Uploaded Successfully',
-        message: `Vendor "${vendorData.name}" has been added to your dashboard.`,
-        details: `Status: ${vendorData.status.toUpperCase()}\nExpiration Date: ${vendorData.expirationDate}${emailNote}`
-      });
-
-    } catch (error) {
-      console.error('Upload error:', error);
-      setUploadingCOI(false);
-      setUploadStatus('');
-      throw new Error(error.message || 'Failed to upload and process COI');
     }
   };
 
@@ -1922,34 +1790,6 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
           onComplete={handleOnboardingComplete}
           onSkip={handleOnboardingSkip}
         />
-      )}
-
-      {/* COI Upload Loading Overlay */}
-      {uploadingCOI && (
-        <div className="fixed inset-0 bg-gradient-to-br from-emerald-900/95 via-gray-900/95 to-teal-900/95 flex items-center justify-center z-[60]">
-          <div className="text-center max-w-md px-6">
-            <div className="relative mb-8">
-              <div className="absolute inset-0 w-24 h-24 mx-auto bg-emerald-500/30 rounded-full animate-ping"></div>
-              <div className="relative w-24 h-24 mx-auto bg-gradient-to-br from-emerald-400 to-teal-500 rounded-2xl flex items-center justify-center shadow-2xl shadow-emerald-500/30">
-                <Sparkles className="w-12 h-12 text-white animate-pulse" />
-              </div>
-            </div>
-            <h2 className="text-2xl sm:text-3xl font-bold text-white mb-4">
-              Processing COI
-            </h2>
-            <p className="text-emerald-200 text-lg mb-6">
-              {uploadStatus || 'Analyzing your certificate...'}
-            </p>
-            <div className="flex items-center justify-center space-x-2 mb-6">
-              <div className="w-3 h-3 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-              <div className="w-3 h-3 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-              <div className="w-3 h-3 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-            </div>
-            <p className="text-emerald-300/70 text-sm">
-              Our AI is extracting coverage details and checking compliance...
-            </p>
-          </div>
-        </div>
       )}
 
       {/* Alert Modal */}

@@ -549,7 +549,7 @@ function TenantModal({ isOpen, onClose, onSave, tenant, properties, units }) {
 
 // Main TenantsView component
 export function TenantsView({ properties }) {
-  const { tenants, loading, stats, addTenant, updateTenant, deleteTenant, refreshTenants } = useTenants();
+  const { tenants, loading, stats, addTenant, updateTenant, deleteTenant } = useTenants();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [showModal, setShowModal] = useState(false);
