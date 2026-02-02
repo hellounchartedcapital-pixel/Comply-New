@@ -28,6 +28,12 @@ if (process.env.REACT_APP_SENTRY_DSN) {
     // Don't send PII
     sendDefaultPii: false,
   });
+
+  // Expose test function for Sentry verification (can be removed after testing)
+  window.testSentry = () => {
+    Sentry.captureException(new Error('Test error from SmartCOI - Sentry is working!'));
+    console.log('Test error sent to Sentry!');
+  };
 }
 
 function AppContent() {
