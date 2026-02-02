@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import {
   Users, Plus, Search, CheckCircle, XCircle, AlertCircle, Clock,
-  Mail, Phone, Calendar, Building2, Edit2, Trash2, X, Send,
-  ExternalLink, Shield, Home, FileText, Loader2
+  Mail, Phone, Calendar, Building2, Edit2, X, Send,
+  ExternalLink, Shield, Loader2
 } from 'lucide-react';
 import { useTenants } from './useTenants';
 import { supabase } from './supabaseClient';
