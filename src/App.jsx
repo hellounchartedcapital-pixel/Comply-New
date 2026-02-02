@@ -2,6 +2,7 @@
 // Main app component with authentication routing
 
 import React, { useState, useEffect } from 'react'
+import * as Sentry from '@sentry/react'
 import { AuthProvider, useAuth } from './AuthContext'
 import { LandingPage } from './LandingPage'
 import Login from './Login'
@@ -14,6 +15,20 @@ import { TenantUploadPortal } from './TenantUploadPortal'
 import { Pricing } from './Pricing'
 import { Loader2 } from 'lucide-react'
 import ErrorBoundary from './ErrorBoundary'
+
+// Initialize Sentry for error tracking
+if (process.env.REACT_APP_SENTRY_DSN) {
+  Sentry.init({
+    dsn: process.env.REACT_APP_SENTRY_DSN,
+    environment: process.env.NODE_ENV,
+    // Only send errors in production
+    enabled: process.env.NODE_ENV === 'production',
+    // Capture 10% of transactions for performance monitoring
+    tracesSampleRate: 0.1,
+    // Don't send PII
+    sendDefaultPii: false,
+  });
+}
 
 function AppContent() {
   const { user, loading, signOut } = useAuth()
