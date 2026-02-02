@@ -205,15 +205,20 @@ export function VendorUploadPortal({ token, onBack }) {
         }
 
         // Check for additional insured / waiver of subrogation requirements
+        // Helper to check if issue already exists (handles both string and object formats)
+        const hasIssue = (issues, message) => {
+          return issues.some(i => (typeof i === 'string' ? i : i.message) === message);
+        };
+
         if (requirements.require_additional_insured && !extractedData.hasAdditionalInsured) {
           extractedData.issues = extractedData.issues || [];
-          if (!extractedData.issues.includes('Missing Additional Insured endorsement')) {
+          if (!hasIssue(extractedData.issues, 'Missing Additional Insured endorsement')) {
             extractedData.issues.push('Missing Additional Insured endorsement');
           }
         }
         if (requirements.require_waiver_of_subrogation && !extractedData.hasWaiverOfSubrogation) {
           extractedData.issues = extractedData.issues || [];
-          if (!extractedData.issues.includes('Missing Waiver of Subrogation endorsement')) {
+          if (!hasIssue(extractedData.issues, 'Missing Waiver of Subrogation endorsement')) {
             extractedData.issues.push('Missing Waiver of Subrogation endorsement');
           }
         }

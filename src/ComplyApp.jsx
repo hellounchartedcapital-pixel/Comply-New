@@ -523,7 +523,7 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
 
       // Send email via Edge Function
       const companyName = userRequirements?.company_name || 'Our Company';
-      const issues = requestCOIVendor.issues.map(i => i.message);
+      const issues = (requestCOIVendor.issues || []).map(i => typeof i === 'string' ? i : i.message);
 
       // Generate upload token if vendor doesn't have one or if it's expired
       let uploadToken = requestCOIVendor.rawData?.uploadToken;
@@ -654,7 +654,7 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
             .eq('id', vendor.id);
 
           // Send email with requirements
-          const issues = vendor.issues.map(i => i.message);
+          const issues = (vendor.issues || []).map(i => typeof i === 'string' ? i : i.message);
           const vendorProperty = properties.find(p => p.id === vendor.propertyId);
           const requirements = {
             generalLiability: vendorProperty?.general_liability || userRequirements?.general_liability || 1000000,
@@ -667,7 +667,7 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
 
           const { data: result, error: fnError } = await supabase.functions.invoke('send-coi-request', {
             body: {
-              to: vendor.email,
+              to: vendor.contactEmail,
               vendorName: vendor.name,
               vendorStatus: vendor.status,
               issues: issues,
@@ -690,8 +690,8 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
             vendor_id: vendor.id,
             user_id: user?.id,
             activity_type: 'email_sent',
-            description: `COI request email sent to ${vendor.email} (bulk)`,
-            metadata: { email: vendor.email, bulk: true }
+            description: `COI request email sent to ${vendor.contactEmail} (bulk)`,
+            metadata: { email: vendor.contactEmail, bulk: true }
           });
 
           await supabase
@@ -758,7 +758,7 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
       escapeCSV(formatCurrency(v.coverage.autoLiability.amount)),
       v.coverage.workersComp.amount,
       escapeCSV(formatCurrency(v.coverage.employersLiability.amount)),
-      escapeCSV(v.issues.map(i => i.message).join('; '))
+      escapeCSV((v.issues || []).map(i => typeof i === 'string' ? i : i.message).join('; '))
     ]);
 
     const csvContent = [headers.map(escapeCSV), ...rows].map(row => row.join(',')).join('\n');
@@ -1114,7 +1114,7 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
             {/* Bulk Request COIs - only show if there are non-compliant vendors with emails */}
             {(() => {
               const needsAttention = filteredVendors.filter(v =>
-                (v.status === 'expired' || v.status === 'non-compliant' || v.status === 'expiring') && v.email
+                (v.status === 'expired' || v.status === 'non-compliant' || v.status === 'expiring') && v.contactEmail
               );
               if (needsAttention.length > 0) {
                 return (
