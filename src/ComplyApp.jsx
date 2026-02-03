@@ -18,7 +18,7 @@ import { TenantsView } from './TenantsView';
 import { Dashboard } from './Dashboard';
 import { isValidEmail } from './validation';
 import logger from './logger';
-import { formatDate, formatRelativeDate, formatCurrency } from './utils/complianceUtils';
+import { formatDate, formatRelativeDate, formatCurrency, getDaysUntil } from './utils/complianceUtils';
 
 function ComplyApp({ user, onSignOut, onShowPricing }) {
   // Active tab state
@@ -86,6 +86,7 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
   const [vendorActivity, setVendorActivity] = useState([]);
   const [loadingActivity, setLoadingActivity] = useState(false);
   const [bulkRequesting, setBulkRequesting] = useState(false);
+  const [bulkRequestConfirm, setBulkRequestConfirm] = useState(null); // vendors to send bulk requests to
   const [selectedVendorIds, setSelectedVendorIds] = useState(new Set());
   const [showBulkAssignModal, setShowBulkAssignModal] = useState(false);
   const [bulkAssignPropertyId, setBulkAssignPropertyId] = useState('');
@@ -246,48 +247,8 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
     return <CheckCircle className="text-emerald-500" size={20} />;
   };
 
-  // Calculate days until expiration
-  const getDaysUntilExpiration = (expirationDate) => {
-    if (!expirationDate) return null;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const expDate = new Date(expirationDate);
-    expDate.setHours(0, 0, 0, 0);
-    return Math.ceil((expDate - today) / (1000 * 60 * 60 * 24));
-  };
-
-  // Get expiration badge with days remaining
-  const getExpirationBadge = (expirationDate) => {
-    const days = getDaysUntilExpiration(expirationDate);
-    if (days === null) return null;
-
-    if (days < 0) {
-      return (
-        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">
-          {Math.abs(days)} days overdue
-        </span>
-      );
-    } else if (days === 0) {
-      return (
-        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">
-          Expires today
-        </span>
-      );
-    } else if (days <= 30) {
-      return (
-        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-          days <= 7 ? 'bg-red-100 text-red-700' :
-          days <= 14 ? 'bg-orange-100 text-orange-700' :
-          'bg-amber-100 text-amber-700'
-        }`}>
-          {days} days left
-        </span>
-      );
-    }
-    return null;
-  };
-
-  const getStatusBadge = (status, daysOverdue) => {
+  // Get status badge with dynamic days calculation
+  const getStatusBadge = (status, expirationDate) => {
     const styles = {
       expired: 'bg-red-100 text-red-700 border border-red-200',
       'non-compliant': 'bg-orange-100 text-orange-700 border border-orange-200',
@@ -295,11 +256,21 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
       compliant: 'bg-emerald-100 text-emerald-700 border border-emerald-200'
     };
 
+    // Calculate days dynamically for accurate display
+    const days = getDaysUntil(expirationDate);
+
+    let label;
+    if (status === 'expired' && days !== null && days < 0) {
+      label = `Expired ${Math.abs(days)} days`;
+    } else if (status === 'expiring' && days !== null && days >= 0) {
+      label = `Expiring in ${days} days`;
+    } else {
+      label = status.replace('-', ' ').toUpperCase();
+    }
+
     return (
       <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${styles[status]}`}>
-        {status === 'expired' && daysOverdue > 0
-          ? `Expired (${daysOverdue} days)`
-          : status.replace('-', ' ').toUpperCase()}
+        {label}
       </span>
     );
   };
@@ -705,16 +676,18 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
     }
   };
 
-  // Bulk Request COIs from multiple vendors
-  const handleBulkRequest = async (vendorsToContact) => {
+  // Show bulk request confirmation modal
+  const handleBulkRequest = (vendorsToContact) => {
+    if (!vendorsToContact || vendorsToContact.length === 0) return;
+    setBulkRequestConfirm(vendorsToContact);
+  };
+
+  // Execute bulk COI requests after confirmation
+  const executeBulkRequest = async () => {
+    const vendorsToContact = bulkRequestConfirm;
     if (!vendorsToContact || vendorsToContact.length === 0) return;
 
-    const confirmed = window.confirm(
-      `Send COI requests to ${vendorsToContact.length} vendors?\n\nThis will email all vendors who need updated certificates and have an email address on file.`
-    );
-
-    if (!confirmed) return;
-
+    setBulkRequestConfirm(null);
     setBulkRequesting(true);
     let successCount = 0;
     let failCount = 0;
@@ -1388,7 +1361,7 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-col sm:flex-row sm:items-center space-y-1 sm:space-y-0 sm:space-x-3 mb-2">
                           <h3 className="text-base font-semibold text-gray-900 truncate">{vendor.name}</h3>
-                          {getStatusBadge(vendor.status, vendor.daysOverdue)}
+                          {getStatusBadge(vendor.status, vendor.expirationDate)}
                         </div>
                         {vendor.dba && (
                           <p className="text-sm text-gray-500 mb-2 truncate">DBA: {vendor.dba}</p>
@@ -1410,12 +1383,9 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
                     </div>
 
                     <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-start space-x-2 sm:space-x-0 sm:space-y-2 sm:ml-4 pt-2 sm:pt-0 border-t sm:border-t-0 border-gray-100">
-                      <div className="flex flex-col items-end gap-1">
-                        <div className="flex items-center text-sm text-gray-500 bg-gray-100 px-2.5 py-1 rounded-lg">
-                          <Calendar size={14} className="mr-1.5" />
-                          {formatDate(vendor.expirationDate)}
-                        </div>
-                        {getExpirationBadge(vendor.expirationDate)}
+                      <div className="flex items-center text-sm text-gray-500 bg-gray-100 px-2.5 py-1 rounded-lg">
+                        <Calendar size={14} className="mr-1.5" />
+                        {formatDate(vendor.expirationDate)}
                       </div>
                       <div className="flex items-center space-x-3">
                         <button
@@ -1674,6 +1644,48 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
         </div>
       )}
 
+      {/* Bulk Request Confirmation Modal */}
+      {bulkRequestConfirm && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4" role="alertdialog" aria-modal="true" aria-labelledby="bulk-confirm-title" aria-describedby="bulk-confirm-desc">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 id="bulk-confirm-title" className="text-xl font-bold flex items-center space-x-2">
+                <div className="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center">
+                  <Send size={20} className="text-orange-600" />
+                </div>
+                <span>Bulk Request COIs</span>
+              </h3>
+              <button onClick={() => setBulkRequestConfirm(null)} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-all" aria-label="Cancel">
+                <X size={20} />
+              </button>
+            </div>
+
+            <p id="bulk-confirm-desc" className="text-gray-600 mb-4">
+              Send COI requests to <strong>{bulkRequestConfirm.length}</strong> vendors?
+            </p>
+
+            <p className="text-sm text-gray-500 mb-6">
+              This will email all vendors who need updated certificates and have an email address on file.
+            </p>
+
+            <div className="flex space-x-3">
+              <button
+                onClick={executeBulkRequest}
+                className="flex-1 px-4 py-3 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-xl hover:shadow-md font-semibold transition-all"
+              >
+                Send Requests
+              </button>
+              <button
+                onClick={() => setBulkRequestConfirm(null)}
+                className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 font-semibold transition-all"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Request COI Modal */}
       {requestCOIVendor && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
@@ -1694,7 +1706,7 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
               <p className="text-sm text-gray-500">Vendor</p>
               <p className="font-semibold text-gray-900">{requestCOIVendor.name}</p>
               <div className="mt-2">
-                {getStatusBadge(requestCOIVendor.status, requestCOIVendor.daysOverdue)}
+                {getStatusBadge(requestCOIVendor.status, requestCOIVendor.expirationDate)}
               </div>
             </div>
 
@@ -1892,7 +1904,7 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
                       <div className="grid grid-cols-3 gap-3 p-3 bg-gray-50 rounded-xl">
                         <div>
                           <p className="text-xs text-gray-500 font-medium">Status</p>
-                          <div className="mt-1">{getStatusBadge(selectedVendor.status, selectedVendor.daysOverdue)}</div>
+                          <div className="mt-1">{getStatusBadge(selectedVendor.status, selectedVendor.expirationDate)}</div>
                         </div>
                         <div className="text-center">
                           <p className="text-xs text-gray-500 font-medium">Expiration</p>
