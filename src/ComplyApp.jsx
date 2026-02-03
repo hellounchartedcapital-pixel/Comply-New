@@ -8,6 +8,7 @@ import { Settings } from './Settings';
 import { NotificationSettings } from './NotificationSettings';
 import { OnboardingTutorial } from './OnboardingTutorial';
 import { AlertModal, useAlertModal } from './AlertModal';
+import { ActivityLog } from './ActivityLog';
 import { supabase } from './supabaseClient';
 import { exportPDFReport } from './exportPDFReport';
 import { Logo } from './Logo';
@@ -59,6 +60,8 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
     contactPhone: v.contact_phone,
     contactNotes: v.contact_notes,
     lastContactedAt: v.last_contacted_at,
+    uploadToken: v.upload_token,
+    uploadTokenExpiresAt: v.upload_token_expires_at,
     rawData: v.raw_data
   }));
 
@@ -72,6 +75,7 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
   const [deletingVendor, setDeletingVendor] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showActivityLog, setShowActivityLog] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboardingChecked, setOnboardingChecked] = useState(false);
   const [userRequirements, setUserRequirements] = useState(null);
@@ -81,6 +85,10 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
   const [vendorActivity, setVendorActivity] = useState([]);
   const [loadingActivity, setLoadingActivity] = useState(false);
   const [bulkRequesting, setBulkRequesting] = useState(false);
+  const [selectedVendorIds, setSelectedVendorIds] = useState(new Set());
+  const [showBulkAssignModal, setShowBulkAssignModal] = useState(false);
+  const [bulkAssignPropertyId, setBulkAssignPropertyId] = useState('');
+  const [bulkAssigning, setBulkAssigning] = useState(false);
   const { alertModal, showAlert, hideAlert } = useAlertModal();
   const { subscription, isFreePlan } = useSubscription();
 
@@ -237,6 +245,47 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
     return <CheckCircle className="text-emerald-500" size={20} />;
   };
 
+  // Calculate days until expiration
+  const getDaysUntilExpiration = (expirationDate) => {
+    if (!expirationDate) return null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const expDate = new Date(expirationDate);
+    expDate.setHours(0, 0, 0, 0);
+    return Math.ceil((expDate - today) / (1000 * 60 * 60 * 24));
+  };
+
+  // Get expiration badge with days remaining
+  const getExpirationBadge = (expirationDate) => {
+    const days = getDaysUntilExpiration(expirationDate);
+    if (days === null) return null;
+
+    if (days < 0) {
+      return (
+        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">
+          {Math.abs(days)} days overdue
+        </span>
+      );
+    } else if (days === 0) {
+      return (
+        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">
+          Expires today
+        </span>
+      );
+    } else if (days <= 30) {
+      return (
+        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+          days <= 7 ? 'bg-red-100 text-red-700' :
+          days <= 14 ? 'bg-orange-100 text-orange-700' :
+          'bg-amber-100 text-amber-700'
+        }`}>
+          {days} days left
+        </span>
+      );
+    }
+    return null;
+  };
+
   const getStatusBadge = (status, daysOverdue) => {
     const styles = {
       expired: 'bg-red-100 text-red-700 border border-red-200',
@@ -353,6 +402,19 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
         filtered = filtered.filter(v => v.status === 'non-compliant');
       } else if (quickFilter === 'compliant') {
         filtered = filtered.filter(v => v.status === 'compliant');
+      } else if (quickFilter === 'missing-additional-insured') {
+        filtered = filtered.filter(v => v.missingAdditionalInsured || !v.hasAdditionalInsured);
+      } else if (quickFilter === 'not-contacted-30-days') {
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        filtered = filtered.filter(v => {
+          if (!v.lastContactedAt) return true; // Never contacted
+          return new Date(v.lastContactedAt) < thirtyDaysAgo;
+        });
+      } else if (quickFilter === 'needs-attention') {
+        filtered = filtered.filter(v =>
+          v.status === 'expired' || v.status === 'non-compliant' || v.status === 'expiring'
+        );
       }
     }
 
@@ -365,6 +427,12 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
       } else if (sortBy === 'status') {
         const statusOrder = { expired: 0, 'non-compliant': 1, expiring: 2, compliant: 3 };
         return statusOrder[a.status] - statusOrder[b.status];
+      } else if (sortBy === 'last-contacted') {
+        // Sort by last contacted (null/never contacted first)
+        if (!a.lastContactedAt && !b.lastContactedAt) return 0;
+        if (!a.lastContactedAt) return -1;
+        if (!b.lastContactedAt) return 1;
+        return new Date(a.lastContactedAt) - new Date(b.lastContactedAt);
       }
       return 0;
     });
@@ -375,12 +443,24 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
   const filteredVendors = filterAndSort(vendors);
 
   // Stats
+  // Calculate stats including new filters
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
   const stats = {
     total: vendors.length,
     expired: vendors.filter(v => v.status === 'expired').length,
     expiring: vendors.filter(v => v.status === 'expiring').length,
     nonCompliant: vendors.filter(v => v.status === 'non-compliant').length,
-    compliant: vendors.filter(v => v.status === 'compliant').length
+    compliant: vendors.filter(v => v.status === 'compliant').length,
+    missingAdditionalInsured: vendors.filter(v => v.missingAdditionalInsured || !v.hasAdditionalInsured).length,
+    notContactedRecently: vendors.filter(v => {
+      if (!v.lastContactedAt) return true;
+      return new Date(v.lastContactedAt) < thirtyDaysAgo;
+    }).length,
+    needsAttention: vendors.filter(v =>
+      v.status === 'expired' || v.status === 'non-compliant' || v.status === 'expiring'
+    ).length
   };
 
   // Edit vendor
@@ -735,6 +815,89 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
     }
   };
 
+  // Bulk property assignment
+  const handleBulkPropertyAssign = async () => {
+    if (selectedVendorIds.size === 0) return;
+
+    setBulkAssigning(true);
+    let successCount = 0;
+    let failCount = 0;
+
+    try {
+      for (const vendorId of selectedVendorIds) {
+        try {
+          const { error } = await supabase
+            .from('vendors')
+            .update({ property_id: bulkAssignPropertyId || null })
+            .eq('id', vendorId);
+
+          if (error) {
+            failCount++;
+          } else {
+            successCount++;
+          }
+        } catch (err) {
+          failCount++;
+        }
+      }
+
+      refreshVendors();
+      setSelectedVendorIds(new Set());
+      setShowBulkAssignModal(false);
+      setBulkAssignPropertyId('');
+
+      const propertyName = bulkAssignPropertyId
+        ? properties.find(p => p.id === bulkAssignPropertyId)?.name || 'selected property'
+        : 'No Property';
+
+      if (failCount === 0) {
+        showAlert({
+          type: 'success',
+          title: 'Vendors Assigned',
+          message: `Successfully assigned ${successCount} vendors to ${propertyName}.`
+        });
+      } else {
+        showAlert({
+          type: 'warning',
+          title: 'Partial Success',
+          message: `Assigned ${successCount} vendors, ${failCount} failed.`
+        });
+      }
+    } catch (error) {
+      logger.error('Bulk property assignment error', error);
+      showAlert({
+        type: 'error',
+        title: 'Assignment Failed',
+        message: 'An error occurred while assigning properties.',
+        details: error.message
+      });
+    } finally {
+      setBulkAssigning(false);
+    }
+  };
+
+  // Toggle vendor selection
+  const toggleVendorSelection = (vendorId) => {
+    setSelectedVendorIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(vendorId)) {
+        newSet.delete(vendorId);
+      } else {
+        newSet.add(vendorId);
+      }
+      return newSet;
+    });
+  };
+
+  // Select/deselect all vendors
+  const toggleSelectAll = () => {
+    if (selectedVendorIds.size === filteredVendors.length) {
+      setSelectedVendorIds(new Set());
+    } else {
+      setSelectedVendorIds(new Set(filteredVendors.map(v => v.id)));
+    }
+  };
+
   // Export to CSV
   const exportToCSV = () => {
     const headers = ['Company Name', 'DBA', 'Status', 'Expiration Date', 'Days Overdue', 'General Liability', 'Auto Liability', 'Workers Comp', 'Employers Liability', 'Issues'];
@@ -915,6 +1078,13 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
                 <Bell size={18} />
               </button>
               <button
+                onClick={() => setShowActivityLog(true)}
+                className="p-2.5 bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 hover:text-gray-900 transition-all"
+                title="Activity Log"
+              >
+                <History size={18} />
+              </button>
+              <button
                 onClick={() => setShowSmartUpload(true)}
                 className="px-4 py-2.5 bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 text-white rounded-xl hover:shadow-lg hover:shadow-emerald-500/25 hover:-translate-y-0.5 transition-all duration-200 flex items-center space-x-2 font-semibold"
                 data-onboarding="upload-button"
@@ -1090,6 +1260,23 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
               <option value="name">Sort: Name (A-Z)</option>
               <option value="expiration">Sort: Expiration Date</option>
               <option value="status">Sort: Status</option>
+              <option value="last-contacted">Sort: Last Contacted</option>
+            </select>
+
+            {/* Issue Filter */}
+            <select
+              value={quickFilter}
+              onChange={(e) => setQuickFilter(e.target.value)}
+              className="px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent bg-gray-50 font-medium text-gray-700"
+            >
+              <option value="all">All Vendors</option>
+              <option value="needs-attention">⚠️ Needs Attention ({stats.needsAttention})</option>
+              <option value="expired">🔴 Expired ({stats.expired})</option>
+              <option value="expiring">🟡 Expiring Soon ({stats.expiring})</option>
+              <option value="non-compliant">🟠 Non-Compliant ({stats.nonCompliant})</option>
+              <option value="compliant">🟢 Compliant ({stats.compliant})</option>
+              <option value="missing-additional-insured">📋 Missing Add'l Insured ({stats.missingAdditionalInsured})</option>
+              <option value="not-contacted-30-days">📭 Not Contacted 30+ Days ({stats.notContactedRecently})</option>
             </select>
 
             {/* Export Buttons */}
@@ -1141,6 +1328,18 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
               return null;
             })()}
 
+            {/* Bulk Assign Property - show when vendors are selected */}
+            {selectedVendorIds.size > 0 && properties.length > 0 && (
+              <button
+                onClick={() => setShowBulkAssignModal(true)}
+                className="px-4 py-2.5 bg-purple-500 text-white rounded-xl hover:bg-purple-600 flex items-center space-x-2 text-sm font-semibold transition-all"
+                title={`Assign ${selectedVendorIds.size} vendors to a property`}
+              >
+                <Building2 size={16} />
+                <span className="hidden sm:inline">Assign Property ({selectedVendorIds.size})</span>
+              </button>
+            )}
+
             {/* Clear */}
             {(searchQuery || quickFilter !== 'all' || sortBy !== 'name') && (
               <button
@@ -1165,6 +1364,29 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
 
         {/* Vendors List */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden" data-onboarding="vendor-list">
+          {/* Select All Header */}
+          {filteredVendors.length > 0 && !loading && (
+            <div className="px-5 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+              <label className="flex items-center space-x-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={selectedVendorIds.size === filteredVendors.length && filteredVendors.length > 0}
+                  onChange={toggleSelectAll}
+                  className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                />
+                <span className="text-sm font-medium text-gray-700">
+                  {selectedVendorIds.size === filteredVendors.length && filteredVendors.length > 0
+                    ? 'Deselect All'
+                    : `Select All (${filteredVendors.length})`}
+                </span>
+              </label>
+              {selectedVendorIds.size > 0 && (
+                <span className="text-sm text-purple-600 font-medium">
+                  {selectedVendorIds.size} selected
+                </span>
+              )}
+            </div>
+          )}
           {loading ? (
             <div className="p-12 text-center">
               <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500 mb-4"></div>
@@ -1206,9 +1428,19 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
               </div>
             ) : (
               filteredVendors.map((vendor) => (
-                <div key={vendor.id} className="p-5 hover:bg-gray-50 transition-colors">
+                <div key={vendor.id} className={`p-5 hover:bg-gray-50 transition-colors ${selectedVendorIds.has(vendor.id) ? 'bg-purple-50' : ''}`}>
                   <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between space-y-3 sm:space-y-0">
                     <div className="flex items-start space-x-4 flex-1">
+                      {/* Checkbox for bulk selection */}
+                      <div className="flex-shrink-0 pt-0.5">
+                        <input
+                          type="checkbox"
+                          checked={selectedVendorIds.has(vendor.id)}
+                          onChange={() => toggleVendorSelection(vendor.id)}
+                          className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500 cursor-pointer"
+                          title="Select for bulk actions"
+                        />
+                      </div>
                       <div className="flex-shrink-0 mt-0.5">
                         {getStatusIcon(vendor.status)}
                       </div>
@@ -1249,14 +1481,22 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
                     </div>
 
                     <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-start space-x-2 sm:space-x-0 sm:space-y-2 sm:ml-4 pt-2 sm:pt-0 border-t sm:border-t-0 border-gray-100">
-                      <div className="flex items-center text-sm text-gray-500 bg-gray-100 px-2.5 py-1 rounded-lg">
-                        <Calendar size={14} className="mr-1.5" />
-                        {formatDate(vendor.expirationDate)}
+                      <div className="flex flex-col items-end gap-1">
+                        <div className="flex items-center text-sm text-gray-500 bg-gray-100 px-2.5 py-1 rounded-lg">
+                          <Calendar size={14} className="mr-1.5" />
+                          {formatDate(vendor.expirationDate)}
+                        </div>
+                        {getExpirationBadge(vendor.expirationDate)}
                       </div>
-                      {vendor.lastContactedAt && (
+                      {vendor.lastContactedAt ? (
                         <div className="flex items-center text-xs text-gray-500" title={`Last contacted: ${formatDate(vendor.lastContactedAt)}`}>
                           <Mail size={12} className="mr-1" />
                           <span>Contacted {formatRelativeDate(vendor.lastContactedAt)}</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center text-xs text-amber-600" title="Never contacted">
+                          <Mail size={12} className="mr-1" />
+                          <span>Never contacted</span>
                         </div>
                       )}
                       <div className="flex items-center space-x-2">
@@ -1280,16 +1520,18 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
                       >
                         View Details
                       </button>
-                      {(vendor.status === 'expired' || vendor.status === 'non-compliant' || vendor.status === 'expiring') && (
-                        <button
-                          onClick={() => handleRequestCOI(vendor)}
-                          className="text-xs bg-gradient-to-r from-orange-500 to-orange-600 text-white px-3 py-1.5 rounded-lg hover:shadow-md font-semibold whitespace-nowrap flex items-center space-x-1.5 transition-all"
-                        >
-                          <Send size={12} />
-                          <span className="hidden sm:inline">Request COI</span>
-                          <span className="sm:hidden">Request</span>
-                        </button>
-                      )}
+                      <button
+                        onClick={() => handleRequestCOI(vendor)}
+                        className={`text-xs px-3 py-1.5 rounded-lg font-semibold whitespace-nowrap flex items-center space-x-1.5 transition-all ${
+                          vendor.status === 'expired' || vendor.status === 'non-compliant' || vendor.status === 'expiring'
+                            ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white hover:shadow-md'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
+                      >
+                        <Send size={12} />
+                        <span className="hidden sm:inline">Request COI</span>
+                        <span className="sm:hidden">Request</span>
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -1505,7 +1747,7 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
               </div>
             )}
 
-            <div className="mb-6">
+            <div className="mb-4">
               <label className="block text-sm font-semibold text-gray-700 mb-2">
                 Vendor Contact Email
                 {!requestCOIVendor.contactEmail && (
@@ -1524,6 +1766,26 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
                   This email will be saved to the vendor's contact info
                 </p>
               )}
+            </div>
+
+            {/* Email Preview */}
+            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
+              <div className="flex items-center space-x-2 mb-2">
+                <Eye size={14} className="text-blue-600" />
+                <p className="text-sm font-semibold text-blue-800">Email Preview</p>
+              </div>
+              <div className="text-xs text-blue-700 space-y-1">
+                <p><strong>Subject:</strong> Certificate of Insurance Request - {requestCOIVendor.name}</p>
+                <p><strong>To:</strong> {requestCOIEmail || '(enter email above)'}</p>
+                <div className="mt-2 p-2 bg-white/50 rounded-lg text-blue-600">
+                  <p>The email will include:</p>
+                  <ul className="list-disc list-inside mt-1">
+                    <li>Direct upload link (valid 30 days)</li>
+                    <li>List of current compliance issues</li>
+                    <li>Your company name as the requester</li>
+                  </ul>
+                </div>
+              </div>
             </div>
 
             <div className="flex space-x-3">
@@ -1794,6 +2056,54 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
                   </div>
                 )}
               </div>
+
+              {/* Upload Link Status */}
+              <div className="p-4 bg-purple-50 border border-purple-200 rounded-xl">
+                <h4 className="font-bold text-purple-900 mb-3 flex items-center space-x-2">
+                  <Send size={16} />
+                  <span>Upload Link Status</span>
+                </h4>
+                {selectedVendor.uploadToken && selectedVendor.uploadTokenExpiresAt ? (
+                  <div className="space-y-2">
+                    {(() => {
+                      const expiresAt = new Date(selectedVendor.uploadTokenExpiresAt);
+                      const now = new Date();
+                      const daysRemaining = Math.ceil((expiresAt - now) / (1000 * 60 * 60 * 24));
+                      const isExpired = daysRemaining < 0;
+                      const isExpiringSoon = daysRemaining >= 0 && daysRemaining <= 7;
+
+                      return (
+                        <>
+                          <div className={`flex items-center space-x-2 text-sm ${
+                            isExpired ? 'text-red-700' : isExpiringSoon ? 'text-orange-700' : 'text-purple-700'
+                          }`}>
+                            <Clock size={14} />
+                            <span>
+                              {isExpired
+                                ? `Link expired ${Math.abs(daysRemaining)} days ago`
+                                : daysRemaining === 0
+                                ? 'Link expires today'
+                                : `Link expires in ${daysRemaining} days`}
+                            </span>
+                          </div>
+                          <p className="text-xs text-purple-600">
+                            Expires: {formatDate(selectedVendor.uploadTokenExpiresAt)}
+                          </p>
+                          {isExpired && (
+                            <p className="text-xs text-red-600 mt-1">
+                              Send a new COI request to generate a fresh link
+                            </p>
+                          )}
+                        </>
+                      );
+                    })()}
+                  </div>
+                ) : (
+                  <p className="text-sm text-purple-600">
+                    No active upload link. Send a COI request to generate one.
+                  </p>
+                )}
+              </div>
             </div>
             )}
 
@@ -1928,6 +2238,12 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
         <NotificationSettings onClose={() => setShowNotifications(false)} />
       )}
 
+      {/* Activity Log Modal */}
+      <ActivityLog
+        isOpen={showActivityLog}
+        onClose={() => setShowActivityLog(false)}
+      />
+
       {/* Properties Modal */}
       {showProperties && (
         <Properties
@@ -1947,6 +2263,88 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
           onComplete={handleOnboardingComplete}
           onSkip={handleOnboardingSkip}
         />
+      )}
+
+      {/* Bulk Property Assign Modal */}
+      {showBulkAssignModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-gray-900 flex items-center space-x-2">
+                <Building2 size={24} className="text-purple-600" />
+                <span>Assign Property</span>
+              </h3>
+              <button
+                onClick={() => {
+                  setShowBulkAssignModal(false);
+                  setBulkAssignPropertyId('');
+                }}
+                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-all"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="mb-4 p-4 bg-purple-50 border border-purple-200 rounded-xl">
+              <p className="text-sm text-purple-800">
+                <strong>{selectedVendorIds.size}</strong> vendor{selectedVendorIds.size !== 1 ? 's' : ''} selected
+              </p>
+            </div>
+
+            <div className="mb-6">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Assign to Property
+              </label>
+              <select
+                value={bulkAssignPropertyId}
+                onChange={(e) => setBulkAssignPropertyId(e.target.value)}
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-gray-50"
+              >
+                <option value="">No Property (Unassign)</option>
+                {properties.map((property) => (
+                  <option key={property.id} value={property.id}>
+                    {property.name}{property.address ? ` - ${property.address}` : ''}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500 mt-2">
+                {bulkAssignPropertyId
+                  ? 'Selected vendors will use this property\'s insurance requirements'
+                  : 'Selected vendors will be unassigned from any property'}
+              </p>
+            </div>
+
+            <div className="flex space-x-3">
+              <button
+                onClick={handleBulkPropertyAssign}
+                disabled={bulkAssigning}
+                className="flex-1 px-4 py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 font-semibold flex items-center justify-center space-x-2 disabled:opacity-50 transition-all"
+              >
+                {bulkAssigning ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    <span>Assigning...</span>
+                  </>
+                ) : (
+                  <>
+                    <Building2 size={16} />
+                    <span>Assign Property</span>
+                  </>
+                )}
+              </button>
+              <button
+                onClick={() => {
+                  setShowBulkAssignModal(false);
+                  setBulkAssignPropertyId('');
+                }}
+                disabled={bulkAssigning}
+                className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 font-semibold disabled:opacity-50 transition-all"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Alert Modal */}
