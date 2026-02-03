@@ -82,6 +82,8 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
   const [requestCOIVendor, setRequestCOIVendor] = useState(null);
   const [requestCOIEmail, setRequestCOIEmail] = useState('');
   const [vendorDetailsTab, setVendorDetailsTab] = useState('details');
+  const [coiPreviewUrl, setCoiPreviewUrl] = useState(null);
+  const [showCoiPreview, setShowCoiPreview] = useState(false);
   const [vendorActivity, setVendorActivity] = useState([]);
   const [loadingActivity, setLoadingActivity] = useState(false);
   const [bulkRequesting, setBulkRequesting] = useState(false);
@@ -542,10 +544,19 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
   };
 
   // Handle selecting a vendor (load details and activity)
-  const handleSelectVendor = (vendor) => {
+  const handleSelectVendor = async (vendor) => {
     setSelectedVendor(vendor);
     setVendorDetailsTab('details');
+    setShowCoiPreview(false);
     loadVendorActivity(vendor.id);
+
+    // Load COI preview URL
+    if (vendor.rawData?.documentPath) {
+      const url = await getCOIDocumentUrl(vendor.rawData.documentPath);
+      setCoiPreviewUrl(url);
+    } else {
+      setCoiPreviewUrl(null);
+    }
   };
 
   // Handle Request New COI
@@ -1980,25 +1991,113 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
                 </div>
               )}
 
-              {/* COI Document Actions */}
+              {/* COI Document Preview */}
               <div>
-                <h4 className="font-bold text-gray-900 mb-3">Certificate of Insurance</h4>
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="font-bold text-gray-900">Certificate of Insurance</h4>
+                  {selectedVendor.rawData?.documentPath && (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setShowCoiPreview(!showCoiPreview)}
+                        className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-all ${
+                          showCoiPreview
+                            ? 'bg-blue-100 text-blue-700'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
+                      >
+                        <Eye size={14} className="inline mr-1.5" />
+                        {showCoiPreview ? 'Hide Preview' : 'Show Preview'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+
                 {selectedVendor.rawData?.documentPath ? (
-                  <div className="flex flex-col sm:flex-row gap-3">
-                    <button
-                      onClick={() => handleViewCOI(selectedVendor)}
-                      className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-semibold flex items-center justify-center space-x-2 transition-all"
-                    >
-                      <Eye size={18} />
-                      <span>View COI</span>
-                    </button>
-                    <button
-                      onClick={() => handleDownloadCOI(selectedVendor)}
-                      className="flex-1 px-4 py-3 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 font-semibold flex items-center justify-center space-x-2 transition-all"
-                    >
-                      <Download size={18} />
-                      <span>Download COI</span>
-                    </button>
+                  <div className="space-y-3">
+                    {/* COI Preview */}
+                    {showCoiPreview && coiPreviewUrl && (
+                      <div className="relative rounded-xl overflow-hidden border border-gray-200 bg-gray-100">
+                        {/* AI Check Legend */}
+                        <div className="bg-gray-800 text-white px-4 py-2 text-xs flex flex-wrap gap-4">
+                          <span className="font-semibold">AI Checks:</span>
+                          <span className="flex items-center gap-1">
+                            <span className="w-3 h-3 rounded bg-blue-400"></span>
+                            Insured Name
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <span className="w-3 h-3 rounded bg-emerald-400"></span>
+                            Coverage Limits
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <span className="w-3 h-3 rounded bg-amber-400"></span>
+                            Expiration Dates
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <span className="w-3 h-3 rounded bg-purple-400"></span>
+                            Additional Insured
+                          </span>
+                        </div>
+
+                        {/* PDF Preview */}
+                        <div className="relative" style={{ height: '500px' }}>
+                          <iframe
+                            src={`${coiPreviewUrl}#toolbar=0&navpanes=0`}
+                            className="w-full h-full"
+                            title="COI Preview"
+                          />
+
+                          {/* ACORD Form Region Overlay - positioned over standard ACORD 25 regions */}
+                          <svg
+                            className="absolute inset-0 w-full h-full pointer-events-none"
+                            viewBox="0 0 100 130"
+                            preserveAspectRatio="none"
+                          >
+                            {/* Insured Name Region - top section */}
+                            <rect x="2" y="8" width="45" height="10" fill="rgba(59, 130, 246, 0.15)" stroke="rgba(59, 130, 246, 0.5)" strokeWidth="0.3" rx="0.5" />
+
+                            {/* General Liability Section */}
+                            <rect x="2" y="28" width="96" height="12" fill="rgba(16, 185, 129, 0.1)" stroke="rgba(16, 185, 129, 0.4)" strokeWidth="0.3" rx="0.5" />
+
+                            {/* Auto Liability Section */}
+                            <rect x="2" y="41" width="96" height="10" fill="rgba(16, 185, 129, 0.1)" stroke="rgba(16, 185, 129, 0.4)" strokeWidth="0.3" rx="0.5" />
+
+                            {/* Workers Comp Section */}
+                            <rect x="2" y="52" width="96" height="10" fill="rgba(16, 185, 129, 0.1)" stroke="rgba(16, 185, 129, 0.4)" strokeWidth="0.3" rx="0.5" />
+
+                            {/* Expiration Date Columns - on policy rows */}
+                            <rect x="55" y="28" width="12" height="34" fill="rgba(245, 158, 11, 0.15)" stroke="rgba(245, 158, 11, 0.5)" strokeWidth="0.3" rx="0.5" />
+
+                            {/* Description / Additional Insured Box */}
+                            <rect x="2" y="75" width="96" height="18" fill="rgba(168, 85, 247, 0.1)" stroke="rgba(168, 85, 247, 0.4)" strokeWidth="0.3" rx="0.5" />
+
+                            {/* Certificate Holder */}
+                            <rect x="2" y="95" width="45" height="15" fill="rgba(107, 114, 128, 0.1)" stroke="rgba(107, 114, 128, 0.4)" strokeWidth="0.3" rx="0.5" />
+                          </svg>
+                        </div>
+
+                        <p className="text-xs text-gray-500 p-2 bg-gray-50 border-t border-gray-200">
+                          Colored regions show where the AI extracts compliance data from standard ACORD 25 forms
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Action Buttons */}
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <button
+                        onClick={() => handleViewCOI(selectedVendor)}
+                        className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-semibold flex items-center justify-center space-x-2 transition-all"
+                      >
+                        <Eye size={18} />
+                        <span>Open Full View</span>
+                      </button>
+                      <button
+                        onClick={() => handleDownloadCOI(selectedVendor)}
+                        className="flex-1 px-4 py-3 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 font-semibold flex items-center justify-center space-x-2 transition-all"
+                      >
+                        <Download size={18} />
+                        <span>Download COI</span>
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl">
