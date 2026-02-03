@@ -1402,18 +1402,6 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
                             ))}
                           </div>
                         )}
-
-                        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-600">
-                          <div className="bg-gray-100 px-2 py-1 rounded-lg">
-                            <span className="font-medium">GL:</span> {formatCurrency(vendor.coverage.generalLiability.amount)}
-                          </div>
-                          <div className="bg-gray-100 px-2 py-1 rounded-lg">
-                            <span className="font-medium">Auto:</span> {formatCurrency(vendor.coverage.autoLiability.amount)}
-                          </div>
-                          <div className="bg-gray-100 px-2 py-1 rounded-lg">
-                            <span className="font-medium">WC:</span> {vendor.coverage.workersComp.amount}
-                          </div>
-                        </div>
                       </div>
                     </div>
 
@@ -1425,23 +1413,12 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
                         </div>
                         {getExpirationBadge(vendor.expirationDate)}
                       </div>
-                      {vendor.lastContactedAt ? (
-                        <div className="flex items-center text-xs text-gray-500" title={`Last contacted: ${formatDate(vendor.lastContactedAt)}`}>
-                          <Mail size={12} className="mr-1" />
-                          <span>Contacted {formatRelativeDate(vendor.lastContactedAt)}</span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center text-xs text-amber-600" title="Never contacted">
-                          <Mail size={12} className="mr-1" />
-                          <span>Never contacted</span>
-                        </div>
-                      )}
-                      <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-3">
                         <button
-                          onClick={() => handleEdit(vendor)}
-                          className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                          onClick={() => handleSelectVendor(vendor)}
+                          className="text-sm text-emerald-600 hover:text-emerald-700 font-semibold"
                         >
-                          Edit
+                          Details
                         </button>
                         <span className="text-gray-300">|</span>
                         <button
@@ -1451,12 +1428,6 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
                           Delete
                         </button>
                       </div>
-                      <button
-                        onClick={() => handleSelectVendor(vendor)}
-                        className="text-sm text-emerald-600 hover:text-emerald-700 font-semibold whitespace-nowrap"
-                      >
-                        View Details
-                      </button>
                       <button
                         onClick={() => handleRequestCOI(vendor)}
                         className={`text-xs px-3 py-1.5 rounded-lg font-semibold whitespace-nowrap flex items-center space-x-1.5 transition-all ${
@@ -1768,9 +1739,20 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
                 <h3 className="text-xl font-bold text-gray-900">{selectedVendor.name}</h3>
                 {selectedVendor.dba && <p className="text-gray-500">DBA: {selectedVendor.dba}</p>}
               </div>
-              <button onClick={() => setSelectedVendor(null)} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-all">
-                <X size={24} />
-              </button>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => {
+                    setEditingVendor({...selectedVendor});
+                    setSelectedVendor(null);
+                  }}
+                  className="px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg font-medium transition-all"
+                >
+                  Edit
+                </button>
+                <button onClick={() => setSelectedVendor(null)} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-all">
+                  <X size={24} />
+                </button>
+              </div>
             </div>
 
             {/* Tabs */}
@@ -1802,14 +1784,20 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
             {/* Details Tab Content */}
             {vendorDetailsTab === 'details' && (
             <div className="space-y-6">
-              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+              <div className="grid grid-cols-3 gap-4 p-4 bg-gray-50 rounded-xl">
                 <div>
                   <p className="text-sm text-gray-500 font-medium">Status</p>
                   <div className="mt-1">{getStatusBadge(selectedVendor.status, selectedVendor.daysOverdue)}</div>
                 </div>
-                <div className="text-right">
+                <div className="text-center">
                   <p className="text-sm text-gray-500 font-medium">Expiration</p>
                   <p className="font-semibold text-gray-900 mt-1">{formatDate(selectedVendor.expirationDate)}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm text-gray-500 font-medium">Last Contacted</p>
+                  <p className={`font-semibold mt-1 ${selectedVendor.lastContactedAt ? 'text-gray-900' : 'text-amber-600'}`}>
+                    {selectedVendor.lastContactedAt ? formatRelativeDate(selectedVendor.lastContactedAt) : 'Never'}
+                  </p>
                 </div>
               </div>
 
