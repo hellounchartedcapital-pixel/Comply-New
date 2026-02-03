@@ -1798,11 +1798,11 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
 
               {/* Property Assignment */}
               {properties.length > 0 && (
-                <div className="p-4 bg-purple-50 border border-purple-200 rounded-xl">
+                <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
-                      <Building2 size={18} className="text-purple-600" />
-                      <h4 className="font-semibold text-purple-900">Assigned Property</h4>
+                      <Building2 size={18} className="text-gray-600" />
+                      <h4 className="font-semibold text-gray-900">Assigned Property</h4>
                     </div>
                   </div>
                   <div className="mt-3">
@@ -1837,7 +1837,7 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
                           });
                         }
                       }}
-                      className="w-full px-4 py-2.5 border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white text-gray-900 font-medium"
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent bg-white text-gray-900 font-medium"
                     >
                       <option value="">No Property (Unassigned)</option>
                       {properties.map((property) => (
@@ -1846,7 +1846,7 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
                         </option>
                       ))}
                     </select>
-                    <p className="text-xs text-purple-600 mt-2">
+                    <p className="text-xs text-gray-500 mt-2">
                       Assign this vendor to a property to use property-specific insurance requirements
                     </p>
                   </div>
@@ -1854,24 +1854,57 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
               )}
 
               <div>
-                <h4 className="font-bold text-gray-900 mb-3">Standard Coverage</h4>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="p-3 bg-gray-50 rounded-xl">
-                    <p className="text-xs text-gray-500 font-medium">General Liability</p>
-                    <p className="font-semibold text-gray-900">{formatCurrency(selectedVendor.coverage.generalLiability.amount)}</p>
-                  </div>
-                  <div className="p-3 bg-gray-50 rounded-xl">
-                    <p className="text-xs text-gray-500 font-medium">Auto Liability</p>
-                    <p className="font-semibold text-gray-900">{formatCurrency(selectedVendor.coverage.autoLiability.amount)}</p>
-                  </div>
-                  <div className="p-3 bg-gray-50 rounded-xl">
-                    <p className="text-xs text-gray-500 font-medium">Workers Comp</p>
-                    <p className="font-semibold text-gray-900">{selectedVendor.coverage.workersComp.amount}</p>
-                  </div>
-                  <div className="p-3 bg-gray-50 rounded-xl">
-                    <p className="text-xs text-gray-500 font-medium">Employers Liability</p>
-                    <p className="font-semibold text-gray-900">{formatCurrency(selectedVendor.coverage.employersLiability.amount)}</p>
-                  </div>
+                <h4 className="font-bold text-gray-900 mb-3">Coverage Details</h4>
+                <div className="space-y-2">
+                  {[
+                    { key: 'generalLiability', label: 'General Liability', coverage: selectedVendor.coverage.generalLiability },
+                    { key: 'autoLiability', label: 'Auto Liability', coverage: selectedVendor.coverage.autoLiability },
+                    { key: 'workersComp', label: 'Workers Compensation', coverage: selectedVendor.coverage.workersComp },
+                    { key: 'employersLiability', label: 'Employers Liability', coverage: selectedVendor.coverage.employersLiability },
+                  ].map(({ key, label, coverage }) => {
+                    const amount = coverage?.amount;
+                    const isExpired = coverage?.expired;
+                    const isExpiringSoon = coverage?.expiringSoon;
+                    const hasAmount = amount && amount !== 'N/A' && amount !== 0;
+
+                    let statusIcon, statusColor, statusBg, statusText;
+                    if (!hasAmount) {
+                      statusIcon = <XCircle size={16} className="text-gray-400" />;
+                      statusColor = 'text-gray-400';
+                      statusBg = 'bg-gray-50';
+                      statusText = 'Not provided';
+                    } else if (isExpired) {
+                      statusIcon = <XCircle size={16} className="text-red-600" />;
+                      statusColor = 'text-red-600';
+                      statusBg = 'bg-red-50';
+                      statusText = 'Expired';
+                    } else if (isExpiringSoon) {
+                      statusIcon = <AlertCircle size={16} className="text-amber-600" />;
+                      statusColor = 'text-amber-600';
+                      statusBg = 'bg-amber-50';
+                      statusText = 'Expiring Soon';
+                    } else {
+                      statusIcon = <CheckCircle size={16} className="text-emerald-600" />;
+                      statusColor = 'text-emerald-600';
+                      statusBg = 'bg-emerald-50';
+                      statusText = 'Compliant';
+                    }
+
+                    return (
+                      <div key={key} className={`flex items-center justify-between p-3 rounded-xl ${statusBg}`}>
+                        <div className="flex items-center space-x-3">
+                          {statusIcon}
+                          <div>
+                            <p className="font-medium text-gray-900">{label}</p>
+                            <p className={`text-xs ${statusColor}`}>{statusText}</p>
+                          </div>
+                        </div>
+                        <p className="font-semibold text-gray-900">
+                          {key === 'workersComp' ? (amount || 'N/A') : formatCurrency(amount)}
+                        </p>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -1977,53 +2010,6 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
                 )}
               </div>
 
-              {/* Upload Link Status */}
-              <div className="p-4 bg-purple-50 border border-purple-200 rounded-xl">
-                <h4 className="font-bold text-purple-900 mb-3 flex items-center space-x-2">
-                  <Send size={16} />
-                  <span>Upload Link Status</span>
-                </h4>
-                {selectedVendor.uploadToken && selectedVendor.uploadTokenExpiresAt ? (
-                  <div className="space-y-2">
-                    {(() => {
-                      const expiresAt = new Date(selectedVendor.uploadTokenExpiresAt);
-                      const now = new Date();
-                      const daysRemaining = Math.ceil((expiresAt - now) / (1000 * 60 * 60 * 24));
-                      const isExpired = daysRemaining < 0;
-                      const isExpiringSoon = daysRemaining >= 0 && daysRemaining <= 7;
-
-                      return (
-                        <>
-                          <div className={`flex items-center space-x-2 text-sm ${
-                            isExpired ? 'text-red-700' : isExpiringSoon ? 'text-orange-700' : 'text-purple-700'
-                          }`}>
-                            <Clock size={14} />
-                            <span>
-                              {isExpired
-                                ? `Link expired ${Math.abs(daysRemaining)} days ago`
-                                : daysRemaining === 0
-                                ? 'Link expires today'
-                                : `Link expires in ${daysRemaining} days`}
-                            </span>
-                          </div>
-                          <p className="text-xs text-purple-600">
-                            Expires: {formatDate(selectedVendor.uploadTokenExpiresAt)}
-                          </p>
-                          {isExpired && (
-                            <p className="text-xs text-red-600 mt-1">
-                              Send a new COI request to generate a fresh link
-                            </p>
-                          )}
-                        </>
-                      );
-                    })()}
-                  </div>
-                ) : (
-                  <p className="text-sm text-purple-600">
-                    No active upload link. Send a COI request to generate one.
-                  </p>
-                )}
-              </div>
             </div>
             )}
 
