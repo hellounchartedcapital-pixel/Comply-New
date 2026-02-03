@@ -8,6 +8,7 @@ import { useTenants } from './useTenants';
 import { supabase } from './supabaseClient';
 import { formatCurrency, formatDate, formatRelativeDate, getStatusConfig } from './utils/complianceUtils';
 import { AlertModal, useAlertModal } from './AlertModal';
+import { PropertySelector } from './PropertySelector';
 import logger from './logger';
 
 // Status icon component (matches vendor style)
@@ -380,7 +381,7 @@ function TenantModal({ isOpen, onClose, onSave, tenant, properties }) {
 }
 
 // Main TenantsView component
-export function TenantsView({ properties, userRequirements }) {
+export function TenantsView({ properties, userRequirements, selectedProperty, onSelectProperty, loadingProperties }) {
   const { tenants, loading, stats, addTenant, updateTenant, deleteTenant, refreshTenants } = useTenants();
   const { alertModal, showAlert, hideAlert } = useAlertModal();
   const [searchQuery, setSearchQuery] = useState('');
@@ -727,6 +728,23 @@ export function TenantsView({ properties, userRequirements }) {
 
   return (
     <div className="space-y-6">
+      {/* Property Selector for Tenants */}
+      {properties.length > 0 && (
+        <div className="flex items-center justify-between">
+          <PropertySelector
+            properties={properties}
+            selectedProperty={selectedProperty}
+            onSelectProperty={onSelectProperty}
+            loading={loadingProperties}
+          />
+          {selectedProperty && (
+            <p className="text-sm text-gray-500">
+              Showing tenants for <span className="font-medium text-gray-700">{selectedProperty.name}</span>
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Stats Cards - Same style as vendors */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <button

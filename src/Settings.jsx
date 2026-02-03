@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Save, X, CheckCircle, AlertCircle, Info, Mail, Bell, Clock, Building2, Users, Shield } from 'lucide-react';
+import { Save, X, CheckCircle, AlertCircle, Info, Mail, Bell, Clock, Building2, Users, Shield, ChevronRight } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import logger from './logger';
 
-export function Settings({ onClose }) {
+export function Settings({ onClose, onManageProperties, propertyCount = 0 }) {
   const [settings, setSettings] = useState({
     // Company/Account Info
     companyName: '',
@@ -208,11 +208,35 @@ export function Settings({ onClose }) {
               />
             </div>
 
-            {/* Info about property settings */}
-            <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg flex items-start space-x-2">
-              <Info size={16} className="text-purple-600 flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-purple-800">
-                <strong>Insurance requirements</strong> are now managed per-property. Use the property selector in the header to manage properties and their specific requirements.
+            {/* Manage Properties Button */}
+            <button
+              onClick={() => {
+                if (onManageProperties) {
+                  onManageProperties();
+                }
+              }}
+              className="w-full p-4 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-lg flex items-center justify-between transition-colors"
+            >
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                  <Building2 className="w-5 h-5 text-purple-600" />
+                </div>
+                <div className="text-left">
+                  <h4 className="font-medium text-gray-900">Manage Properties</h4>
+                  <p className="text-sm text-gray-500">
+                    {propertyCount === 0
+                      ? 'Add your first property to set requirements'
+                      : `${propertyCount} propert${propertyCount === 1 ? 'y' : 'ies'} configured`}
+                  </p>
+                </div>
+              </div>
+              <ChevronRight size={20} className="text-purple-400" />
+            </button>
+
+            <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg flex items-start space-x-2">
+              <Info size={16} className="text-gray-500 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-gray-600">
+                Insurance requirements are managed per-property. Each property can have different coverage requirements.
               </p>
             </div>
           </div>

@@ -5,10 +5,15 @@ import {
   FileText, Users, ChevronRight, TrendingUp
 } from 'lucide-react';
 import { formatDate } from './utils/complianceUtils';
+import { PropertySelector } from './PropertySelector';
 
 export function Dashboard({
   vendors = [],
   tenants = [],
+  properties = [],
+  selectedProperty,
+  onSelectProperty,
+  loadingProperties = false,
   onViewVendors,
   onViewTenants,
   onSelectVendor,
@@ -162,6 +167,23 @@ export function Dashboard({
 
   return (
     <div className="space-y-6" role="main" aria-label="Compliance Dashboard">
+      {/* Property Selector */}
+      {properties.length > 0 && (
+        <div className="flex items-center justify-between">
+          <PropertySelector
+            properties={properties}
+            selectedProperty={selectedProperty}
+            onSelectProperty={onSelectProperty}
+            loading={loadingProperties}
+          />
+          {selectedProperty && (
+            <p className="text-sm text-gray-500">
+              Showing data for <span className="font-medium text-gray-700">{selectedProperty.name}</span>
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Welcome Banner */}
       <header className="bg-gradient-to-r from-emerald-600 to-teal-600 rounded-2xl p-6 text-white">
         <div>

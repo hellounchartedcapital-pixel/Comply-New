@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Upload, CheckCircle, XCircle, AlertCircle, FileText, Calendar, X, Search, Download, Settings as SettingsIcon, Eye, Bell, FileDown, Phone, Mail, User, Send, Clock, History, FileCheck, Building2, ChevronDown, CreditCard, Users, LayoutDashboard, Loader2 } from 'lucide-react';
+import { Upload, CheckCircle, XCircle, AlertCircle, FileText, Calendar, X, Search, Download, Settings as SettingsIcon, Eye, Bell, FileDown, Phone, Mail, User, Send, Clock, History, FileCheck, Building2, CreditCard, Users, LayoutDashboard, Loader2 } from 'lucide-react';
 import { useVendors } from './useVendors';
 import { useTenants } from './useTenants';
 import { useSubscription } from './useSubscription';
@@ -13,6 +13,7 @@ import { supabase } from './supabaseClient';
 import { exportPDFReport } from './exportPDFReport';
 import { Logo } from './Logo';
 import Properties from './Properties';
+import { PropertySelector } from './PropertySelector';
 import { TenantsView } from './TenantsView';
 import { Dashboard } from './Dashboard';
 import { isValidEmail } from './validation';
@@ -29,7 +30,6 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
   const [selectedProperty, setSelectedProperty] = useState(null);
   const [showProperties, setShowProperties] = useState(false);
   const [loadingProperties, setLoadingProperties] = useState(true);
-  const [showPropertyDropdown, setShowPropertyDropdown] = useState(false);
 
   // Use database hook instead of local state - filter by selected property
   const { vendors: dbVendors, loading, loadingMore, error, hasMore, totalCount, updateVendor, deleteVendor, loadMore, refreshVendors } = useVendors(selectedProperty?.id);
@@ -961,88 +961,6 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <Logo size="default" />
-              {/* Property Selector */}
-              {properties.length > 0 && (
-                <div className="relative" data-onboarding="property-selector">
-                  <button
-                    onClick={() => setShowPropertyDropdown(!showPropertyDropdown)}
-                    className="flex items-center space-x-2 px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-xl transition-all text-sm font-medium text-gray-700"
-                  >
-                    <Building2 size={16} className="text-gray-500" />
-                    <span className="max-w-[150px] truncate">
-                      {selectedProperty ? selectedProperty.name : 'All Properties'}
-                    </span>
-                    <ChevronDown size={16} className={`text-gray-400 transition-transform ${showPropertyDropdown ? 'rotate-180' : ''}`} />
-                  </button>
-
-                  {showPropertyDropdown && (
-                    <>
-                      <div
-                        className="fixed inset-0 z-40"
-                        onClick={() => setShowPropertyDropdown(false)}
-                      />
-                      <div className="absolute left-0 top-full mt-2 w-64 bg-white rounded-xl shadow-lg border border-gray-200 z-50 overflow-hidden">
-                        <div className="p-2">
-                          <button
-                            onClick={() => {
-                              setSelectedProperty(null);
-                              setShowPropertyDropdown(false);
-                            }}
-                            className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                              !selectedProperty
-                                ? 'bg-emerald-50 text-emerald-700'
-                                : 'text-gray-700 hover:bg-gray-100'
-                            }`}
-                          >
-                            All Properties
-                          </button>
-                          {properties.map((property) => (
-                            <button
-                              key={property.id}
-                              onClick={() => {
-                                setSelectedProperty(property);
-                                setShowPropertyDropdown(false);
-                              }}
-                              className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                                selectedProperty?.id === property.id
-                                  ? 'bg-emerald-50 text-emerald-700'
-                                  : 'text-gray-700 hover:bg-gray-100'
-                              }`}
-                            >
-                              <div className="truncate">{property.name}</div>
-                              {property.address && (
-                                <div className="text-xs text-gray-500 truncate">{property.address}</div>
-                              )}
-                            </button>
-                          ))}
-                        </div>
-                        <div className="border-t border-gray-200 p-2">
-                          <button
-                            onClick={() => {
-                              setShowPropertyDropdown(false);
-                              setShowProperties(true);
-                            }}
-                            className="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-emerald-600 hover:bg-emerald-50 transition-colors flex items-center space-x-2"
-                          >
-                            <SettingsIcon size={14} />
-                            <span>Manage Properties</span>
-                          </button>
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
-              {properties.length === 0 && !loadingProperties && (
-                <button
-                  onClick={() => setShowProperties(true)}
-                  className="flex items-center space-x-2 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 rounded-xl transition-all text-sm font-medium text-emerald-700"
-                  data-onboarding="property-selector"
-                >
-                  <Building2 size={16} />
-                  <span>Add Property</span>
-                </button>
-              )}
             </div>
             <div className="flex items-center space-x-3">
               <div className="text-right hidden sm:block">
@@ -1154,6 +1072,10 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
         <Dashboard
           vendors={vendors}
           tenants={dbTenants}
+          properties={properties}
+          selectedProperty={selectedProperty}
+          onSelectProperty={setSelectedProperty}
+          loadingProperties={loadingProperties}
           onViewVendors={() => setActiveTab('vendors')}
           onViewTenants={() => setActiveTab('tenants')}
           onSelectVendor={(vendor) => {
@@ -1169,6 +1091,21 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
       {/* Vendors Tab Content */}
       {activeTab === 'vendors' && (
         <>
+        {/* Property Selector for Vendors */}
+        <div className="mb-6 flex items-center justify-between">
+          <PropertySelector
+            properties={properties}
+            selectedProperty={selectedProperty}
+            onSelectProperty={setSelectedProperty}
+            loading={loadingProperties}
+          />
+          {selectedProperty && (
+            <p className="text-sm text-gray-500">
+              Showing vendors for <span className="font-medium text-gray-700">{selectedProperty.name}</span>
+            </p>
+          )}
+        </div>
+
         {/* Stats Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <button
@@ -2207,7 +2144,13 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
 
       {/* Tenants Tab Content */}
       {activeTab === 'tenants' && (
-        <TenantsView properties={properties} userRequirements={userRequirements} />
+        <TenantsView
+          properties={properties}
+          userRequirements={userRequirements}
+          selectedProperty={selectedProperty}
+          onSelectProperty={setSelectedProperty}
+          loadingProperties={loadingProperties}
+        />
       )}
       </div>
 
@@ -2230,7 +2173,14 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
 
       {/* Settings Modal */}
       {showSettings && (
-        <Settings onClose={() => setShowSettings(false)} />
+        <Settings
+          onClose={() => setShowSettings(false)}
+          onManageProperties={() => {
+            setShowSettings(false);
+            setShowProperties(true);
+          }}
+          propertyCount={properties.length}
+        />
       )}
 
       {/* Notification Settings Modal */}
