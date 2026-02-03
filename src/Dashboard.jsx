@@ -184,19 +184,6 @@ export function Dashboard({
         </div>
       )}
 
-      {/* Welcome Banner */}
-      <header className="bg-gradient-to-r from-emerald-600 to-teal-600 rounded-2xl p-6 text-white">
-        <div>
-          <h1 className="text-2xl font-bold mb-2">Compliance Dashboard</h1>
-          <p className="text-emerald-100">
-            {combinedStats.total === 0
-              ? 'Upload your first COI to get started'
-              : `Tracking ${combinedStats.total} certificates across vendors and tenants`
-            }
-          </p>
-        </div>
-      </header>
-
       {/* Combined Stats Row */}
       <section aria-label="Compliance Statistics">
         <h2 className="sr-only">Compliance Statistics Summary</h2>
