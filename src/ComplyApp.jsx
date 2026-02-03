@@ -83,7 +83,6 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
   const [requestCOIEmail, setRequestCOIEmail] = useState('');
   const [vendorDetailsTab, setVendorDetailsTab] = useState('details');
   const [coiPreviewUrl, setCoiPreviewUrl] = useState(null);
-  const [showCoiPreview, setShowCoiPreview] = useState(false);
   const [vendorActivity, setVendorActivity] = useState([]);
   const [loadingActivity, setLoadingActivity] = useState(false);
   const [bulkRequesting, setBulkRequesting] = useState(false);
@@ -547,7 +546,6 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
   const handleSelectVendor = async (vendor) => {
     setSelectedVendor(vendor);
     setVendorDetailsTab('details');
-    setShowCoiPreview(false);
     loadVendorActivity(vendor.id);
 
     // Load COI preview URL
@@ -1736,14 +1734,15 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
         </div>
       )}
 
-      {/* Vendor Details Modal */}
+      {/* Vendor Details Modal - Two Column Layout */}
       {selectedVendor && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
-          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 max-h-[95vh] sm:max-h-[90vh] overflow-y-auto shadow-2xl">
-            <div className="flex items-center justify-between mb-4">
+          <div className="bg-white rounded-2xl w-full max-w-6xl h-[95vh] sm:h-[90vh] shadow-2xl flex flex-col overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 flex-shrink-0">
               <div>
                 <h3 className="text-xl font-bold text-gray-900">{selectedVendor.name}</h3>
-                {selectedVendor.dba && <p className="text-gray-500">DBA: {selectedVendor.dba}</p>}
+                {selectedVendor.dba && <p className="text-gray-500 text-sm">DBA: {selectedVendor.dba}</p>}
               </div>
               <div className="flex items-center space-x-2">
                 <button
@@ -1761,448 +1760,376 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
               </div>
             </div>
 
-            {/* Tabs */}
-            <div className="flex space-x-1 mb-6 bg-gray-100 rounded-xl p-1">
-              <button
-                onClick={() => setVendorDetailsTab('details')}
-                className={`flex-1 px-4 py-2.5 text-sm font-semibold rounded-lg transition-all ${
-                  vendorDetailsTab === 'details'
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                <FileText size={16} className="inline mr-2 mb-0.5" />
-                Details
-              </button>
-              <button
-                onClick={() => setVendorDetailsTab('history')}
-                className={`flex-1 px-4 py-2.5 text-sm font-semibold rounded-lg transition-all ${
-                  vendorDetailsTab === 'history'
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                <History size={16} className="inline mr-2 mb-0.5" />
-                History
-              </button>
-            </div>
-
-            {/* Details Tab Content */}
-            {vendorDetailsTab === 'details' && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-3 gap-4 p-4 bg-gray-50 rounded-xl">
-                <div>
-                  <p className="text-sm text-gray-500 font-medium">Status</p>
-                  <div className="mt-1">{getStatusBadge(selectedVendor.status, selectedVendor.daysOverdue)}</div>
-                </div>
-                <div className="text-center">
-                  <p className="text-sm text-gray-500 font-medium">Expiration</p>
-                  <p className="font-semibold text-gray-900 mt-1">{formatDate(selectedVendor.expirationDate)}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm text-gray-500 font-medium">Last Contacted</p>
-                  <p className={`font-semibold mt-1 ${selectedVendor.lastContactedAt ? 'text-gray-900' : 'text-amber-600'}`}>
-                    {selectedVendor.lastContactedAt ? formatRelativeDate(selectedVendor.lastContactedAt) : 'Never'}
-                  </p>
-                </div>
-              </div>
-
-              {/* Property Assignment */}
-              {properties.length > 0 && (
-                <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <Building2 size={18} className="text-gray-600" />
-                      <h4 className="font-semibold text-gray-900">Assigned Property</h4>
+            {/* Two Column Content */}
+            <div className="flex flex-1 overflow-hidden">
+              {/* Left Column - COI Preview */}
+              <div className="w-1/2 bg-gray-100 flex flex-col border-r border-gray-200">
+                {selectedVendor.rawData?.documentPath && coiPreviewUrl ? (
+                  <div className="flex-1 flex flex-col">
+                    <div className="p-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+                      <span className="text-sm font-medium text-gray-700">Certificate Preview</span>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleViewCOI(selectedVendor)}
+                          className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 font-medium"
+                        >
+                          Open Full
+                        </button>
+                        <button
+                          onClick={() => handleDownloadCOI(selectedVendor)}
+                          className="text-xs px-2 py-1 bg-emerald-100 text-emerald-700 rounded hover:bg-emerald-200 font-medium"
+                        >
+                          Download
+                        </button>
+                      </div>
+                    </div>
+                    <div className="flex-1">
+                      <iframe
+                        src={`${coiPreviewUrl}#toolbar=0&navpanes=0&scrollbar=0`}
+                        className="w-full h-full"
+                        title="COI Preview"
+                      />
                     </div>
                   </div>
-                  <div className="mt-3">
-                    <select
-                      value={selectedVendor.propertyId || ''}
-                      onChange={async (e) => {
-                        const newPropertyId = e.target.value || null;
-                        const result = await updateVendor(selectedVendor.id, {
-                          ...selectedVendor,
-                          propertyId: newPropertyId
-                        });
-                        if (result.success) {
-                          // Update the selected vendor in local state
-                          setSelectedVendor({
-                            ...selectedVendor,
-                            propertyId: newPropertyId
-                          });
-                          showAlert({
-                            type: 'success',
-                            title: 'Property Updated',
-                            message: newPropertyId
-                              ? `Vendor assigned to ${properties.find(p => p.id === newPropertyId)?.name}`
-                              : 'Vendor unassigned from property'
-                          });
-                          refreshVendors();
-                        } else {
-                          showAlert({
-                            type: 'error',
-                            title: 'Update Failed',
-                            message: 'Failed to update property assignment',
-                            details: result.error
-                          });
-                        }
-                      }}
-                      className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent bg-white text-gray-900 font-medium"
-                    >
-                      <option value="">No Property (Unassigned)</option>
-                      {properties.map((property) => (
-                        <option key={property.id} value={property.id}>
-                          {property.name}{property.address ? ` - ${property.address}` : ''}
-                        </option>
-                      ))}
-                    </select>
-                    <p className="text-xs text-gray-500 mt-2">
-                      Assign this vendor to a property to use property-specific insurance requirements
-                    </p>
+                ) : (
+                  <div className="flex-1 flex items-center justify-center">
+                    <div className="text-center p-8">
+                      <FileText size={48} className="mx-auto text-gray-300 mb-4" />
+                      <p className="text-gray-500 font-medium">No COI Document</p>
+                      <p className="text-sm text-gray-400 mt-1">Upload a certificate to view it here</p>
+                    </div>
                   </div>
+                )}
+              </div>
+
+              {/* Right Column - Details */}
+              <div className="w-1/2 flex flex-col overflow-hidden">
+                {/* Tabs */}
+                <div className="flex space-x-1 p-3 bg-gray-50 border-b border-gray-200 flex-shrink-0">
+                  <button
+                    onClick={() => setVendorDetailsTab('details')}
+                    className={`flex-1 px-4 py-2 text-sm font-semibold rounded-lg transition-all ${
+                      vendorDetailsTab === 'details'
+                        ? 'bg-white text-gray-900 shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    <FileText size={14} className="inline mr-1.5 mb-0.5" />
+                    Details
+                  </button>
+                  <button
+                    onClick={() => setVendorDetailsTab('history')}
+                    className={`flex-1 px-4 py-2 text-sm font-semibold rounded-lg transition-all ${
+                      vendorDetailsTab === 'history'
+                        ? 'bg-white text-gray-900 shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    <History size={14} className="inline mr-1.5 mb-0.5" />
+                    History
+                  </button>
                 </div>
-              )}
 
-              <div>
-                <h4 className="font-bold text-gray-900 mb-3">Coverage Details</h4>
-                <div className="space-y-2">
-                  {[
-                    { key: 'generalLiability', label: 'General Liability', coverage: selectedVendor.coverage.generalLiability },
-                    { key: 'autoLiability', label: 'Auto Liability', coverage: selectedVendor.coverage.autoLiability },
-                    { key: 'workersComp', label: 'Workers Compensation', coverage: selectedVendor.coverage.workersComp },
-                    { key: 'employersLiability', label: 'Employers Liability', coverage: selectedVendor.coverage.employersLiability },
-                  ].map(({ key, label, coverage }) => {
-                    const amount = coverage?.amount;
-                    const isExpired = coverage?.expired;
-                    const isExpiringSoon = coverage?.expiringSoon;
-                    const hasAmount = amount && amount !== 'N/A' && amount !== 0;
+                {/* Scrollable Content */}
+                <div className="flex-1 overflow-y-auto p-4">
+                  {/* Details Tab Content */}
+                  {vendorDetailsTab === 'details' && (
+                    <div className="space-y-4">
+                      {/* Status Grid */}
+                      <div className="grid grid-cols-3 gap-3 p-3 bg-gray-50 rounded-xl">
+                        <div>
+                          <p className="text-xs text-gray-500 font-medium">Status</p>
+                          <div className="mt-1">{getStatusBadge(selectedVendor.status, selectedVendor.daysOverdue)}</div>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-xs text-gray-500 font-medium">Expiration</p>
+                          <p className="font-semibold text-gray-900 text-sm mt-1">{formatDate(selectedVendor.expirationDate)}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs text-gray-500 font-medium">Last Contacted</p>
+                          <p className={`font-semibold text-sm mt-1 ${selectedVendor.lastContactedAt ? 'text-gray-900' : 'text-amber-600'}`}>
+                            {selectedVendor.lastContactedAt ? formatRelativeDate(selectedVendor.lastContactedAt) : 'Never'}
+                          </p>
+                        </div>
+                      </div>
 
-                    let statusIcon, statusColor, statusBg, statusText;
-                    if (!hasAmount) {
-                      statusIcon = <XCircle size={16} className="text-gray-400" />;
-                      statusColor = 'text-gray-400';
-                      statusBg = 'bg-gray-50';
-                      statusText = 'Not provided';
-                    } else if (isExpired) {
-                      statusIcon = <XCircle size={16} className="text-red-600" />;
-                      statusColor = 'text-red-600';
-                      statusBg = 'bg-red-50';
-                      statusText = 'Expired';
-                    } else if (isExpiringSoon) {
-                      statusIcon = <AlertCircle size={16} className="text-amber-600" />;
-                      statusColor = 'text-amber-600';
-                      statusBg = 'bg-amber-50';
-                      statusText = 'Expiring Soon';
-                    } else {
-                      statusIcon = <CheckCircle size={16} className="text-emerald-600" />;
-                      statusColor = 'text-emerald-600';
-                      statusBg = 'bg-emerald-50';
-                      statusText = 'Compliant';
-                    }
+                      {/* Property Assignment */}
+                      {properties.length > 0 && (
+                        <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl">
+                          <div className="flex items-center space-x-2 mb-2">
+                            <Building2 size={16} className="text-gray-600" />
+                            <h4 className="font-semibold text-gray-900 text-sm">Assigned Property</h4>
+                          </div>
+                          <select
+                            value={selectedVendor.propertyId || ''}
+                            onChange={async (e) => {
+                              const newPropertyId = e.target.value || null;
+                              const result = await updateVendor(selectedVendor.id, {
+                                ...selectedVendor,
+                                propertyId: newPropertyId
+                              });
+                              if (result.success) {
+                                setSelectedVendor({
+                                  ...selectedVendor,
+                                  propertyId: newPropertyId
+                                });
+                                showAlert({
+                                  type: 'success',
+                                  title: 'Property Updated',
+                                  message: newPropertyId
+                                    ? `Vendor assigned to ${properties.find(p => p.id === newPropertyId)?.name}`
+                                    : 'Vendor unassigned from property'
+                                });
+                                refreshVendors();
+                              } else {
+                                showAlert({
+                                  type: 'error',
+                                  title: 'Update Failed',
+                                  message: 'Failed to update property assignment',
+                                  details: result.error
+                                });
+                              }
+                            }}
+                            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent bg-white"
+                          >
+                            <option value="">No Property (Unassigned)</option>
+                            {properties.map((property) => (
+                              <option key={property.id} value={property.id}>
+                                {property.name}{property.address ? ` - ${property.address}` : ''}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
 
-                    return (
-                      <div key={key} className={`flex items-center justify-between p-3 rounded-xl ${statusBg}`}>
-                        <div className="flex items-center space-x-3">
-                          {statusIcon}
-                          <div>
-                            <p className="font-medium text-gray-900">{label}</p>
-                            <p className={`text-xs ${statusColor}`}>{statusText}</p>
+                      {/* Coverage Details */}
+                      <div>
+                        <h4 className="font-bold text-gray-900 text-sm mb-2">Coverage Details</h4>
+                        <div className="space-y-1.5">
+                          {[
+                            { key: 'generalLiability', label: 'General Liability', coverage: selectedVendor.coverage.generalLiability },
+                            { key: 'autoLiability', label: 'Auto Liability', coverage: selectedVendor.coverage.autoLiability },
+                            { key: 'workersComp', label: 'Workers Compensation', coverage: selectedVendor.coverage.workersComp },
+                            { key: 'employersLiability', label: 'Employers Liability', coverage: selectedVendor.coverage.employersLiability },
+                          ].map(({ key, label, coverage }) => {
+                            const amount = coverage?.amount;
+                            const isExpired = coverage?.expired;
+                            const isExpiringSoon = coverage?.expiringSoon;
+                            const hasAmount = amount && amount !== 'N/A' && amount !== 0;
+
+                            let statusIcon, statusColor, statusBg, statusText;
+                            if (!hasAmount) {
+                              statusIcon = <XCircle size={14} className="text-gray-400" />;
+                              statusColor = 'text-gray-400';
+                              statusBg = 'bg-gray-50';
+                              statusText = 'Not provided';
+                            } else if (isExpired) {
+                              statusIcon = <XCircle size={14} className="text-red-600" />;
+                              statusColor = 'text-red-600';
+                              statusBg = 'bg-red-50';
+                              statusText = 'Expired';
+                            } else if (isExpiringSoon) {
+                              statusIcon = <AlertCircle size={14} className="text-amber-600" />;
+                              statusColor = 'text-amber-600';
+                              statusBg = 'bg-amber-50';
+                              statusText = 'Expiring Soon';
+                            } else {
+                              statusIcon = <CheckCircle size={14} className="text-emerald-600" />;
+                              statusColor = 'text-emerald-600';
+                              statusBg = 'bg-emerald-50';
+                              statusText = 'Compliant';
+                            }
+
+                            return (
+                              <div key={key} className={`flex items-center justify-between p-2.5 rounded-lg ${statusBg}`}>
+                                <div className="flex items-center space-x-2">
+                                  {statusIcon}
+                                  <div>
+                                    <p className="font-medium text-gray-900 text-sm">{label}</p>
+                                    <p className={`text-xs ${statusColor}`}>{statusText}</p>
+                                  </div>
+                                </div>
+                                <p className="font-semibold text-gray-900 text-sm">
+                                  {key === 'workersComp' ? (amount || 'N/A') : formatCurrency(amount)}
+                                </p>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Additional Insured Status */}
+                      {selectedVendor.additionalInsured && (
+                        <div className={`p-3 rounded-xl border ${
+                          selectedVendor.hasAdditionalInsured
+                            ? 'bg-emerald-50 border-emerald-200'
+                            : selectedVendor.missingAdditionalInsured
+                            ? 'bg-red-50 border-red-200'
+                            : 'bg-gray-50 border-gray-200'
+                        }`}>
+                          <div className="flex items-start space-x-2">
+                            {selectedVendor.hasAdditionalInsured && (
+                              <CheckCircle size={16} className="text-emerald-600 flex-shrink-0 mt-0.5" />
+                            )}
+                            {selectedVendor.missingAdditionalInsured && (
+                              <AlertCircle size={16} className="text-red-600 flex-shrink-0 mt-0.5" />
+                            )}
+                            <div className="flex-1">
+                              <p className="text-sm font-semibold text-gray-900">Additional Insured</p>
+                              <p className={`text-sm mt-1 ${
+                                selectedVendor.hasAdditionalInsured ? 'text-emerald-700' :
+                                selectedVendor.missingAdditionalInsured ? 'text-red-700' : 'text-gray-600'
+                              }`}>
+                                {selectedVendor.additionalInsured}
+                              </p>
+                            </div>
                           </div>
                         </div>
-                        <p className="font-semibold text-gray-900">
-                          {key === 'workersComp' ? (amount || 'N/A') : formatCurrency(amount)}
-                        </p>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+                      )}
 
-              {/* Additional Insured Status */}
-              {selectedVendor.additionalInsured && (
-                <div className={`p-4 rounded-xl border ${
-                  selectedVendor.hasAdditionalInsured
-                    ? 'bg-emerald-50 border-emerald-200'
-                    : selectedVendor.missingAdditionalInsured
-                    ? 'bg-red-50 border-red-200'
-                    : 'bg-gray-50 border-gray-200'
-                }`}>
-                  <div className="flex items-start space-x-2">
-                    {selectedVendor.hasAdditionalInsured && (
-                      <CheckCircle size={18} className="text-emerald-600 flex-shrink-0 mt-0.5" />
-                    )}
-                    {selectedVendor.missingAdditionalInsured && (
-                      <AlertCircle size={18} className="text-red-600 flex-shrink-0 mt-0.5" />
-                    )}
-                    <div className="flex-1">
-                      <p className="text-sm font-semibold text-gray-900">Additional Insured</p>
-                      <p className={`text-sm mt-1 ${
-                        selectedVendor.hasAdditionalInsured ? 'text-emerald-700' :
-                        selectedVendor.missingAdditionalInsured ? 'text-red-700' : 'text-gray-600'
-                      }`}>
-                        {selectedVendor.additionalInsured}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
+                      {/* Issues */}
+                      {selectedVendor.issues.length > 0 && (
+                        <div className="p-3 bg-red-50 border border-red-200 rounded-xl">
+                          <h4 className="font-bold text-red-900 text-sm mb-2">Issues</h4>
+                          <div className="space-y-1.5">
+                            {selectedVendor.issues.map((issue, idx) => (
+                              <div key={idx} className={`flex items-start space-x-2 text-sm ${
+                                issue.type === 'critical' ? 'text-red-700' : 'text-orange-700'
+                              }`}>
+                                <AlertCircle size={14} className="mt-0.5 flex-shrink-0" />
+                                <span>{issue.message}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
 
-              {selectedVendor.issues.length > 0 && (
-                <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
-                  <h4 className="font-bold text-red-900 mb-2">Issues</h4>
-                  <div className="space-y-2">
-                    {selectedVendor.issues.map((issue, idx) => (
-                      <div key={idx} className={`flex items-start space-x-2 text-sm ${
-                        issue.type === 'critical' ? 'text-red-700' : 'text-orange-700'
-                      }`}>
-                        <AlertCircle size={14} className="mt-0.5 flex-shrink-0" />
-                        <span>{issue.message}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Contact Information */}
-              {(selectedVendor.contactName || selectedVendor.contactEmail || selectedVendor.contactPhone) && (
-                <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl">
-                  <h4 className="font-bold text-blue-900 mb-3">Contact Information</h4>
-                  <div className="space-y-2">
-                    {selectedVendor.contactName && (
-                      <div className="flex items-center space-x-2 text-sm">
-                        <User size={14} className="text-blue-600" />
-                        <span className="text-gray-700">{selectedVendor.contactName}</span>
-                      </div>
-                    )}
-                    {selectedVendor.contactEmail && (
-                      <div className="flex items-center space-x-2 text-sm">
-                        <Mail size={14} className="text-blue-600" />
-                        <span className="text-gray-700">{selectedVendor.contactEmail}</span>
-                      </div>
-                    )}
-                    {selectedVendor.contactPhone && (
-                      <div className="flex items-center space-x-2 text-sm">
-                        <Phone size={14} className="text-blue-600" />
-                        <span className="text-gray-700">{selectedVendor.contactPhone}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* COI Document Preview */}
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="font-bold text-gray-900">Certificate of Insurance</h4>
-                  {selectedVendor.rawData?.documentPath && (
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => setShowCoiPreview(!showCoiPreview)}
-                        className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-all ${
-                          showCoiPreview
-                            ? 'bg-blue-100 text-blue-700'
-                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                        }`}
-                      >
-                        <Eye size={14} className="inline mr-1.5" />
-                        {showCoiPreview ? 'Hide Preview' : 'Show Preview'}
-                      </button>
+                      {/* Contact Information */}
+                      {(selectedVendor.contactName || selectedVendor.contactEmail || selectedVendor.contactPhone) && (
+                        <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl">
+                          <h4 className="font-bold text-blue-900 text-sm mb-2">Contact Information</h4>
+                          <div className="space-y-1.5">
+                            {selectedVendor.contactName && (
+                              <div className="flex items-center space-x-2 text-sm">
+                                <User size={14} className="text-blue-600" />
+                                <span className="text-gray-700">{selectedVendor.contactName}</span>
+                              </div>
+                            )}
+                            {selectedVendor.contactEmail && (
+                              <div className="flex items-center space-x-2 text-sm">
+                                <Mail size={14} className="text-blue-600" />
+                                <span className="text-gray-700">{selectedVendor.contactEmail}</span>
+                              </div>
+                            )}
+                            {selectedVendor.contactPhone && (
+                              <div className="flex items-center space-x-2 text-sm">
+                                <Phone size={14} className="text-blue-600" />
+                                <span className="text-gray-700">{selectedVendor.contactPhone}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
-                </div>
 
-                {selectedVendor.rawData?.documentPath ? (
-                  <div className="space-y-3">
-                    {/* COI Preview */}
-                    {showCoiPreview && coiPreviewUrl && (
-                      <div className="relative rounded-xl overflow-hidden border border-gray-200 bg-gray-100">
-                        {/* AI Check Legend */}
-                        <div className="bg-gray-800 text-white px-4 py-2 text-xs flex flex-wrap gap-4">
-                          <span className="font-semibold">AI Checks:</span>
-                          <span className="flex items-center gap-1">
-                            <span className="w-3 h-3 rounded bg-blue-400"></span>
-                            Insured Name
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <span className="w-3 h-3 rounded bg-emerald-400"></span>
-                            Coverage Limits
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <span className="w-3 h-3 rounded bg-amber-400"></span>
-                            Expiration Dates
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <span className="w-3 h-3 rounded bg-purple-400"></span>
-                            Additional Insured
-                          </span>
+                  {/* History Tab Content */}
+                  {vendorDetailsTab === 'history' && (
+                    <div className="space-y-3">
+                      {loadingActivity ? (
+                        <div className="text-center py-8">
+                          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
+                          <p className="text-gray-500 mt-2">Loading history...</p>
                         </div>
-
-                        {/* PDF Preview */}
-                        <div className="relative" style={{ height: '500px' }}>
-                          <iframe
-                            src={`${coiPreviewUrl}#toolbar=0&navpanes=0`}
-                            className="w-full h-full"
-                            title="COI Preview"
-                          />
-
-                          {/* ACORD Form Region Overlay - positioned over standard ACORD 25 regions */}
-                          <svg
-                            className="absolute inset-0 w-full h-full pointer-events-none"
-                            viewBox="0 0 100 130"
-                            preserveAspectRatio="none"
-                          >
-                            {/* Insured Name Region - top section */}
-                            <rect x="2" y="8" width="45" height="10" fill="rgba(59, 130, 246, 0.15)" stroke="rgba(59, 130, 246, 0.5)" strokeWidth="0.3" rx="0.5" />
-
-                            {/* General Liability Section */}
-                            <rect x="2" y="28" width="96" height="12" fill="rgba(16, 185, 129, 0.1)" stroke="rgba(16, 185, 129, 0.4)" strokeWidth="0.3" rx="0.5" />
-
-                            {/* Auto Liability Section */}
-                            <rect x="2" y="41" width="96" height="10" fill="rgba(16, 185, 129, 0.1)" stroke="rgba(16, 185, 129, 0.4)" strokeWidth="0.3" rx="0.5" />
-
-                            {/* Workers Comp Section */}
-                            <rect x="2" y="52" width="96" height="10" fill="rgba(16, 185, 129, 0.1)" stroke="rgba(16, 185, 129, 0.4)" strokeWidth="0.3" rx="0.5" />
-
-                            {/* Expiration Date Columns - on policy rows */}
-                            <rect x="55" y="28" width="12" height="34" fill="rgba(245, 158, 11, 0.15)" stroke="rgba(245, 158, 11, 0.5)" strokeWidth="0.3" rx="0.5" />
-
-                            {/* Description / Additional Insured Box */}
-                            <rect x="2" y="75" width="96" height="18" fill="rgba(168, 85, 247, 0.1)" stroke="rgba(168, 85, 247, 0.4)" strokeWidth="0.3" rx="0.5" />
-
-                            {/* Certificate Holder */}
-                            <rect x="2" y="95" width="45" height="15" fill="rgba(107, 114, 128, 0.1)" stroke="rgba(107, 114, 128, 0.4)" strokeWidth="0.3" rx="0.5" />
-                          </svg>
+                      ) : vendorActivity.length === 0 ? (
+                        <div className="text-center py-8 bg-gray-50 rounded-xl border border-gray-200">
+                          <Clock size={40} className="mx-auto text-gray-300 mb-3" />
+                          <p className="text-gray-500 font-medium">No activity recorded yet</p>
+                          <p className="text-sm text-gray-400 mt-1">Activity will appear here when emails are sent or COIs are uploaded</p>
                         </div>
-
-                        <p className="text-xs text-gray-500 p-2 bg-gray-50 border-t border-gray-200">
-                          Colored regions show where the AI extracts compliance data from standard ACORD 25 forms
-                        </p>
-                      </div>
-                    )}
-
-                    {/* Action Buttons */}
-                    <div className="flex flex-col sm:flex-row gap-3">
-                      <button
-                        onClick={() => handleViewCOI(selectedVendor)}
-                        className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-semibold flex items-center justify-center space-x-2 transition-all"
-                      >
-                        <Eye size={18} />
-                        <span>Open Full View</span>
-                      </button>
-                      <button
-                        onClick={() => handleDownloadCOI(selectedVendor)}
-                        className="flex-1 px-4 py-3 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 font-semibold flex items-center justify-center space-x-2 transition-all"
-                      >
-                        <Download size={18} />
-                        <span>Download COI</span>
-                      </button>
+                      ) : (
+                        <div className="space-y-2">
+                          {vendorActivity.map((activity) => {
+                            const actionType = activity.action || activity.activity_type;
+                            const description = activity.details?.reason || activity.details?.description || activity.description || '';
+                            return (
+                              <div
+                                key={activity.id}
+                                className={`p-3 rounded-xl border ${
+                                  actionType === 'coi_uploaded'
+                                    ? 'bg-emerald-50 border-emerald-200'
+                                    : actionType === 'email_sent' || actionType === 'auto_follow_up_sent'
+                                    ? 'bg-blue-50 border-blue-200'
+                                    : 'bg-gray-50 border-gray-200'
+                                }`}
+                              >
+                                <div className="flex items-start space-x-3">
+                                  <div className={`p-2 rounded-lg ${
+                                    actionType === 'coi_uploaded'
+                                      ? 'bg-emerald-100'
+                                      : actionType === 'email_sent' || actionType === 'auto_follow_up_sent'
+                                      ? 'bg-blue-100'
+                                      : 'bg-gray-100'
+                                  }`}>
+                                    {actionType === 'coi_uploaded' ? (
+                                      <Upload size={14} className="text-emerald-600" />
+                                    ) : actionType === 'email_sent' || actionType === 'auto_follow_up_sent' ? (
+                                      <Mail size={14} className="text-blue-600" />
+                                    ) : (
+                                      <Clock size={14} className="text-gray-600" />
+                                    )}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="font-semibold text-gray-900 text-sm">
+                                      {actionType === 'coi_uploaded'
+                                        ? 'COI Uploaded'
+                                        : actionType === 'email_sent'
+                                        ? 'Request Email Sent'
+                                        : actionType === 'auto_follow_up_sent'
+                                        ? 'Auto Follow-Up Sent'
+                                        : actionType?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Activity'}
+                                    </p>
+                                    {description && <p className="text-sm text-gray-600 mt-0.5">{description}</p>}
+                                    {activity.details?.email && (
+                                      <p className="text-xs text-gray-500 mt-0.5">To: {activity.details.email}</p>
+                                    )}
+                                    <p className="text-xs text-gray-400 mt-1">
+                                      {new Date(activity.created_at).toLocaleString()}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ) : (
-                  <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl">
-                    <p className="text-sm text-gray-600 flex items-center">
-                      <FileText className="mr-2" size={16} />
-                      No document uploaded for this vendor
-                    </p>
-                  </div>
-                )}
-              </div>
+                  )}
 
-            </div>
-            )}
-
-            {/* History Tab Content */}
-            {vendorDetailsTab === 'history' && (
-              <div className="space-y-4">
-                {loadingActivity ? (
-                  <div className="text-center py-8">
-                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
-                    <p className="text-gray-500 mt-2">Loading history...</p>
-                  </div>
-                ) : vendorActivity.length === 0 ? (
-                  <div className="text-center py-8 bg-gray-50 rounded-xl border border-gray-200">
-                    <Clock size={40} className="mx-auto text-gray-300 mb-3" />
-                    <p className="text-gray-500 font-medium">No activity recorded yet</p>
-                    <p className="text-sm text-gray-400 mt-1">Activity will appear here when emails are sent or COIs are uploaded</p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {vendorActivity.map((activity) => {
-                      const actionType = activity.action || activity.activity_type;
-                      const description = activity.details?.reason || activity.details?.description || activity.description || '';
-                      return (
-                      <div
-                        key={activity.id}
-                        className={`p-4 rounded-xl border ${
-                          actionType === 'coi_uploaded'
-                            ? 'bg-emerald-50 border-emerald-200'
-                            : actionType === 'email_sent' || actionType === 'auto_follow_up_sent'
-                            ? 'bg-blue-50 border-blue-200'
-                            : 'bg-gray-50 border-gray-200'
-                        }`}
+                  {/* Action Buttons */}
+                  <div className="flex flex-col sm:flex-row gap-2 pt-4 mt-4 border-t border-gray-200">
+                    {(selectedVendor.status === 'expired' || selectedVendor.status === 'non-compliant' || selectedVendor.status === 'expiring') && (
+                      <button
+                        onClick={() => {
+                          const vendor = selectedVendor;
+                          setSelectedVendor(null);
+                          handleRequestCOI(vendor);
+                        }}
+                        className="flex-1 px-4 py-2.5 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-xl hover:shadow-lg font-semibold flex items-center justify-center space-x-2 transition-all text-sm"
                       >
-                        <div className="flex items-start space-x-3">
-                          <div className={`p-2 rounded-xl ${
-                            actionType === 'coi_uploaded'
-                              ? 'bg-emerald-100'
-                              : actionType === 'email_sent' || actionType === 'auto_follow_up_sent'
-                              ? 'bg-blue-100'
-                              : 'bg-gray-100'
-                          }`}>
-                            {actionType === 'coi_uploaded' ? (
-                              <Upload size={16} className="text-emerald-600" />
-                            ) : actionType === 'email_sent' || actionType === 'auto_follow_up_sent' ? (
-                              <Mail size={16} className="text-blue-600" />
-                            ) : (
-                              <Clock size={16} className="text-gray-600" />
-                            )}
-                          </div>
-                          <div className="flex-1">
-                            <p className="font-semibold text-gray-900">
-                              {actionType === 'coi_uploaded'
-                                ? 'COI Uploaded'
-                                : actionType === 'email_sent'
-                                ? 'Request Email Sent'
-                                : actionType === 'auto_follow_up_sent'
-                                ? 'Auto Follow-Up Sent'
-                                : actionType?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Activity'}
-                            </p>
-                            {description && <p className="text-sm text-gray-600 mt-1">{description}</p>}
-                            {activity.details?.email && (
-                              <p className="text-sm text-gray-500 mt-1">To: {activity.details.email}</p>
-                            )}
-                            <p className="text-xs text-gray-400 mt-2">
-                              {new Date(activity.created_at).toLocaleString()}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    )})}
+                        <Send size={14} />
+                        <span>Request New COI</span>
+                      </button>
+                    )}
+                    <button
+                      onClick={() => setSelectedVendor(null)}
+                      className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 font-semibold transition-all text-sm"
+                    >
+                      Close
+                    </button>
                   </div>
-                )}
+                </div>
               </div>
-            )}
-
-            <div className="flex flex-col sm:flex-row gap-3 mt-6">
-              {(selectedVendor.status === 'expired' || selectedVendor.status === 'non-compliant' || selectedVendor.status === 'expiring') && (
-                <button
-                  onClick={() => {
-                    setSelectedVendor(null);
-                    handleRequestCOI(selectedVendor);
-                  }}
-                  className="flex-1 px-4 py-3 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-xl hover:shadow-lg font-semibold flex items-center justify-center space-x-2 transition-all"
-                >
-                  <Send size={16} />
-                  <span>Request New COI</span>
-                </button>
-              )}
-              <button
-                onClick={() => setSelectedVendor(null)}
-                className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 font-semibold transition-all"
-              >
-                Close
-              </button>
             </div>
           </div>
         </div>
