@@ -1,15 +1,48 @@
 import React, { useState, useEffect } from 'react';
 import {
   Users, Plus, Search, CheckCircle, XCircle, AlertCircle, Clock,
-  Mail, Phone, Calendar, Building2, Edit2, X, Send,
+  Mail, Phone, Calendar, Building2, X, Send,
   ExternalLink, Shield, Loader2
 } from 'lucide-react';
 import { useTenants } from './useTenants';
 import { supabase } from './supabaseClient';
-import { formatCurrency, formatDate, formatRelativeDate, getStatusConfig } from './utils/complianceUtils';
+import { formatCurrency, formatDate, formatRelativeDate, getStatusConfig, getDaysUntil } from './utils/complianceUtils';
 import { AlertModal, useAlertModal } from './AlertModal';
 import { PropertySelector } from './PropertySelector';
 import logger from './logger';
+
+// Expiration badge component (matches vendor style)
+function getExpirationBadge(expirationDate) {
+  if (!expirationDate) return null;
+
+  const days = getDaysUntil(expirationDate);
+  if (days === null) return null;
+
+  if (days < 0) {
+    return (
+      <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">
+        {Math.abs(days)} days overdue
+      </span>
+    );
+  } else if (days === 0) {
+    return (
+      <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">
+        Expires today
+      </span>
+    );
+  } else if (days <= 30) {
+    return (
+      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+        days <= 7 ? 'bg-red-100 text-red-700' :
+        days <= 14 ? 'bg-orange-100 text-orange-700' :
+        'bg-amber-100 text-amber-700'
+      }`}>
+        {days} days left
+      </span>
+    );
+  }
+  return null;
+}
 
 // Status icon component (matches vendor style)
 function getStatusIcon(status) {
@@ -967,43 +1000,26 @@ export function TenantsView({ properties, userRequirements, selectedProperty, on
                             ))}
                           </div>
                         )}
-
-                        {/* Coverage Tags */}
-                        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-600">
-                          <div className="bg-gray-100 px-2 py-1 rounded-lg">
-                            <span className="font-medium">Liability:</span> {formatCurrency(tenant.policy_liability_amount || tenant.required_liability_min)}
-                          </div>
-                          {tenant.requires_additional_insured && (
-                            <div className="bg-gray-100 px-2 py-1 rounded-lg">
-                              <span className="font-medium">Add'l Insured:</span> {tenant.has_additional_insured ? 'Yes' : 'Required'}
-                            </div>
-                          )}
-                        </div>
                       </div>
                     </div>
 
                     <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-start space-x-2 sm:space-x-0 sm:space-y-2 sm:ml-4 pt-2 sm:pt-0 border-t sm:border-t-0 border-gray-100">
                       {/* Expiration Date */}
-                      <div className="flex items-center text-sm text-gray-500 bg-gray-100 px-2.5 py-1 rounded-lg">
-                        <Calendar size={14} className="mr-1.5" />
-                        {tenant.policy_expiration_date ? formatDate(tenant.policy_expiration_date) : 'No policy'}
+                      <div className="flex flex-col items-end gap-1">
+                        <div className="flex items-center text-sm text-gray-500 bg-gray-100 px-2.5 py-1 rounded-lg">
+                          <Calendar size={14} className="mr-1.5" />
+                          {tenant.policy_expiration_date ? formatDate(tenant.policy_expiration_date) : 'No policy'}
+                        </div>
+                        {getExpirationBadge(tenant.policy_expiration_date)}
                       </div>
 
-                      {/* Last Contacted */}
-                      {tenant.last_contacted_at && (
-                        <div className="flex items-center text-xs text-gray-500" title={`Last contacted: ${formatDate(tenant.last_contacted_at)}`}>
-                          <Mail size={12} className="mr-1" />
-                          <span>Contacted {formatRelativeDate(tenant.last_contacted_at)}</span>
-                        </div>
-                      )}
-
                       {/* Action Buttons */}
-                      <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-3">
                         <button
-                          onClick={() => { setEditingTenant(tenant); setShowModal(true); }}
-                          className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                          onClick={() => setSelectedTenant(tenant)}
+                          className="text-sm text-emerald-600 hover:text-emerald-700 font-semibold"
                         >
-                          Edit
+                          Details
                         </button>
                         <span className="text-gray-300">|</span>
                         <button
@@ -1014,36 +1030,32 @@ export function TenantsView({ properties, userRequirements, selectedProperty, on
                         </button>
                       </div>
 
-                      <button
-                        onClick={() => setSelectedTenant(tenant)}
-                        className="text-sm text-emerald-600 hover:text-emerald-700 font-semibold whitespace-nowrap"
-                      >
-                        View Details
-                      </button>
-
                       {/* Request COI Button */}
-                      {(tenant.insurance_status === 'expired' || tenant.insurance_status === 'non-compliant' || tenant.insurance_status === 'expiring' || tenant.insurance_status === 'pending') && tenant.email && (
-                        requestSuccess === tenant.id ? (
-                          <span className="text-xs bg-emerald-500 text-white px-3 py-1.5 rounded-lg font-semibold whitespace-nowrap flex items-center space-x-1.5">
+                      <button
+                        onClick={() => handleSendRequest(tenant)}
+                        disabled={sendingRequest === tenant.id || !tenant.email}
+                        className={`text-xs px-3 py-1.5 rounded-lg font-semibold whitespace-nowrap flex items-center space-x-1.5 transition-all ${
+                          requestSuccess === tenant.id
+                            ? 'bg-emerald-500 text-white'
+                            : !tenant.email
+                            ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                            : 'bg-gradient-to-r from-orange-500 to-orange-600 text-white hover:shadow-md disabled:opacity-50'
+                        }`}
+                      >
+                        {requestSuccess === tenant.id ? (
+                          <>
                             <CheckCircle size={12} />
                             <span>Sent!</span>
-                          </span>
+                          </>
+                        ) : sendingRequest === tenant.id ? (
+                          <Loader2 size={12} className="animate-spin" />
                         ) : (
-                          <button
-                            onClick={() => handleSendRequest(tenant)}
-                            disabled={sendingRequest === tenant.id}
-                            className="text-xs bg-gradient-to-r from-orange-500 to-orange-600 text-white px-3 py-1.5 rounded-lg hover:shadow-md font-semibold whitespace-nowrap flex items-center space-x-1.5 transition-all disabled:opacity-50"
-                          >
-                            {sendingRequest === tenant.id ? (
-                              <Loader2 size={12} className="animate-spin" />
-                            ) : (
-                              <Send size={12} />
-                            )}
+                          <>
+                            <Send size={12} />
                             <span className="hidden sm:inline">Request COI</span>
-                            <span className="sm:hidden">Request</span>
-                          </button>
-                        )
-                      )}
+                          </>
+                        )}
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -1097,14 +1109,41 @@ export function TenantsView({ properties, userRequirements, selectedProperty, on
           >
             <div className="p-6 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white">
               <h2 className="text-xl font-bold text-gray-900">{selectedTenant.name}</h2>
-              <button onClick={() => setSelectedTenant(null)} className="p-2 hover:bg-gray-100 rounded-lg">
-                <X size={20} className="text-gray-500" />
-              </button>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => {
+                    setEditingTenant(selectedTenant);
+                    setShowModal(true);
+                    setSelectedTenant(null);
+                  }}
+                  className="px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg font-medium transition-all"
+                >
+                  Edit
+                </button>
+                <button onClick={() => setSelectedTenant(null)} className="p-2 hover:bg-gray-100 rounded-lg">
+                  <X size={20} className="text-gray-500" />
+                </button>
+              </div>
             </div>
             <div className="p-6 space-y-6">
-              {/* Status */}
-              <div className="flex items-center gap-3">
-                {getStatusBadge(selectedTenant.insurance_status)}
+              {/* Status / Expiration / Last Contacted Grid */}
+              <div className="grid grid-cols-3 gap-4 p-4 bg-gray-50 rounded-xl">
+                <div>
+                  <p className="text-sm text-gray-500 font-medium">Status</p>
+                  <div className="mt-1">{getStatusBadge(selectedTenant.insurance_status)}</div>
+                </div>
+                <div className="text-center">
+                  <p className="text-sm text-gray-500 font-medium">Expiration</p>
+                  <p className="font-semibold text-gray-900 mt-1">
+                    {selectedTenant.policy_expiration_date ? formatDate(selectedTenant.policy_expiration_date) : 'N/A'}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm text-gray-500 font-medium">Last Contacted</p>
+                  <p className={`font-semibold mt-1 ${selectedTenant.last_contacted_at ? 'text-gray-900' : 'text-amber-600'}`}>
+                    {selectedTenant.last_contacted_at ? formatRelativeDate(selectedTenant.last_contacted_at) : 'Never'}
+                  </p>
+                </div>
               </div>
 
               {/* Contact Info */}
@@ -1231,13 +1270,6 @@ export function TenantsView({ properties, userRequirements, selectedProperty, on
                     </button>
                   )
                 )}
-                <button
-                  onClick={() => { setEditingTenant(selectedTenant); setShowModal(true); setSelectedTenant(null); }}
-                  className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium flex items-center justify-center gap-2"
-                >
-                  <Edit2 size={18} />
-                  Edit Tenant
-                </button>
               </div>
             </div>
           </div>

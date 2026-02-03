@@ -463,11 +463,6 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
     ).length
   };
 
-  // Edit vendor
-  const handleEdit = (vendor) => {
-    setEditingVendor({...vendor});
-  };
-
   const saveEdit = async () => {
     setSavingVendor(true);
     try {
