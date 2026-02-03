@@ -1505,45 +1505,56 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
                 />
               </div>
 
-              {/* Property Assignment */}
+              {/* Property Assignment - Multi-select */}
               {properties.length > 0 && (
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1.5">
                     <Building2 size={14} className="inline mr-1.5 mb-0.5" />
-                    Assigned Property
+                    Assigned Properties
                   </label>
+                  <p className="text-xs text-gray-500 mb-2">Select one or more properties</p>
                   <div className="border border-gray-200 rounded-xl bg-gray-50 max-h-40 overflow-y-auto">
-                    <label
-                      className="flex items-center px-4 py-2.5 hover:bg-gray-100 cursor-pointer border-b border-gray-100"
-                    >
-                      <input
-                        type="radio"
-                        name="property"
-                        checked={!editingVendor.propertyId}
-                        onChange={() => setEditingVendor({...editingVendor, propertyId: null})}
-                        className="w-4 h-4 text-emerald-600 border-gray-300 focus:ring-emerald-500"
-                      />
-                      <span className="ml-3 text-sm text-gray-500 italic">No property assigned</span>
-                    </label>
-                    {properties.map((property) => (
-                      <label
-                        key={property.id}
-                        className="flex items-center px-4 py-2.5 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
-                      >
-                        <input
-                          type="radio"
-                          name="property"
-                          checked={editingVendor.propertyId === property.id}
-                          onChange={() => setEditingVendor({...editingVendor, propertyId: property.id})}
-                          className="w-4 h-4 text-emerald-600 border-gray-300 focus:ring-emerald-500"
-                        />
-                        <span className="ml-3 text-sm text-gray-700">{property.name}</span>
-                        {property.address && (
-                          <span className="ml-2 text-xs text-gray-400">{property.address}</span>
-                        )}
-                      </label>
-                    ))}
+                    {properties.map((property) => {
+                      // Get property IDs - check both property_ids array and legacy propertyId
+                      const currentPropertyIds = editingVendor.property_ids || editingVendor.propertyIds ||
+                        (editingVendor.propertyId ? [editingVendor.propertyId] : []);
+                      const isChecked = currentPropertyIds.includes(property.id);
+
+                      return (
+                        <label
+                          key={property.id}
+                          className="flex items-center px-4 py-2.5 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={(e) => {
+                              let newPropertyIds;
+                              if (e.target.checked) {
+                                newPropertyIds = [...currentPropertyIds, property.id];
+                              } else {
+                                newPropertyIds = currentPropertyIds.filter(id => id !== property.id);
+                              }
+                              setEditingVendor({
+                                ...editingVendor,
+                                propertyIds: newPropertyIds,
+                                property_ids: newPropertyIds,
+                                propertyId: newPropertyIds[0] || null
+                              });
+                            }}
+                            className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
+                          />
+                          <span className="ml-3 text-sm text-gray-700">{property.name}</span>
+                          {property.address && (
+                            <span className="ml-2 text-xs text-gray-400">{property.address}</span>
+                          )}
+                        </label>
+                      );
+                    })}
                   </div>
+                  {(editingVendor.property_ids?.length === 0 && editingVendor.propertyIds?.length === 0 && !editingVendor.propertyId) && (
+                    <p className="text-xs text-gray-400 mt-1 italic">No properties selected</p>
+                  )}
                 </div>
               )}
 
@@ -1895,19 +1906,40 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
                         </div>
                       </div>
 
-                      {/* Assigned Property - Read Only */}
+                      {/* Assigned Properties - Read Only */}
                       {properties.length > 0 && (
                         <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl">
                           <div className="flex items-center space-x-2">
                             <Building2 size={16} className="text-gray-600" />
-                            <h4 className="font-semibold text-gray-900 text-sm">Assigned Property</h4>
+                            <h4 className="font-semibold text-gray-900 text-sm">Assigned Properties</h4>
                           </div>
-                          <p className="mt-2 text-sm text-gray-700">
-                            {selectedVendor.propertyId
-                              ? properties.find(p => p.id === selectedVendor.propertyId)?.name || 'Unknown Property'
-                              : <span className="text-gray-400 italic">Not assigned to any property</span>
-                            }
-                          </p>
+                          <div className="mt-2">
+                            {(() => {
+                              // Get property IDs from multiple possible sources
+                              const propertyIds = selectedVendor.property_ids || selectedVendor.propertyIds ||
+                                (selectedVendor.propertyId ? [selectedVendor.propertyId] : []);
+
+                              if (propertyIds.length === 0) {
+                                return <span className="text-sm text-gray-400 italic">Not assigned to any property</span>;
+                              }
+
+                              return (
+                                <div className="flex flex-wrap gap-1.5">
+                                  {propertyIds.map(propId => {
+                                    const prop = properties.find(p => p.id === propId);
+                                    return prop ? (
+                                      <span
+                                        key={propId}
+                                        className="inline-flex items-center px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs text-gray-700"
+                                      >
+                                        {prop.name}
+                                      </span>
+                                    ) : null;
+                                  })}
+                                </div>
+                              );
+                            })()}
+                          </div>
                         </div>
                       )}
 
