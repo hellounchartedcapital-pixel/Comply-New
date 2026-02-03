@@ -382,7 +382,7 @@ function TenantModal({ isOpen, onClose, onSave, tenant, properties }) {
 
 // Main TenantsView component
 export function TenantsView({ properties, userRequirements, selectedProperty, onSelectProperty, loadingProperties }) {
-  const { tenants, loading, stats, addTenant, updateTenant, deleteTenant, refreshTenants } = useTenants();
+  const { tenants, loading, stats, addTenant, updateTenant, deleteTenant, refreshTenants } = useTenants(selectedProperty?.id);
   const { alertModal, showAlert, hideAlert } = useAlertModal();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
