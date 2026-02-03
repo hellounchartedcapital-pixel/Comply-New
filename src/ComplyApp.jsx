@@ -2047,24 +2047,24 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
 
                       {/* Contact Information */}
                       {(selectedVendor.contactName || selectedVendor.contactEmail || selectedVendor.contactPhone) && (
-                        <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl">
-                          <h4 className="font-bold text-blue-900 text-sm mb-2">Contact Information</h4>
+                        <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl">
+                          <h4 className="font-bold text-gray-900 text-sm mb-2">Contact Information</h4>
                           <div className="space-y-1.5">
                             {selectedVendor.contactName && (
                               <div className="flex items-center space-x-2 text-sm">
-                                <User size={14} className="text-blue-600" />
+                                <User size={14} className="text-gray-500" />
                                 <span className="text-gray-700">{selectedVendor.contactName}</span>
                               </div>
                             )}
                             {selectedVendor.contactEmail && (
                               <div className="flex items-center space-x-2 text-sm">
-                                <Mail size={14} className="text-blue-600" />
+                                <Mail size={14} className="text-gray-500" />
                                 <span className="text-gray-700">{selectedVendor.contactEmail}</span>
                               </div>
                             )}
                             {selectedVendor.contactPhone && (
                               <div className="flex items-center space-x-2 text-sm">
-                                <Phone size={14} className="text-blue-600" />
+                                <Phone size={14} className="text-gray-500" />
                                 <span className="text-gray-700">{selectedVendor.contactPhone}</span>
                               </div>
                             )}
