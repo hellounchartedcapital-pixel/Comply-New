@@ -1736,8 +1736,8 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
 
       {/* Vendor Details Modal - Two Column Layout */}
       {selectedVendor && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
-          <div className="bg-white rounded-2xl w-full max-w-6xl h-[95vh] sm:h-[90vh] shadow-2xl flex flex-col overflow-hidden">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4 lg:p-6">
+          <div className="bg-white rounded-2xl w-full max-w-[95vw] lg:max-w-[85vw] xl:max-w-7xl h-[95vh] shadow-2xl flex flex-col overflow-hidden">
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-gray-200 flex-shrink-0">
               <div>
