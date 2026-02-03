@@ -2,6 +2,7 @@
 // AI-powered extraction of insurance requirements from PDFs
 
 import { supabase } from './supabaseClient';
+import logger from './logger';
 
 const MAX_RETRIES = 3;
 const INITIAL_DELAY_MS = 1000;
@@ -79,7 +80,7 @@ export async function extractRequirementsFromPDF(file) {
     };
 
   } catch (error) {
-    console.error('Error extracting requirements:', error);
+    logger.error('Error extracting requirements', error);
     return {
       success: false,
       error: error.message,

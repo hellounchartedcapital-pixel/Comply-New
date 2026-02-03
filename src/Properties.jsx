@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Plus, Building2, MapPin, Edit2, Trash2, Save, AlertCircle, CheckCircle } from 'lucide-react';
 import { supabase } from './supabaseClient';
+import logger from './logger';
 
 export function Properties({ isOpen, onClose, onPropertyChange }) {
   const [properties, setProperties] = useState([]);
@@ -180,7 +181,7 @@ export function Properties({ isOpen, onClose, onPropertyChange }) {
           }
         });
       } catch (recheckErr) {
-        console.error('Error rechecking compliance:', recheckErr);
+        logger.error('Error rechecking compliance', recheckErr);
         // Don't fail the save if recheck fails
       }
 

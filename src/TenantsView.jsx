@@ -8,6 +8,7 @@ import { useTenants } from './useTenants';
 import { supabase } from './supabaseClient';
 import { formatCurrency, formatDate, formatRelativeDate, getStatusConfig } from './utils/complianceUtils';
 import { AlertModal, useAlertModal } from './AlertModal';
+import logger from './logger';
 
 // Status icon component (matches vendor style)
 function getStatusIcon(status) {
@@ -121,7 +122,7 @@ function TenantModal({ isOpen, onClose, onSave, tenant, properties }) {
       await onSave(formData);
       onClose();
     } catch (err) {
-      console.error('Error saving tenant:', err);
+      logger.error('Error saving tenant', err);
     } finally {
       setSaving(false);
     }
@@ -583,7 +584,7 @@ export function TenantsView({ properties, userRequirements }) {
       refreshTenants();
 
     } catch (error) {
-      console.error('Failed to send tenant COI request:', error);
+      logger.error('Failed to send tenant COI request', error);
       showAlert({
         type: 'error',
         title: 'Request Failed',
@@ -693,7 +694,7 @@ export function TenantsView({ properties, userRequirements }) {
 
           successCount++;
         } catch (err) {
-          console.error(`Failed to send to ${tenant.email}:`, err);
+          logger.error(`Failed to send to ${tenant.email}`, err);
           failCount++;
         }
       }
@@ -712,7 +713,7 @@ export function TenantsView({ properties, userRequirements }) {
       refreshTenants();
 
     } catch (error) {
-      console.error('Bulk request failed:', error);
+      logger.error('Bulk request failed', error);
       showAlert({
         type: 'error',
         title: 'Bulk Request Failed',

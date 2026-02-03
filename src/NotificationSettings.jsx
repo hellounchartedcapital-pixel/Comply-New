@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Bell, Mail, X } from 'lucide-react';
 import { supabase } from './supabaseClient';
+import logger from './logger';
 
 export function NotificationSettings({ onClose }) {
   const [settings, setSettings] = useState({
@@ -32,7 +33,7 @@ export function NotificationSettings({ onClose }) {
         .single();
 
       if (error && error.code !== 'PGRST116') {
-        console.error('Error loading notification settings:', error);
+        logger.error('Error loading notification settings', error);
         setLoading(false);
         return;
       }
@@ -55,7 +56,7 @@ export function NotificationSettings({ onClose }) {
         }));
       }
     } catch (err) {
-      console.error('Error loading notification settings:', err);
+      logger.error('Error loading notification settings', err);
     } finally {
       setLoading(false);
     }
@@ -94,7 +95,7 @@ export function NotificationSettings({ onClose }) {
       setMessage('Notification settings saved successfully!');
       setTimeout(() => setMessage(''), 3000);
     } catch (err) {
-      console.error('Error saving notification settings:', err);
+      logger.error('Error saving notification settings', err);
       setMessage(`Error: ${err.message}`);
     } finally {
       setSaving(false);

@@ -7,6 +7,7 @@ import { supabase } from './supabaseClient';
 import { Logo } from './Logo';
 import { AlertModal, useAlertModal } from './AlertModal';
 import { determineVendorStatus, checkCoverageExpiration as checkExpiration } from './utils/complianceUtils';
+import logger from './logger';
 
 export function VendorUploadPortal({ token, onBack }) {
   const [loading, setLoading] = useState(true);
@@ -62,7 +63,7 @@ export function VendorUploadPortal({ token, onBack }) {
 
       setVendor(data);
     } catch (err) {
-      console.error('Error loading vendor:', err);
+      logger.error('Error loading vendor', err);
       setError('Failed to load vendor information.');
     } finally {
       setLoading(false);
@@ -291,8 +292,8 @@ export function VendorUploadPortal({ token, onBack }) {
       });
       setUploadSuccess(true);
     } catch (err) {
-      console.error('Upload error:', err);
-      console.error('Error details:', JSON.stringify(err, null, 2));
+      logger.error('Upload error', err);
+      logger.error('Error details', { error: err });
       showAlert({
         type: 'error',
         title: 'Upload Failed',

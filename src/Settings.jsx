@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Save, X, CheckCircle, AlertCircle, Info, Mail, Bell, Clock, Building2, Users, Shield } from 'lucide-react';
 import { supabase } from './supabaseClient';
+import logger from './logger';
 
 export function Settings({ onClose }) {
   const [settings, setSettings] = useState({
@@ -78,7 +79,7 @@ export function Settings({ onClose }) {
         });
       }
     } catch (err) {
-      console.error('Error loading settings:', err);
+      logger.error('Error loading settings', err);
       setError('Failed to load settings');
     } finally {
       setLoading(false);
@@ -132,7 +133,7 @@ export function Settings({ onClose }) {
       }, 1500);
 
     } catch (err) {
-      console.error('Error saving settings:', err);
+      logger.error('Error saving settings', err);
       setError('Failed to save settings: ' + err.message);
       setSaving(false);
     }

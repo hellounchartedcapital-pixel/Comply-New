@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from './supabaseClient';
+import logger from './logger';
 
 const PLAN_LIMITS = {
   free: 10,
@@ -74,7 +75,7 @@ export function useSubscription() {
         vendor_limit: PLAN_LIMITS.free,
       });
     } catch (err) {
-      console.error('Error loading subscription:', err);
+      logger.error('Error loading subscription', err);
       setError(err.message);
       // Default to free on error
       setSubscription({
@@ -131,7 +132,7 @@ export function useSubscription() {
       if (error) throw error;
       return data;
     } catch (err) {
-      console.error('Error creating checkout session:', err);
+      logger.error('Error creating checkout session', err);
       throw err;
     }
   }, []);
@@ -147,7 +148,7 @@ export function useSubscription() {
         window.location.href = data.url;
       }
     } catch (err) {
-      console.error('Error opening customer portal:', err);
+      logger.error('Error opening customer portal', err);
       throw err;
     }
   }, []);

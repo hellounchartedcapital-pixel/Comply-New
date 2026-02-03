@@ -7,6 +7,7 @@ import { supabase } from './supabaseClient';
 import { Logo } from './Logo';
 import { AlertModal, useAlertModal } from './AlertModal';
 import { formatCurrency, checkCoverageExpiration as checkExpiration } from './utils/complianceUtils';
+import logger from './logger';
 
 export function TenantUploadPortal({ token, onBack }) {
   const [loading, setLoading] = useState(true);
@@ -62,7 +63,7 @@ export function TenantUploadPortal({ token, onBack }) {
 
       setTenant(data);
     } catch (err) {
-      console.error('Error loading tenant:', err);
+      logger.error('Error loading tenant', err);
       setError('Failed to load tenant information.');
     } finally {
       setLoading(false);
@@ -168,7 +169,7 @@ export function TenantUploadPortal({ token, onBack }) {
       let issues = [];
 
       if (extractionError) {
-        console.error('Extraction error:', extractionError);
+        logger.error('Extraction error', extractionError);
         // Continue without extraction - will need manual review
       } else if (extractionResult?.success && extractionResult?.data) {
         extractedData = extractionResult.data;
@@ -305,7 +306,7 @@ export function TenantUploadPortal({ token, onBack }) {
       });
       setUploadSuccess(true);
     } catch (err) {
-      console.error('Upload error:', err);
+      logger.error('Upload error', err);
       showAlert({
         type: 'error',
         title: 'Upload Failed',

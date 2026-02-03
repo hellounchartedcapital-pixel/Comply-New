@@ -3,6 +3,7 @@
 
 import React, { createContext, useState, useEffect, useContext } from 'react'
 import { supabase } from './supabaseClient'
+import logger from './logger'
 
 const AuthContext = createContext({})
 
@@ -21,11 +22,19 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     // Check active sessions and sets the user
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session)
-      setUser(session?.user ?? null)
-      setLoading(false)
-    })
+    supabase.auth.getSession()
+      .then(({ data: { session } }) => {
+        setSession(session)
+        setUser(session?.user ?? null)
+        setLoading(false)
+      })
+      .catch((error) => {
+        // Session retrieval failed - user will need to sign in
+        console.warn('Session retrieval failed:', error.message)
+        setSession(null)
+        setUser(null)
+        setLoading(false)
+      })
 
     // Listen for changes on auth state (sign in, sign out, etc.)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -59,7 +68,7 @@ export const AuthProvider = ({ children }) => {
           require_waiver_of_subrogation: false
         }, { onConflict: 'user_id' })
       } catch (settingsError) {
-        console.error('Failed to create settings:', settingsError)
+        logger.error('Failed to create settings', settingsError)
         // Don't throw - user is still created
       }
     }

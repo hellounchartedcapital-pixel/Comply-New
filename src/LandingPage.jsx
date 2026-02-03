@@ -7,6 +7,7 @@ import {
   Building2, ChevronDown, Upload, Search, FileText
 } from 'lucide-react';
 import { supabase } from './supabaseClient';
+import logger from './logger';
 
 // Contact Form Modal
 function ContactModal({ isOpen, onClose }) {
@@ -39,7 +40,7 @@ function ContactModal({ isOpen, onClose }) {
       setSent(true);
       setFormData({ name: '', email: '', message: '' });
     } catch (err) {
-      console.error('Contact form error:', err);
+      logger.error('Contact form error', err);
       setError('Failed to send message. Please try emailing us directly at contact@smartcoi.io');
     } finally {
       setSending(false);

@@ -6,6 +6,7 @@ import { Logo } from './Logo';
 import { Check, X, Loader2, ArrowLeft, Zap, FileCheck } from 'lucide-react';
 import { AlertModal, useAlertModal } from './AlertModal';
 import { useSubscription } from './useSubscription';
+import logger from './logger';
 
 const plans = [
   {
@@ -186,7 +187,7 @@ export function Pricing({ onBack, onSignUp, user }) {
         throw new Error('No checkout URL returned');
       }
     } catch (error) {
-      console.error('Error creating checkout session:', error);
+      logger.error('Error creating checkout session', error);
       showAlert({
         type: 'error',
         title: 'Checkout Failed',
