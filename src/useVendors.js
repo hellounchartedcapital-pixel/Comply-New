@@ -45,10 +45,10 @@ export function useVendors(propertyId = null) {
         .select('*')
         .eq('user_id', user.id);
 
-      // Filter by property if specified
+      // Filter by property if specified (check both property_id and property_ids array)
       if (propertyId) {
-        countQuery = countQuery.eq('property_id', propertyId);
-        dataQuery = dataQuery.eq('property_id', propertyId);
+        countQuery = countQuery.or(`property_id.eq.${propertyId},property_ids.cs.{${propertyId}}`);
+        dataQuery = dataQuery.or(`property_id.eq.${propertyId},property_ids.cs.{${propertyId}}`);
       }
 
       // Get total count first (only on initial load)
@@ -107,11 +107,16 @@ export function useVendors(propertyId = null) {
       const tokenExpiresAt = vendorData.rawData?.uploadTokenExpiresAt ||
         new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
+      // Handle both single propertyId and multiple propertyIds
+      const propertyIds = vendorData.propertyIds || (vendorData.propertyId ? [vendorData.propertyId] : []);
+      const primaryPropertyId = propertyIds[0] || propertyId || null;
+
       const { data, error } = await supabase
         .from('vendors')
         .insert([{
           user_id: user.id,
-          property_id: vendorData.propertyId || propertyId || null,
+          property_id: primaryPropertyId, // Keep for backwards compatibility
+          property_ids: propertyIds, // New array field
           name: vendorData.name,
           dba: vendorData.dba,
           status: vendorData.status,
@@ -174,7 +179,15 @@ export function useVendors(propertyId = null) {
       if (updates.contactEmail !== undefined) dbUpdates.contact_email = updates.contactEmail;
       if (updates.contactPhone !== undefined) dbUpdates.contact_phone = updates.contactPhone;
       if (updates.contactNotes !== undefined) dbUpdates.contact_notes = updates.contactNotes;
-      if (updates.propertyId !== undefined) dbUpdates.property_id = updates.propertyId;
+
+      // Handle property assignment (support both single and multiple)
+      if (updates.propertyIds !== undefined) {
+        dbUpdates.property_ids = updates.propertyIds;
+        dbUpdates.property_id = updates.propertyIds[0] || null; // Keep primary for backwards compatibility
+      } else if (updates.propertyId !== undefined) {
+        dbUpdates.property_id = updates.propertyId;
+        dbUpdates.property_ids = updates.propertyId ? [updates.propertyId] : [];
+      }
 
       const { data, error } = await supabase
         .from('vendors')
