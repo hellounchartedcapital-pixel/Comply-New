@@ -2,7 +2,7 @@
 import React, { useMemo } from 'react';
 import {
   CheckCircle, XCircle, AlertCircle, Clock,
-  FileText, Users, ChevronRight, TrendingUp
+  FileText, Users, ChevronRight, TrendingUp, Upload, Plus, Sparkles
 } from 'lucide-react';
 import { formatDate } from './utils/complianceUtils';
 import { PropertySelector } from './PropertySelector';
@@ -17,7 +17,9 @@ export function Dashboard({
   onViewVendors,
   onViewTenants,
   onSelectVendor,
-  onSelectTenant
+  onSelectTenant,
+  onUploadCOI,
+  onAddTenant
 }) {
   // Combined stats
   const combinedStats = useMemo(() => {
@@ -181,6 +183,40 @@ export function Dashboard({
               Showing data for <span className="font-medium text-gray-700">{selectedProperty.name}</span>
             </p>
           )}
+        </div>
+      )}
+
+      {/* Empty State - Show when no vendors AND no tenants */}
+      {combinedStats.total === 0 && (
+        <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-2xl border border-emerald-200 p-8 text-center">
+          <div className="w-16 h-16 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <Sparkles size={32} className="text-emerald-600" />
+          </div>
+          <h3 className="text-xl font-bold text-gray-900 mb-2">Welcome to SmartCOI!</h3>
+          <p className="text-gray-600 mb-6 max-w-md mx-auto">
+            Get started by uploading your first Certificate of Insurance or adding a tenant.
+            SmartCOI will automatically track compliance and send reminders.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            {onUploadCOI && (
+              <button
+                onClick={onUploadCOI}
+                className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 font-semibold transition-colors"
+              >
+                <Upload size={20} />
+                Upload COI
+              </button>
+            )}
+            {onAddTenant && (
+              <button
+                onClick={onAddTenant}
+                className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-white text-gray-700 border border-gray-300 rounded-xl hover:bg-gray-50 font-semibold transition-colors"
+              >
+                <Plus size={20} />
+                Add Tenant
+              </button>
+            )}
+          </div>
         </div>
       )}
 

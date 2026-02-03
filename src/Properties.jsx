@@ -164,6 +164,7 @@ export function Properties({ isOpen, onClose, onPropertyChange }) {
       if (error) throw error;
 
       // Recheck compliance for all vendors assigned to this property
+      let recheckFailed = false;
       try {
         await supabase.functions.invoke('recheck-compliance', {
           body: {
@@ -182,6 +183,7 @@ export function Properties({ isOpen, onClose, onPropertyChange }) {
         });
       } catch (recheckErr) {
         logger.error('Error rechecking compliance', recheckErr);
+        recheckFailed = true;
         // Don't fail the save if recheck fails
       }
 
@@ -190,8 +192,14 @@ export function Properties({ isOpen, onClose, onPropertyChange }) {
       ));
       setEditingProperty(null);
       resetForm();
-      setSuccess('Property updated and vendor compliance rechecked');
-      setTimeout(() => setSuccess(null), 3000);
+
+      // Show appropriate message based on whether recheck succeeded
+      if (recheckFailed) {
+        setSuccess('Property updated. Note: Automatic compliance recheck could not be completed - vendor statuses may need manual review.');
+      } else {
+        setSuccess('Property updated and vendor compliance rechecked');
+      }
+      setTimeout(() => setSuccess(null), 5000);
       if (onPropertyChange) onPropertyChange();
     } catch (err) {
       setError(err.message);

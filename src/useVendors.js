@@ -5,7 +5,15 @@ import { recalculateVendorStatus } from './utils/complianceUtils';
 
 const PAGE_SIZE = 50;
 
-export function useVendors(propertyId = null) {
+/**
+ * Custom hook for managing vendors
+ * @param {string|null} propertyId - Filter vendors by property ID
+ * @param {object} options - Optional configuration
+ * @param {number} options.expiringThresholdDays - Days before expiration to mark as "expiring" (default: 30)
+ */
+export function useVendors(propertyId = null, options = {}) {
+  const { expiringThresholdDays = 30 } = options;
+
   const [vendors, setVendors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -63,8 +71,8 @@ export function useVendors(propertyId = null) {
 
       if (error) throw error;
 
-      // Recalculate status for each vendor based on current date
-      const newVendors = (data || []).map(recalculateVendorStatus);
+      // Recalculate status for each vendor based on current date and threshold
+      const newVendors = (data || []).map(v => recalculateVendorStatus(v, expiringThresholdDays));
 
       if (reset) {
         setVendors(newVendors);
@@ -85,7 +93,7 @@ export function useVendors(propertyId = null) {
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [propertyId]); // Removed vendors.length to prevent infinite loop
+  }, [propertyId, expiringThresholdDays]); // Removed vendors.length to prevent infinite loop
 
   // Load more vendors
   const loadMore = useCallback(() => {
@@ -95,7 +103,8 @@ export function useVendors(propertyId = null) {
   }, [fetchVendors, loadingMore, hasMore]);
 
   // Add a new vendor
-  const addVendor = async (vendorData) => {
+  // tokenExpiryDays can be passed from settings (default: 30 days)
+  const addVendor = async (vendorData, tokenExpiryDays = 30) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
 
@@ -103,9 +112,10 @@ export function useVendors(propertyId = null) {
 
       // Generate upload token if not provided (for vendor upload portal)
       const uploadToken = vendorData.rawData?.uploadToken || crypto.randomUUID();
-      // Token expiration: use provided value or default to 30 days from now
+      // Token expiration: use provided value, passed setting, or default to 30 days
+      const expiryDays = tokenExpiryDays || 30;
       const tokenExpiresAt = vendorData.rawData?.uploadTokenExpiresAt ||
-        new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+        new Date(Date.now() + expiryDays * 24 * 60 * 60 * 1000).toISOString();
 
       // Handle both single propertyId and multiple propertyIds
       const propertyIds = vendorData.propertyIds || (vendorData.propertyId ? [vendorData.propertyId] : []);
@@ -249,6 +259,28 @@ export function useVendors(propertyId = null) {
     fetchVendors(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [propertyId]);
+
+  // Auto-refresh on interval and tab focus to prevent stale data
+  useEffect(() => {
+    // Refresh every 60 seconds
+    const intervalId = setInterval(() => {
+      fetchVendors(true);
+    }, 60000);
+
+    // Refresh when tab regains focus
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchVendors(true);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [fetchVendors]);
 
   return {
     vendors,

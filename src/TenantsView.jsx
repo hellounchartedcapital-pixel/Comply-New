@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   Users, Plus, Search, CheckCircle, XCircle, AlertCircle, Clock,
   Mail, Phone, Calendar, Building2, X, Send,
-  ExternalLink, Shield, Loader2, FileText, History, Upload
+  ExternalLink, Shield, Loader2, FileText, History, Upload, ChevronDown
 } from 'lucide-react';
 import { useTenants } from './useTenants';
 import { supabase } from './supabaseClient';
@@ -74,6 +74,76 @@ function TenantModal({ isOpen, onClose, onSave, tenant, properties }) {
     requires_endorsement_pages: true,
   });
   const [saving, setSaving] = useState(false);
+  // Progressive disclosure - collapse advanced insurance requirements by default for new tenants
+  const [showInsuranceRequirements, setShowInsuranceRequirements] = useState(false);
+  // Lease extraction state
+  const [extractingFromLease, setExtractingFromLease] = useState(false);
+  const [extractionError, setExtractionError] = useState(null);
+  const leaseInputRef = React.useRef(null);
+
+  // Handle lease PDF upload and requirements extraction
+  const handleExtractFromLease = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Reset file input
+    if (leaseInputRef.current) {
+      leaseInputRef.current.value = '';
+    }
+
+    // Validate file type
+    if (!file.type.includes('pdf')) {
+      setExtractionError('Please select a PDF file');
+      return;
+    }
+
+    // Validate file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      setExtractionError('File too large. Maximum size is 10MB.');
+      return;
+    }
+
+    setExtractingFromLease(true);
+    setExtractionError(null);
+
+    try {
+      // Convert to base64
+      const arrayBuffer = await file.arrayBuffer();
+      const base64Data = btoa(
+        new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
+      );
+
+      // Call edge function
+      const { data: result, error } = await supabase.functions.invoke('extract-requirements', {
+        body: { pdfBase64: base64Data }
+      });
+
+      if (error) throw error;
+      if (!result?.success) throw new Error(result?.error || 'Extraction failed');
+
+      const reqs = result.data?.requirements;
+      if (reqs) {
+        // Auto-populate form fields from extracted requirements
+        setFormData(prev => ({
+          ...prev,
+          required_liability_min: reqs.general_liability?.amount || prev.required_liability_min,
+          required_auto_liability_min: reqs.auto_liability?.amount || prev.required_auto_liability_min,
+          required_workers_comp: reqs.workers_comp?.required || prev.required_workers_comp,
+          required_employers_liability_min: reqs.employers_liability?.amount || prev.required_employers_liability_min,
+          requires_additional_insured: reqs.special_requirements?.additional_insured ?? prev.requires_additional_insured,
+          cancellation_notice_days: reqs.special_requirements?.notice_of_cancellation_days || prev.cancellation_notice_days,
+        }));
+
+        // Expand the requirements section to show extracted values
+        setShowInsuranceRequirements(true);
+      }
+    } catch (err) {
+      logger.error('Failed to extract requirements from lease', err);
+      setExtractionError(err.message || 'Failed to extract requirements');
+    } finally {
+      setExtractingFromLease(false);
+    }
+  };
 
   useEffect(() => {
     if (tenant) {
@@ -100,6 +170,8 @@ function TenantModal({ isOpen, onClose, onSave, tenant, properties }) {
         requires_declarations_page: tenant.requires_declarations_page !== false,
         requires_endorsement_pages: tenant.requires_endorsement_pages !== false,
       });
+      // Expand requirements section when editing existing tenant
+      setShowInsuranceRequirements(true);
     } else {
       setFormData({
         name: '',
@@ -124,6 +196,8 @@ function TenantModal({ isOpen, onClose, onSave, tenant, properties }) {
         requires_declarations_page: true,
         requires_endorsement_pages: true,
       });
+      // Collapse requirements section for new tenants
+      setShowInsuranceRequirements(false);
     }
   }, [tenant, isOpen]);
 
@@ -289,78 +363,141 @@ function TenantModal({ isOpen, onClose, onSave, tenant, properties }) {
               </div>
             </div>
 
-            {/* Insurance Requirements */}
-            <div>
-              <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                <Shield size={16} className="text-emerald-600" />
-                Insurance Requirements
-              </h3>
-
-              {/* Coverage Limits */}
-              <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                <h4 className="text-xs font-semibold text-gray-500 uppercase mb-3">Required Coverage Limits</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      General Liability
-                    </label>
-                    <select
-                      value={formData.required_liability_min}
-                      onChange={(e) => setFormData({ ...formData, required_liability_min: parseInt(e.target.value) })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                    >
-                      <option value={0}>Per Lease</option>
-                      <option value={100000}>$100,000</option>
-                      <option value={300000}>$300,000</option>
-                      <option value={500000}>$500,000</option>
-                      <option value={1000000}>$1,000,000</option>
-                      <option value={2000000}>$2,000,000</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Business Auto Liability
-                    </label>
-                    <select
-                      value={formData.required_auto_liability_min}
-                      onChange={(e) => setFormData({ ...formData, required_auto_liability_min: parseInt(e.target.value) })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                    >
-                      <option value={0}>Not Required</option>
-                      <option value={100000}>$100,000</option>
-                      <option value={300000}>$300,000</option>
-                      <option value={500000}>$500,000</option>
-                      <option value={1000000}>$1,000,000</option>
-                    </select>
-                  </div>
+            {/* Extract from Lease Feature */}
+            <div className="p-4 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl border border-purple-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="font-medium text-gray-900 flex items-center gap-2">
+                    <FileText size={16} className="text-purple-600" />
+                    Extract Requirements from Lease
+                  </h4>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Upload a lease PDF and we'll auto-extract insurance requirements
+                  </p>
                 </div>
-
-                {/* Workers Compensation */}
-                <div className="mt-4 pt-4 border-t border-gray-200">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={formData.required_workers_comp}
-                      onChange={(e) => setFormData({ ...formData, required_workers_comp: e.target.checked, workers_comp_exempt: false })}
-                      className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
-                    />
-                    <span className="text-sm text-gray-700">Workers' Compensation Required</span>
+                <div>
+                  <input
+                    ref={leaseInputRef}
+                    type="file"
+                    accept=".pdf,application/pdf"
+                    onChange={handleExtractFromLease}
+                    className="hidden"
+                    id="lease-upload"
+                  />
+                  <label
+                    htmlFor="lease-upload"
+                    className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium cursor-pointer transition-colors ${
+                      extractingFromLease
+                        ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                        : 'bg-purple-600 text-white hover:bg-purple-700'
+                    }`}
+                  >
+                    {extractingFromLease ? (
+                      <>
+                        <Loader2 size={16} className="animate-spin" />
+                        <span>Extracting...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Upload size={16} />
+                        <span>Upload Lease</span>
+                      </>
+                    )}
                   </label>
                 </div>
               </div>
+              {extractionError && (
+                <p className="mt-2 text-sm text-red-600">{extractionError}</p>
+              )}
+            </div>
 
-              {/* Additional Insured */}
-              <div className="bg-gray-50 rounded-lg p-4">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.requires_additional_insured}
-                    onChange={(e) => setFormData({ ...formData, requires_additional_insured: e.target.checked })}
-                    className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
-                  />
-                  <span className="text-sm text-gray-700">Require owner as additional insured</span>
-                </label>
-              </div>
+            {/* Insurance Requirements - Collapsible */}
+            <div>
+              <button
+                type="button"
+                onClick={() => setShowInsuranceRequirements(!showInsuranceRequirements)}
+                className="w-full text-sm font-semibold text-gray-900 mb-3 flex items-center justify-between gap-2 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <Shield size={16} className="text-emerald-600" />
+                  Insurance Requirements
+                  <span className="text-xs font-normal text-gray-500">(uses defaults from Settings)</span>
+                </div>
+                <ChevronDown
+                  size={16}
+                  className={`text-gray-400 transition-transform ${showInsuranceRequirements ? 'rotate-180' : ''}`}
+                />
+              </button>
+
+              {showInsuranceRequirements && (
+                <>
+                  {/* Coverage Limits */}
+                  <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                    <h4 className="text-xs font-semibold text-gray-500 uppercase mb-3">Required Coverage Limits</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          General Liability
+                        </label>
+                        <select
+                          value={formData.required_liability_min}
+                          onChange={(e) => setFormData({ ...formData, required_liability_min: parseInt(e.target.value) })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                        >
+                          <option value={0}>Per Lease</option>
+                          <option value={100000}>$100,000</option>
+                          <option value={300000}>$300,000</option>
+                          <option value={500000}>$500,000</option>
+                          <option value={1000000}>$1,000,000</option>
+                          <option value={2000000}>$2,000,000</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Business Auto Liability
+                        </label>
+                        <select
+                          value={formData.required_auto_liability_min}
+                          onChange={(e) => setFormData({ ...formData, required_auto_liability_min: parseInt(e.target.value) })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                        >
+                          <option value={0}>Not Required</option>
+                          <option value={100000}>$100,000</option>
+                          <option value={300000}>$300,000</option>
+                          <option value={500000}>$500,000</option>
+                          <option value={1000000}>$1,000,000</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Workers Compensation */}
+                    <div className="mt-4 pt-4 border-t border-gray-200">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formData.required_workers_comp}
+                          onChange={(e) => setFormData({ ...formData, required_workers_comp: e.target.checked, workers_comp_exempt: false })}
+                          className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
+                        />
+                        <span className="text-sm text-gray-700">Workers' Compensation Required</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* Additional Insured */}
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.requires_additional_insured}
+                        onChange={(e) => setFormData({ ...formData, requires_additional_insured: e.target.checked })}
+                        className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
+                      />
+                      <span className="text-sm text-gray-700">Require owner as additional insured</span>
+                    </label>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </form>

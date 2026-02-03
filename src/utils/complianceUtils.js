@@ -183,13 +183,15 @@ export function checkAllCoveragesExpiration(coverage, additionalCoverages = [], 
 
 /**
  * Determine vendor compliance status based on coverage and issues
+ * @param {object} vendorData - The vendor data object
+ * @param {number} expiringThresholdDays - Days before expiration to mark as "expiring" (default: 30)
  */
-export function determineVendorStatus(vendorData) {
+export function determineVendorStatus(vendorData, expiringThresholdDays = 30) {
   const coverage = vendorData.coverage || {};
   const additionalCoverages = vendorData.additional_coverages || vendorData.additionalCoverages || [];
 
   // Check for expired coverages
-  const { hasExpired, hasExpiringSoon } = checkAllCoveragesExpiration(coverage, additionalCoverages);
+  const { hasExpired, hasExpiringSoon } = checkAllCoveragesExpiration(coverage, additionalCoverages, expiringThresholdDays);
 
   if (hasExpired) return 'expired';
   if (hasExpiringSoon) return 'expiring';
@@ -206,8 +208,10 @@ export function determineVendorStatus(vendorData) {
 /**
  * Recalculate vendor status based on current date and update coverage flags
  * Returns updated vendor object with recalculated status
+ * @param {object} vendor - The vendor object
+ * @param {number} expiringThresholdDays - Days before expiration to mark as "expiring" (default: 30)
  */
-export function recalculateVendorStatus(vendor) {
+export function recalculateVendorStatus(vendor, expiringThresholdDays = 30) {
   const updatedVendor = { ...vendor };
 
   // Update coverage expiration flags
@@ -215,7 +219,7 @@ export function recalculateVendorStatus(vendor) {
     const coverageTypes = ['generalLiability', 'autoLiability', 'workersComp', 'employersLiability'];
     coverageTypes.forEach(type => {
       if (updatedVendor.coverage[type]) {
-        const result = checkCoverageExpiration(updatedVendor.coverage[type]);
+        const result = checkCoverageExpiration(updatedVendor.coverage[type], expiringThresholdDays);
         updatedVendor.coverage[type] = {
           ...updatedVendor.coverage[type],
           expired: result.expired,
@@ -228,7 +232,7 @@ export function recalculateVendorStatus(vendor) {
   // Update additional coverages flags
   if (Array.isArray(updatedVendor.additional_coverages)) {
     updatedVendor.additional_coverages = updatedVendor.additional_coverages.map(cov => {
-      const result = checkCoverageExpiration(cov);
+      const result = checkCoverageExpiration(cov, expiringThresholdDays);
       return { ...cov, expired: result.expired, expiringSoon: result.expiringSoon };
     });
   }
@@ -236,17 +240,9 @@ export function recalculateVendorStatus(vendor) {
   // Normalize issues
   updatedVendor.issues = normalizeIssues(updatedVendor.issues);
 
-  // Determine new status
-  const newStatus = determineVendorStatus(updatedVendor);
-
-  // Only update status if it would be "worse"
-  const statusPriority = { expired: 0, 'non-compliant': 1, expiring: 2, pending: 3, compliant: 4 };
-  const currentPriority = statusPriority[updatedVendor.status] ?? 4;
-  const newPriority = statusPriority[newStatus] ?? 4;
-
-  if (newPriority < currentPriority) {
-    updatedVendor.status = newStatus;
-  }
+  // Determine new status based on current state
+  // Always update to the accurate status (allows both worsening AND improvement)
+  updatedVendor.status = determineVendorStatus(updatedVendor, expiringThresholdDays);
 
   return updatedVendor;
 }
@@ -257,8 +253,10 @@ export function recalculateVendorStatus(vendor) {
 
 /**
  * Determine tenant insurance status based on policy and requirements
+ * @param {object} tenant - The tenant object
+ * @param {number} expiringThresholdDays - Days before expiration to mark as "expiring" (default: 30)
  */
-export function determineTenantStatus(tenant) {
+export function determineTenantStatus(tenant, expiringThresholdDays = 30) {
   // Check if policy exists
   if (!tenant.policy_expiration_date) {
     return 'pending';
@@ -269,7 +267,7 @@ export function determineTenantStatus(tenant) {
   if (daysUntil !== null && daysUntil < 0) {
     return 'expired';
   }
-  if (daysUntil !== null && daysUntil <= 30) {
+  if (daysUntil !== null && daysUntil <= expiringThresholdDays) {
     return 'expiring';
   }
 

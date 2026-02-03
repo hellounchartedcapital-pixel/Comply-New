@@ -25,6 +25,9 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
   const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard', 'vendors', or 'tenants'
   const [showSmartUpload, setShowSmartUpload] = useState(false);
 
+  // User settings (must be declared before useVendors to pass expiring threshold)
+  const [userRequirements, setUserRequirements] = useState(null);
+
   // Properties state
   const [properties, setProperties] = useState([]);
   const [selectedProperty, setSelectedProperty] = useState(null);
@@ -32,7 +35,10 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
   const [loadingProperties, setLoadingProperties] = useState(true);
 
   // Use database hook instead of local state - filter by selected property
-  const { vendors: dbVendors, loading, loadingMore, error, hasMore, totalCount, updateVendor, deleteVendor, loadMore, refreshVendors } = useVendors(selectedProperty?.id);
+  // Pass expiring threshold from user settings (will refetch when settings load)
+  const { vendors: dbVendors, loading, loadingMore, error, hasMore, totalCount, updateVendor, deleteVendor, loadMore, refreshVendors } = useVendors(selectedProperty?.id, {
+    expiringThresholdDays: userRequirements?.expiring_threshold_days || 30
+  });
 
   // Tenants hook for dashboard
   const { tenants: dbTenants, refreshTenants } = useTenants();
@@ -78,7 +84,6 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
   const [showActivityLog, setShowActivityLog] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboardingChecked, setOnboardingChecked] = useState(false);
-  const [userRequirements, setUserRequirements] = useState(null);
   const [requestCOIVendor, setRequestCOIVendor] = useState(null);
   const [requestCOIEmail, setRequestCOIEmail] = useState('');
   const [vendorDetailsTab, setVendorDetailsTab] = useState('details');
@@ -171,7 +176,9 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
           custom_coverages: customCoverages,
           company_name: data.company_name || '',
           require_additional_insured: data.require_additional_insured !== false,
-          require_waiver_of_subrogation: data.require_waiver_of_subrogation || false
+          require_waiver_of_subrogation: data.require_waiver_of_subrogation || false,
+          upload_token_expiry_days: data.upload_token_expiry_days || 30,
+          expiring_threshold_days: data.expiring_threshold_days || 30
         });
       }
     } catch (err) {
@@ -233,6 +240,22 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
       setShowOnboarding(false);
     }
   };
+
+  // Update selectedVendor when vendors refresh to prevent stale data
+  // We intentionally omit selectedVendor from deps to avoid infinite loop
+  React.useEffect(() => {
+    if (selectedVendor && vendors.length > 0) {
+      const updatedVendor = vendors.find(v => v.id === selectedVendor.id);
+      if (updatedVendor) {
+        // Update selectedVendor with fresh data
+        setSelectedVendor(updatedVendor);
+      } else {
+        // Vendor was deleted or filtered out - close the detail view
+        setSelectedVendor(null);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vendors]); // Run when vendors array changes
 
   const handleOnboardingSkip = async () => {
     // Same as complete - mark as done so they don't see it again
@@ -583,7 +606,8 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
       // Generate upload token if vendor doesn't have one or if it's expired
       let uploadToken = requestCOIVendor.rawData?.uploadToken;
       const tokenExpiresAt = new Date();
-      tokenExpiresAt.setDate(tokenExpiresAt.getDate() + 30); // Token valid for 30 days
+      const tokenExpiryDays = userRequirements?.upload_token_expiry_days || 30;
+      tokenExpiresAt.setDate(tokenExpiresAt.getDate() + tokenExpiryDays);
 
       if (!uploadToken) {
         uploadToken = crypto.randomUUID();
@@ -691,6 +715,7 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
     setBulkRequesting(true);
     let successCount = 0;
     let failCount = 0;
+    const failedVendors = []; // Track which vendors failed and why
     const companyName = userRequirements?.company_name || 'Our Company';
     const appUrl = window.location.origin;
 
@@ -700,7 +725,8 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
           // Generate/refresh upload token
           const uploadToken = crypto.randomUUID();
           const tokenExpiresAt = new Date();
-          tokenExpiresAt.setDate(tokenExpiresAt.getDate() + 30);
+          const tokenExpiryDays = userRequirements?.upload_token_expiry_days || 30;
+          tokenExpiresAt.setDate(tokenExpiresAt.getDate() + tokenExpiryDays);
 
           await supabase
             .from('vendors')
@@ -739,6 +765,8 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
 
           if (fnError || (result && !result.success)) {
             failCount++;
+            const errorMsg = fnError?.message || result?.error || 'Unknown error';
+            failedVendors.push({ name: vendor.name, reason: errorMsg });
             continue;
           }
 
@@ -760,6 +788,7 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
         } catch (err) {
           logger.error(`Failed to send to ${vendor.name}`, err);
           failCount++;
+          failedVendors.push({ name: vendor.name, reason: err.message || 'Network error' });
         }
       }
 
@@ -772,11 +801,14 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
           message: `Successfully sent COI requests to ${successCount} vendors.`
         });
       } else {
+        // Build detailed failure message
+        const failedNames = failedVendors.slice(0, 5).map(v => v.name).join(', ');
+        const moreText = failedVendors.length > 5 ? ` and ${failedVendors.length - 5} more` : '';
         showAlert({
           type: 'warning',
           title: 'Partial Success',
           message: `Sent ${successCount} emails, ${failCount} failed.`,
-          details: 'Check vendor email addresses and try again for failed vendors.'
+          details: `Failed vendors: ${failedNames}${moreText}. Check vendor email addresses and try again.`
         });
       }
     } catch (error) {
@@ -1062,6 +1094,8 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
           onSelectTenant={(tenant) => {
             setActiveTab('tenants');
           }}
+          onUploadCOI={() => setShowSmartUpload(true)}
+          onAddTenant={() => setActiveTab('tenants')}
         />
       )}
 

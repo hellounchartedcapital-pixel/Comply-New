@@ -182,9 +182,15 @@ export function VendorUploadPortal({ token, onBack }) {
 
       let vendorStatus = 'compliant';
       let extractedData = {};
+      let extractionWarning = null;
 
       if (extractionError) {
-        // Continue without extraction - user will need to manually review
+        // Log the error but continue - mark as pending review
+        logger.error('COI extraction failed', extractionError);
+        extractionWarning = 'We could not automatically analyze your certificate. It has been uploaded for manual review.';
+        vendorStatus = 'non-compliant';
+        extractedData.issues = extractedData.issues || [];
+        extractedData.issues.push('Certificate requires manual review - automatic extraction failed');
       } else if (extractionResult?.success && extractionResult?.data) {
         extractedData = extractionResult.data;
 
@@ -288,7 +294,8 @@ export function VendorUploadPortal({ token, onBack }) {
       setUploadResult({
         status: vendorStatus,
         issues: normalizedIssues,
-        coverage: extractedData.coverage || {}
+        coverage: extractedData.coverage || {},
+        extractionWarning: extractionWarning
       });
       setUploadSuccess(true);
     } catch (err) {
@@ -361,6 +368,15 @@ export function VendorUploadPortal({ token, onBack }) {
               COI Uploaded Successfully!
             </h1>
           </div>
+
+          {/* Extraction Warning (if extraction failed) */}
+          {uploadResult?.extractionWarning && (
+            <div className="rounded-lg p-4 mb-4 bg-blue-50 border border-blue-200">
+              <p className="text-blue-800 text-sm">
+                <strong>Note:</strong> {uploadResult.extractionWarning}
+              </p>
+            </div>
+          )}
 
           {/* Compliance Status */}
           <div className={`rounded-lg p-4 mb-6 ${

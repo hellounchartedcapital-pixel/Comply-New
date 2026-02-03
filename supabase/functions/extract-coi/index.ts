@@ -2,9 +2,9 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import Anthropic from 'https://esm.sh/@anthropic-ai/sdk@0.52.0';
 import { getCorsHeaders, handleCorsPreflightRequest } from '../_shared/cors.ts';
 
-// Rate limiting configuration
-const RATE_LIMIT_WINDOW_MS = 60000; // 1 minute
-const MAX_REQUESTS_PER_WINDOW = 10; // 10 requests per minute
+// Rate limiting configuration (configurable via environment variables)
+const RATE_LIMIT_WINDOW_MS = parseInt(Deno.env.get('RATE_LIMIT_WINDOW_MS') || '60000'); // Default: 1 minute
+const MAX_REQUESTS_PER_WINDOW = parseInt(Deno.env.get('MAX_REQUESTS_PER_WINDOW') || '10'); // Default: 10 requests per window
 
 // In-memory rate limit store (resets on cold start, but provides basic protection)
 const rateLimitStore = new Map<string, { count: number; resetTime: number }>();

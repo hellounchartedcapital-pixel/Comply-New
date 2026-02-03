@@ -51,7 +51,30 @@ export function useTenants(propertyId = null) {
     loadTenants();
   }, [loadTenants]);
 
-  const addTenant = useCallback(async (tenantData) => {
+  // Auto-refresh on interval and tab focus to prevent stale data
+  useEffect(() => {
+    // Refresh every 60 seconds
+    const intervalId = setInterval(() => {
+      loadTenants();
+    }, 60000);
+
+    // Refresh when tab regains focus
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        loadTenants();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [loadTenants]);
+
+  // tokenExpiryDays can be passed from settings (default: 30 days)
+  const addTenant = useCallback(async (tenantData, tokenExpiryDays = 30) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
@@ -59,7 +82,8 @@ export function useTenants(propertyId = null) {
       // Generate upload token
       const uploadToken = crypto.randomUUID();
       const tokenExpiry = new Date();
-      tokenExpiry.setDate(tokenExpiry.getDate() + 30); // 30 days expiry
+      const expiryDays = tokenExpiryDays || 30;
+      tokenExpiry.setDate(tokenExpiry.getDate() + expiryDays);
 
       const { data, error } = await supabase
         .from('tenants')
@@ -127,11 +151,13 @@ export function useTenants(propertyId = null) {
     }
   }, []);
 
-  const regenerateUploadToken = useCallback(async (id) => {
+  // tokenExpiryDays can be passed from settings (default: 30 days)
+  const regenerateUploadToken = useCallback(async (id, tokenExpiryDays = 30) => {
     try {
       const uploadToken = crypto.randomUUID();
       const tokenExpiry = new Date();
-      tokenExpiry.setDate(tokenExpiry.getDate() + 30);
+      const expiryDays = tokenExpiryDays || 30;
+      tokenExpiry.setDate(tokenExpiry.getDate() + expiryDays);
 
       const { data, error } = await supabase
         .from('tenants')

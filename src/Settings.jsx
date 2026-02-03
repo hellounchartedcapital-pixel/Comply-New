@@ -8,6 +8,12 @@ export function Settings({ onClose, onManageProperties, propertyCount = 0 }) {
     // Company/Account Info
     companyName: '',
 
+    // Upload Link Settings
+    uploadTokenExpiryDays: 30, // Days until upload links expire (7-90)
+
+    // Compliance Settings
+    expiringThresholdDays: 30, // Days before expiration to mark as "expiring"
+
     // Auto Follow-Up Settings
     autoFollowUpEnabled: false,
     followUpDays: [30, 14, 7], // Days before expiration to send reminders
@@ -58,6 +64,10 @@ export function Settings({ onClose, onManageProperties, propertyCount = 0 }) {
       if (data) {
         setSettings({
           companyName: data.company_name || '',
+          // Upload Link Settings
+          uploadTokenExpiryDays: data.upload_token_expiry_days || 30,
+          // Compliance Settings
+          expiringThresholdDays: data.expiring_threshold_days || 30,
           // Auto Follow-Up Settings
           autoFollowUpEnabled: data.auto_follow_up_enabled || false,
           followUpDays: data.follow_up_days || [30, 14, 7],
@@ -98,6 +108,10 @@ export function Settings({ onClose, onManageProperties, propertyCount = 0 }) {
       const settingsData = {
         user_id: user.id,
         company_name: settings.companyName,
+        // Upload Link Settings
+        upload_token_expiry_days: settings.uploadTokenExpiryDays,
+        // Compliance Settings
+        expiring_threshold_days: settings.expiringThresholdDays,
         // Auto Follow-Up Settings
         auto_follow_up_enabled: settings.autoFollowUpEnabled,
         follow_up_days: settings.followUpDays,
@@ -237,6 +251,74 @@ export function Settings({ onClose, onManageProperties, propertyCount = 0 }) {
               <Info size={16} className="text-gray-500 flex-shrink-0 mt-0.5" />
               <p className="text-sm text-gray-600">
                 Insurance requirements are managed per-property. Each property can have different coverage requirements.
+              </p>
+            </div>
+          </div>
+
+          {/* Upload Link Settings Section */}
+          <div className="border-t border-gray-200 pt-6">
+            <div className="flex items-center space-x-3 mb-4">
+              <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
+                <Clock className="w-5 h-5 text-amber-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Upload Link Settings</h3>
+                <p className="text-sm text-gray-500">Configure how upload links work for vendors and tenants</p>
+              </div>
+            </div>
+
+            <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
+              <div className="mb-3">
+                <h4 className="font-medium text-gray-900">Upload Link Expiration</h4>
+                <p className="text-sm text-gray-500">How long upload links remain valid before expiring</p>
+              </div>
+              <select
+                value={settings.uploadTokenExpiryDays}
+                onChange={(e) => setSettings({...settings, uploadTokenExpiryDays: parseInt(e.target.value)})}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+              >
+                <option value={7}>7 days</option>
+                <option value={14}>14 days</option>
+                <option value={30}>30 days (default)</option>
+                <option value={60}>60 days</option>
+                <option value={90}>90 days</option>
+              </select>
+              <p className="mt-2 text-xs text-gray-500">
+                After this time, vendors/tenants will need a new link to upload their COI.
+              </p>
+            </div>
+          </div>
+
+          {/* Compliance Settings Section */}
+          <div className="border-t border-gray-200 pt-6">
+            <div className="flex items-center space-x-3 mb-4">
+              <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
+                <AlertCircle className="w-5 h-5 text-orange-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Compliance Thresholds</h3>
+                <p className="text-sm text-gray-500">Configure when vendors and tenants are marked as "expiring"</p>
+              </div>
+            </div>
+
+            <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
+              <div className="mb-3">
+                <h4 className="font-medium text-gray-900">Expiring Warning Threshold</h4>
+                <p className="text-sm text-gray-500">How many days before expiration should certificates be marked as "expiring"?</p>
+              </div>
+              <select
+                value={settings.expiringThresholdDays}
+                onChange={(e) => setSettings({...settings, expiringThresholdDays: parseInt(e.target.value)})}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+              >
+                <option value={14}>14 days</option>
+                <option value={30}>30 days (default)</option>
+                <option value={45}>45 days</option>
+                <option value={60}>60 days</option>
+                <option value={90}>90 days</option>
+              </select>
+              <p className="mt-2 text-xs text-gray-500">
+                Vendors and tenants with certificates expiring within this window will show an "Expiring" status.
               </p>
             </div>
           </div>
