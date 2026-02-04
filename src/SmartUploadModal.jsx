@@ -22,7 +22,8 @@ export function SmartUploadModal({
   onUploadComplete,
   properties = [],
   selectedProperty: initialProperty,
-  userRequirements
+  userRequirements,
+  defaultDocumentType = null // 'vendor' or 'tenant' - if set, skips type selection
 }) {
   // Simplified: Step 1 = select type/property/name/email, Step 2 = upload, Step 3 = result
   const [step, setStep] = useState(1);
@@ -76,7 +77,7 @@ export function SmartUploadModal({
   useEffect(() => {
     if (isOpen) {
       setStep(1);
-      setDocumentType(null);
+      setDocumentType(defaultDocumentType); // Use default if provided
       setContactName('');
       setContactEmail('');
       setResult(null);
@@ -104,7 +105,7 @@ export function SmartUploadModal({
       setUnitNumber('');
       loadTenantDefaults();
     }
-  }, [isOpen, initialProperty, properties]);
+  }, [isOpen, initialProperty, properties, defaultDocumentType]);
 
   // Save property selection to localStorage
   useEffect(() => {
@@ -533,55 +534,57 @@ export function SmartUploadModal({
                 </div>
               )}
 
-              {/* Document Type Selection */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-3">
-                  What type of document is this?
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    onClick={() => setDocumentType('vendor')}
-                    className={`p-4 rounded-xl border-2 transition-all text-left ${
-                      documentType === 'vendor'
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-2 ${
-                      documentType === 'vendor' ? 'bg-blue-100' : 'bg-gray-100'
-                    }`}>
-                      <FileCheck size={20} className={documentType === 'vendor' ? 'text-blue-600' : 'text-gray-500'} />
-                    </div>
-                    <p className={`font-semibold ${documentType === 'vendor' ? 'text-blue-900' : 'text-gray-900'}`}>
-                      Vendor COI
-                    </p>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Commercial certificate
-                    </p>
-                  </button>
+              {/* Document Type Selection - Only show if no default type provided */}
+              {!defaultDocumentType && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                    What type of document is this?
+                  </label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      onClick={() => setDocumentType('vendor')}
+                      className={`p-4 rounded-xl border-2 transition-all text-left ${
+                        documentType === 'vendor'
+                          ? 'border-blue-500 bg-blue-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-2 ${
+                        documentType === 'vendor' ? 'bg-blue-100' : 'bg-gray-100'
+                      }`}>
+                        <FileCheck size={20} className={documentType === 'vendor' ? 'text-blue-600' : 'text-gray-500'} />
+                      </div>
+                      <p className={`font-semibold ${documentType === 'vendor' ? 'text-blue-900' : 'text-gray-900'}`}>
+                        Vendor COI
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Commercial certificate
+                      </p>
+                    </button>
 
-                  <button
-                    onClick={() => setDocumentType('tenant')}
-                    className={`p-4 rounded-xl border-2 transition-all text-left ${
-                      documentType === 'tenant'
-                        ? 'border-purple-500 bg-purple-50'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-2 ${
-                      documentType === 'tenant' ? 'bg-purple-100' : 'bg-gray-100'
-                    }`}>
-                      <Users size={20} className={documentType === 'tenant' ? 'text-purple-600' : 'text-gray-500'} />
-                    </div>
-                    <p className={`font-semibold ${documentType === 'tenant' ? 'text-purple-900' : 'text-gray-900'}`}>
-                      Tenant Insurance
-                    </p>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Renter's policy
-                    </p>
-                  </button>
+                    <button
+                      onClick={() => setDocumentType('tenant')}
+                      className={`p-4 rounded-xl border-2 transition-all text-left ${
+                        documentType === 'tenant'
+                          ? 'border-purple-500 bg-purple-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-2 ${
+                        documentType === 'tenant' ? 'bg-purple-100' : 'bg-gray-100'
+                      }`}>
+                        <Users size={20} className={documentType === 'tenant' ? 'text-purple-600' : 'text-gray-500'} />
+                      </div>
+                      <p className={`font-semibold ${documentType === 'tenant' ? 'text-purple-900' : 'text-gray-900'}`}>
+                        Tenant Insurance
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Renter's policy
+                      </p>
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Property Selection */}
               <div>

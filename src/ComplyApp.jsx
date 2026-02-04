@@ -2239,7 +2239,7 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
       )}
       </div>
 
-      {/* Upload Modal */}
+      {/* Upload Modal - Vendor only from Add Vendor button */}
       <SmartUploadModal
         isOpen={showSmartUpload}
         onClose={() => setShowSmartUpload(false)}
@@ -2254,6 +2254,7 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
         properties={properties}
         selectedProperty={selectedProperty}
         userRequirements={userRequirements}
+        defaultDocumentType="vendor"
       />
 
       {/* Settings Modal */}
