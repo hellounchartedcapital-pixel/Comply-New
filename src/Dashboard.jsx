@@ -2,7 +2,7 @@
 import React, { useMemo } from 'react';
 import {
   CheckCircle, XCircle, AlertCircle, Clock,
-  FileText, Users, ChevronRight, TrendingUp, Upload, Plus, Sparkles
+  FileText, Users, ChevronRight, TrendingUp, Upload, Plus, Sparkles, Loader2
 } from 'lucide-react';
 import { formatDate } from './utils/complianceUtils';
 import { PropertySelector } from './PropertySelector';
@@ -14,6 +14,8 @@ export function Dashboard({
   selectedProperty,
   onSelectProperty,
   loadingProperties = false,
+  loadingVendors = false,
+  loadingTenants = false,
   onViewVendors,
   onViewTenants,
   onSelectVendor,
@@ -21,6 +23,8 @@ export function Dashboard({
   onUploadCOI,
   onAddTenant
 }) {
+  // Check if initial data is still loading
+  const isInitialLoading = loadingVendors || loadingTenants;
   // Combined stats
   const combinedStats = useMemo(() => {
     const vendorStats = {
@@ -186,8 +190,16 @@ export function Dashboard({
         </div>
       )}
 
-      {/* Empty State - Show when no vendors AND no tenants */}
-      {combinedStats.total === 0 && (
+      {/* Loading State - Show while fetching initial data */}
+      {isInitialLoading && (
+        <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center">
+          <Loader2 className="w-12 h-12 text-emerald-500 animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">Loading your compliance data...</p>
+        </div>
+      )}
+
+      {/* Empty State - Show when no vendors AND no tenants (only after loading) */}
+      {!isInitialLoading && combinedStats.total === 0 && (
         <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-2xl border border-emerald-200 p-8 text-center">
           <div className="w-16 h-16 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
             <Sparkles size={32} className="text-emerald-600" />
@@ -220,7 +232,8 @@ export function Dashboard({
         </div>
       )}
 
-      {/* Combined Stats Row */}
+      {/* Combined Stats Row - Only show after loading and when there's data */}
+      {!isInitialLoading && combinedStats.total > 0 && (
       <section aria-label="Compliance Statistics">
         <h2 className="sr-only">Compliance Statistics Summary</h2>
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-4" role="list">
@@ -285,8 +298,10 @@ export function Dashboard({
           </div>
         </div>
       </section>
+      )}
 
-      {/* Two Column Layout */}
+      {/* Two Column Layout - Only show when there's data */}
+      {!isInitialLoading && combinedStats.total > 0 && (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Combined Pie Chart */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
@@ -434,9 +449,10 @@ export function Dashboard({
           </div>
         </div>
       </div>
+      )}
 
       {/* Needs Attention Section */}
-      {needsAttention.length > 0 && (
+      {!isInitialLoading && needsAttention.length > 0 && (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-bold text-gray-900">Needs Attention</h3>
@@ -489,7 +505,8 @@ export function Dashboard({
         </div>
       )}
 
-      {/* Quick Links */}
+      {/* Quick Links - Only show when there's data */}
+      {!isInitialLoading && combinedStats.total > 0 && (
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <button
           onClick={onViewVendors}
@@ -527,6 +544,7 @@ export function Dashboard({
           </div>
         </button>
       </div>
+      )}
     </div>
   );
 }

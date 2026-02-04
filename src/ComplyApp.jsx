@@ -41,7 +41,7 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
   });
 
   // Tenants hook for dashboard
-  const { tenants: dbTenants, refreshTenants } = useTenants();
+  const { tenants: dbTenants, loading: loadingTenants, refreshTenants } = useTenants();
 
   // Convert database format (snake_case) to app format (camelCase)
   const vendors = dbVendors.map(v => ({
@@ -1081,6 +1081,8 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
           selectedProperty={selectedProperty}
           onSelectProperty={setSelectedProperty}
           loadingProperties={loadingProperties}
+          loadingVendors={loading}
+          loadingTenants={loadingTenants}
           onViewVendors={() => setActiveTab('vendors')}
           onViewTenants={() => setActiveTab('tenants')}
           onSelectVendor={(vendor) => {
