@@ -19,6 +19,7 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
   const [session, setSession] = useState(null)
+  const [emailVerified, setEmailVerified] = useState(false)
 
   useEffect(() => {
     // Check active sessions and sets the user
@@ -26,6 +27,8 @@ export const AuthProvider = ({ children }) => {
       .then(({ data: { session } }) => {
         setSession(session)
         setUser(session?.user ?? null)
+        // Check if email is verified
+        setEmailVerified(!!session?.user?.email_confirmed_at)
         setLoading(false)
       })
       .catch((error) => {
@@ -33,6 +36,7 @@ export const AuthProvider = ({ children }) => {
         console.warn('Session retrieval failed:', error.message)
         setSession(null)
         setUser(null)
+        setEmailVerified(false)
         setLoading(false)
       })
 
@@ -40,6 +44,8 @@ export const AuthProvider = ({ children }) => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session)
       setUser(session?.user ?? null)
+      // Update email verification status
+      setEmailVerified(!!session?.user?.email_confirmed_at)
       setLoading(false)
     })
 
@@ -103,6 +109,7 @@ export const AuthProvider = ({ children }) => {
     user,
     session,
     loading,
+    emailVerified,
     signUp,
     signIn,
     signOut,

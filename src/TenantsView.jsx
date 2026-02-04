@@ -10,6 +10,7 @@ import { formatCurrency, formatDate, formatRelativeDate, getStatusConfig, getDay
 import { AlertModal, useAlertModal } from './AlertModal';
 import { PropertySelector } from './PropertySelector';
 import logger from './logger';
+import { showSuccess, showError } from './toast';
 
 
 // Status icon component (matches vendor style)
@@ -755,10 +756,15 @@ export function TenantsView({ properties, userRequirements, selectedProperty, on
   };
 
   const copyUploadLink = async (tenant) => {
-    const link = `${window.location.origin}?tenant_upload=${tenant.upload_token}`;
-    await navigator.clipboard.writeText(link);
-    setCopySuccess(tenant.id);
-    setTimeout(() => setCopySuccess(null), 2000);
+    try {
+      const link = `${window.location.origin}?tenant_upload=${tenant.upload_token}`;
+      await navigator.clipboard.writeText(link);
+      setCopySuccess(tenant.id);
+      showSuccess('Upload link copied to clipboard');
+      setTimeout(() => setCopySuccess(null), 2000);
+    } catch (err) {
+      showError('Failed to copy link. Please try again.');
+    }
   };
 
   const handleSendRequest = async (tenant) => {

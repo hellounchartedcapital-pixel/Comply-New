@@ -1,13 +1,11 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import Anthropic from 'https://esm.sh/@anthropic-ai/sdk@0.52.0';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { getCorsHeaders, handleCorsPreflightRequest } from '../_shared/cors.ts';
 
 // Rate limiting configuration (configurable via environment variables)
-const RATE_LIMIT_WINDOW_MS = parseInt(Deno.env.get('RATE_LIMIT_WINDOW_MS') || '60000'); // Default: 1 minute
 const MAX_REQUESTS_PER_WINDOW = parseInt(Deno.env.get('MAX_REQUESTS_PER_WINDOW') || '10'); // Default: 10 requests per window
-
-// In-memory rate limit store (resets on cold start, but provides basic protection)
-const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
+const RATE_LIMIT_WINDOW_SECONDS = parseInt(Deno.env.get('RATE_LIMIT_WINDOW_SECONDS') || '60'); // Default: 60 seconds
 
 function getRateLimitKey(req: Request): string {
   // Use X-Forwarded-For header (set by Supabase) or fall back to a default
@@ -16,34 +14,120 @@ function getRateLimitKey(req: Request): string {
 
   // Also include authorization to rate limit per user
   const authHeader = req.headers.get('authorization') || '';
-  return `${clientIp}:${authHeader.slice(-20)}`;
+  return `extract-coi:${clientIp}:${authHeader.slice(-20)}`;
 }
 
-function checkRateLimit(key: string): { allowed: boolean; remaining: number; resetIn: number } {
-  const now = Date.now();
-  const record = rateLimitStore.get(key);
+// Persistent rate limiting using Supabase database
+async function checkRateLimit(key: string): Promise<{ allowed: boolean; remaining: number; resetIn: number }> {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
-  // Clean up expired entries periodically
-  if (rateLimitStore.size > 1000) {
-    for (const [k, v] of rateLimitStore.entries()) {
-      if (now > v.resetTime) {
-        rateLimitStore.delete(k);
-      }
+  if (!supabaseUrl || !supabaseServiceKey) {
+    // Fallback: allow request if DB not configured (but log warning)
+    console.warn('Rate limiting DB not configured - allowing request');
+    return { allowed: true, remaining: MAX_REQUESTS_PER_WINDOW, resetIn: RATE_LIMIT_WINDOW_SECONDS };
+  }
+
+  try {
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    const { data, error } = await supabase.rpc('check_rate_limit', {
+      p_key: key,
+      p_max_requests: MAX_REQUESTS_PER_WINDOW,
+      p_window_seconds: RATE_LIMIT_WINDOW_SECONDS
+    });
+
+    if (error) {
+      console.error('Rate limit check failed:', error);
+      // Fallback: allow request on error (fail open, but log)
+      return { allowed: true, remaining: MAX_REQUESTS_PER_WINDOW, resetIn: RATE_LIMIT_WINDOW_SECONDS };
     }
+
+    const result = data?.[0] || { allowed: true, remaining: MAX_REQUESTS_PER_WINDOW, reset_in: RATE_LIMIT_WINDOW_SECONDS };
+    return {
+      allowed: result.allowed,
+      remaining: result.remaining,
+      resetIn: result.reset_in
+    };
+  } catch (err) {
+    console.error('Rate limit error:', err);
+    return { allowed: true, remaining: MAX_REQUESTS_PER_WINDOW, resetIn: RATE_LIMIT_WINDOW_SECONDS };
+  }
+}
+
+// Server-side token validation
+async function validateUploadToken(token: string | undefined, corsHeaders: Record<string, string>, rateLimitHeaders: Record<string, string>): Promise<{ valid: boolean; error?: Response; vendorId?: string }> {
+  if (!token) {
+    // No token provided - this is an authenticated user upload, not vendor portal
+    return { valid: true };
   }
 
-  if (!record || now > record.resetTime) {
-    // Start new window
-    rateLimitStore.set(key, { count: 1, resetTime: now + RATE_LIMIT_WINDOW_MS });
-    return { allowed: true, remaining: MAX_REQUESTS_PER_WINDOW - 1, resetIn: RATE_LIMIT_WINDOW_MS };
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+
+  if (!supabaseUrl || !supabaseServiceKey) {
+    return {
+      valid: false,
+      error: new Response(
+        JSON.stringify({ success: false, error: 'Server configuration error' }),
+        { headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json' }, status: 500 }
+      )
+    };
   }
 
-  if (record.count >= MAX_REQUESTS_PER_WINDOW) {
-    return { allowed: false, remaining: 0, resetIn: record.resetTime - now };
+  const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+  // Check vendors table for this token
+  const { data: vendor, error: vendorError } = await supabase
+    .from('vendors')
+    .select('id, upload_token_expires_at')
+    .eq('upload_token', token)
+    .single();
+
+  if (vendorError || !vendor) {
+    // Try tenants table
+    const { data: tenant, error: tenantError } = await supabase
+      .from('tenants')
+      .select('id, upload_token_expires_at')
+      .eq('upload_token', token)
+      .single();
+
+    if (tenantError || !tenant) {
+      return {
+        valid: false,
+        error: new Response(
+          JSON.stringify({ success: false, error: 'Invalid upload link. Please request a new link from your contact.' }),
+          { headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json' }, status: 403 }
+        )
+      };
+    }
+
+    // Check tenant token expiry
+    if (tenant.upload_token_expires_at && new Date(tenant.upload_token_expires_at) < new Date()) {
+      return {
+        valid: false,
+        error: new Response(
+          JSON.stringify({ success: false, error: 'This upload link has expired. Please request a new link from your contact.' }),
+          { headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json' }, status: 403 }
+        )
+      };
+    }
+
+    return { valid: true, vendorId: tenant.id };
   }
 
-  record.count++;
-  return { allowed: true, remaining: MAX_REQUESTS_PER_WINDOW - record.count, resetIn: record.resetTime - now };
+  // Check vendor token expiry
+  if (vendor.upload_token_expires_at && new Date(vendor.upload_token_expires_at) < new Date()) {
+    return {
+      valid: false,
+      error: new Response(
+        JSON.stringify({ success: false, error: 'This upload link has expired. Please request a new link from your contact.' }),
+        { headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json' }, status: 403 }
+      )
+    };
+  }
+
+  return { valid: true, vendorId: vendor.id };
 }
 
 interface Requirements {
@@ -83,12 +167,12 @@ serve(async (req) => {
 
   // Check rate limit
   const rateLimitKey = getRateLimitKey(req);
-  const rateLimit = checkRateLimit(rateLimitKey);
+  const rateLimit = await checkRateLimit(rateLimitKey);
 
   const rateLimitHeaders = {
     'X-RateLimit-Limit': MAX_REQUESTS_PER_WINDOW.toString(),
     'X-RateLimit-Remaining': rateLimit.remaining.toString(),
-    'X-RateLimit-Reset': Math.ceil(rateLimit.resetIn / 1000).toString(),
+    'X-RateLimit-Reset': rateLimit.resetIn.toString(),
   };
 
   if (!rateLimit.allowed) {
@@ -96,7 +180,7 @@ serve(async (req) => {
       JSON.stringify({
         success: false,
         error: 'Rate limit exceeded. Please wait before making more requests.',
-        retryAfter: Math.ceil(rateLimit.resetIn / 1000),
+        retryAfter: rateLimit.resetIn,
       }),
       {
         headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json' },
@@ -111,7 +195,13 @@ serve(async (req) => {
       throw new Error('ANTHROPIC_API_KEY not configured');
     }
 
-    const { pdfBase64, requirements } = await req.json();
+    const { pdfBase64, requirements, uploadToken } = await req.json();
+
+    // Server-side token validation (critical security check)
+    const tokenValidation = await validateUploadToken(uploadToken, corsHeaders, rateLimitHeaders);
+    if (!tokenValidation.valid && tokenValidation.error) {
+      return tokenValidation.error;
+    }
 
     if (!pdfBase64) {
       throw new Error('No PDF data provided');

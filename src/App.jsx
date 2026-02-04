@@ -13,8 +13,14 @@ import { TermsOfService } from './TermsOfService'
 import { VendorUploadPortal } from './VendorUploadPortal'
 import { TenantUploadPortal } from './TenantUploadPortal'
 import { Pricing } from './Pricing'
+import { NotFound } from './NotFound'
+import { EmailVerification } from './EmailVerification'
 import { Loader2 } from 'lucide-react'
+import { Toaster } from 'react-hot-toast'
 import ErrorBoundary from './ErrorBoundary'
+
+// Valid paths for the app (for 404 detection)
+const VALID_PATHS = ['/', '/privacy', '/terms', '/pricing'];
 
 // Initialize Sentry for error tracking
 if (process.env.REACT_APP_SENTRY_DSN) {
@@ -31,7 +37,7 @@ if (process.env.REACT_APP_SENTRY_DSN) {
 }
 
 function AppContent() {
-  const { user, loading, signOut } = useAuth()
+  const { user, loading, signOut, emailVerified } = useAuth()
   const [showSignup, setShowSignup] = useState(false)
   const [showAuth, setShowAuth] = useState(false)
   const [showPrivacy, setShowPrivacy] = useState(false)
@@ -39,23 +45,34 @@ function AppContent() {
   const [showPricing, setShowPricing] = useState(false)
   const [uploadToken, setUploadToken] = useState(null)
   const [tenantUploadToken, setTenantUploadToken] = useState(null)
+  const [showNotFound, setShowNotFound] = useState(false)
 
   // Check URL for upload token or pricing page on mount
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
+    const path = window.location.pathname
     const token = params.get('upload')
+    const tenantToken = params.get('tenant_upload')
+    const checkoutResult = params.get('checkout')
+
+    // Check for upload tokens first
     if (token) {
       setUploadToken(token)
+      return
     }
-    // Check for tenant upload token
-    const tenantToken = params.get('tenant_upload')
     if (tenantToken) {
       setTenantUploadToken(tenantToken)
+      return
     }
     // Check if coming back from checkout
-    const checkoutResult = params.get('checkout')
     if (checkoutResult) {
       setShowPricing(true)
+      return
+    }
+
+    // Check for invalid paths (404)
+    if (path !== '/' && !VALID_PATHS.includes(path) && !params.toString()) {
+      setShowNotFound(true)
     }
   }, [])
 
@@ -68,6 +85,18 @@ function AppContent() {
           <p className="text-gray-600">Loading...</p>
         </div>
       </div>
+    )
+  }
+
+  // Show 404 page for invalid routes
+  if (showNotFound) {
+    return (
+      <NotFound
+        onGoHome={() => {
+          setShowNotFound(false)
+          window.history.pushState({}, '', '/')
+        }}
+      />
     )
   }
 
@@ -150,7 +179,21 @@ function AppContent() {
     return <Login onSwitchToSignup={() => setShowSignup(true)} onBack={() => setShowAuth(false)} />
   }
 
-  // User is logged in, show main app
+  // User is logged in but email not verified - show verification page
+  if (!emailVerified) {
+    return (
+      <EmailVerification
+        email={user.email}
+        onSignOut={signOut}
+        onBack={() => {
+          signOut()
+          setShowAuth(false)
+        }}
+      />
+    )
+  }
+
+  // User is logged in and verified, show main app
   return <ComplyApp user={user} onSignOut={signOut} onShowPricing={() => setShowPricing(true)} />
 }
 
@@ -159,6 +202,32 @@ export default function App() {
     <ErrorBoundary>
       <AuthProvider>
         <AppContent />
+        <Toaster
+          position="top-right"
+          toastOptions={{
+            // Default options for all toasts
+            duration: 4000,
+            style: {
+              background: '#fff',
+              color: '#363636',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+              borderRadius: '12px',
+              padding: '12px 16px',
+            },
+            success: {
+              iconTheme: {
+                primary: '#10B981',
+                secondary: '#fff',
+              },
+            },
+            error: {
+              iconTheme: {
+                primary: '#EF4444',
+                secondary: '#fff',
+              },
+            },
+          }}
+        />
       </AuthProvider>
     </ErrorBoundary>
   )

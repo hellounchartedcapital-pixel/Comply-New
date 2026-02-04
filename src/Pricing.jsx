@@ -182,7 +182,18 @@ export function Pricing({ onBack, onSignUp, user }) {
     try {
       const { url } = await createCheckoutSession(planKey, billingCycle === 'annual' ? 'annual' : 'monthly');
       if (url) {
-        window.location.href = url;
+        // Validate URL before redirecting (security: prevent open redirect attacks)
+        try {
+          const parsedUrl = new URL(url);
+          const allowedDomains = ['stripe.com', 'checkout.stripe.com', 'billing.stripe.com'];
+          if (allowedDomains.some(domain => parsedUrl.hostname.endsWith(domain))) {
+            window.location.href = url;
+          } else {
+            throw new Error('Invalid checkout URL');
+          }
+        } catch (urlError) {
+          throw new Error('Unable to start checkout. Please try again.');
+        }
       } else {
         throw new Error('No checkout URL returned');
       }

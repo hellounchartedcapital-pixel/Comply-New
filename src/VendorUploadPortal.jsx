@@ -172,11 +172,12 @@ export function VendorUploadPortal({ token, onBack }) {
         require_waiver_of_subrogation: userSettings.require_waiver_of_subrogation || false
       };
 
-      // Call the extraction Edge Function
+      // Call the extraction Edge Function with token for server-side validation
       const { data: extractionResult, error: extractionError } = await supabase.functions.invoke('extract-coi', {
         body: {
           pdfBase64: base64Data,
-          requirements: requirements
+          requirements: requirements,
+          uploadToken: token // Server-side validation of token expiry
         }
       });
 

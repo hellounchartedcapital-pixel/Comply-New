@@ -144,8 +144,21 @@ export function useSubscription() {
 
       if (error) throw error;
 
+      // Validate URL before redirecting (security: prevent open redirect attacks)
       if (data?.url) {
-        window.location.href = data.url;
+        try {
+          const url = new URL(data.url);
+          // Only allow Stripe domains for redirect
+          const allowedDomains = ['stripe.com', 'checkout.stripe.com', 'billing.stripe.com'];
+          if (allowedDomains.some(domain => url.hostname.endsWith(domain))) {
+            window.location.href = data.url;
+          } else {
+            throw new Error('Invalid redirect URL');
+          }
+        } catch (urlError) {
+          logger.error('Invalid portal URL received', urlError);
+          throw new Error('Unable to open billing portal. Please try again.');
+        }
       }
     } catch (err) {
       logger.error('Error opening customer portal', err);
