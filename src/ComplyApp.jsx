@@ -19,7 +19,6 @@ import { Dashboard } from './Dashboard';
 import { isValidEmail } from './validation';
 import logger from './logger';
 import { formatDate, formatRelativeDate, formatCurrency, getDaysUntil } from './utils/complianceUtils';
-import { showSuccess, showError } from './toast';
 
 function ComplyApp({ user, onSignOut, onShowPricing }) {
   // Active tab state
