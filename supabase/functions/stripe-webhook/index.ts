@@ -122,11 +122,8 @@ serve(async (req) => {
         const subscriptionId = session.subscription as string;
         const customerId = session.customer as string;
 
-        console.log('Processing checkout.session.completed:', { subscriptionId, customerId });
-
         // Get the subscription details from Stripe API
         const subscription = await stripeRequest(`/subscriptions/${subscriptionId}`);
-        console.log('Subscription data:', JSON.stringify(subscription, null, 2));
 
         const plan = subscription.metadata?.plan || 'starter';
         const userId = subscription.metadata?.supabase_user_id;
@@ -163,9 +160,7 @@ serve(async (req) => {
           });
 
         if (error) {
-          console.error('Error upserting subscription:', error);
-        } else {
-          console.log(`Subscription created/updated for user ${userId}: ${plan}`);
+          console.error('Error upserting subscription:', error.message);
         }
         break;
       }
@@ -202,9 +197,7 @@ serve(async (req) => {
           .eq('user_id', userId);
 
         if (error) {
-          console.error('Error updating subscription:', error);
-        } else {
-          console.log(`Subscription updated for user ${userId}: ${subscription.status}`);
+          console.error('Error updating subscription:', error.message);
         }
         break;
       }
@@ -231,9 +224,7 @@ serve(async (req) => {
           .eq('user_id', userId);
 
         if (error) {
-          console.error('Error downgrading subscription:', error);
-        } else {
-          console.log(`Subscription canceled for user ${userId}, downgraded to free`);
+          console.error('Error downgrading subscription:', error.message);
         }
         break;
       }
