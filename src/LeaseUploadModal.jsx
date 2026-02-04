@@ -1,6 +1,6 @@
 // LeaseUploadModal.jsx - Upload commercial lease to auto-extract tenant info and insurance requirements
 import React, { useState, useCallback } from 'react';
-import { X, Upload, FileText, Loader2, CheckCircle, AlertCircle, Building2, User, Shield } from 'lucide-react';
+import { X, Upload, FileText, Loader2, CheckCircle, AlertCircle, Building2, User, Shield, Mail, ArrowRight, SkipForward } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import logger from './logger';
 
@@ -8,6 +8,9 @@ const STEPS = {
   UPLOAD: 'upload',
   EXTRACTING: 'extracting',
   REVIEW: 'review',
+  COI_UPLOAD: 'coi_upload',
+  PROCESSING_COI: 'processing_coi',
+  SUCCESS: 'success',
   ERROR: 'error'
 };
 
@@ -22,6 +25,14 @@ export function LeaseUploadModal({ isOpen, onClose, onTenantCreated, onManualAdd
   // Extracted/editable data from lease
   const [editedData, setEditedData] = useState(null);
   const [selectedPropertyId, setSelectedPropertyId] = useState('');
+  const [contactEmail, setContactEmail] = useState('');
+
+  // Created tenant for COI upload step
+  const [createdTenant, setCreatedTenant] = useState(null);
+
+  // COI upload state
+  const [coiFile, setCoiFile] = useState(null);
+  const [coiDragActive, setCoiDragActive] = useState(false);
 
   const resetState = useCallback(() => {
     setStep(STEPS.UPLOAD);
@@ -30,7 +41,10 @@ export function LeaseUploadModal({ isOpen, onClose, onTenantCreated, onManualAdd
     setEditedData(null);
     setStoragePath(null);
     setSelectedPropertyId('');
+    setContactEmail('');
     setSaving(false);
+    setCreatedTenant(null);
+    setCoiFile(null);
   }, []);
 
   const handleClose = useCallback(() => {
@@ -122,6 +136,9 @@ export function LeaseUploadModal({ isOpen, onClose, onTenantCreated, onManualAdd
 
       setEditedData(result.data);
 
+      // Pre-fill contact email if found in lease
+      setContactEmail(result.data?.tenant?.contactEmail || '');
+
       // Try to match property from extracted address
       if (result.data?.property?.address && properties.length > 0) {
         const extractedAddr = result.data.property.address.toLowerCase();
@@ -149,6 +166,11 @@ export function LeaseUploadModal({ isOpen, onClose, onTenantCreated, onManualAdd
       return;
     }
 
+    if (!contactEmail || !contactEmail.includes('@')) {
+      setError('Please enter a valid contact email');
+      return;
+    }
+
     setSaving(true);
     setError(null);
 
@@ -163,7 +185,7 @@ export function LeaseUploadModal({ isOpen, onClose, onTenantCreated, onManualAdd
         user_id: user.id,
         property_id: selectedPropertyId,
         name: editedData.tenant?.name || 'Unknown Tenant',
-        email: editedData.tenant?.contactEmail || null,
+        email: contactEmail, // Use the editable email field
         phone: editedData.tenant?.contactPhone || null,
         contact_name: editedData.tenant?.contactName || null,
         suite_number: editedData.leaseDetails?.suite || null,
@@ -198,7 +220,7 @@ export function LeaseUploadModal({ isOpen, onClose, onTenantCreated, onManualAdd
         certificate_holder_name: insuranceReqs.certificateHolder?.name || null,
         certificate_holder_address: insuranceReqs.certificateHolder?.address || null,
 
-        // Compliance status starts as pending
+        // Compliance status starts as pending (no COI uploaded yet)
         insurance_status: 'pending',
 
         // Store raw extracted text for reference
@@ -232,15 +254,181 @@ export function LeaseUploadModal({ isOpen, onClose, onTenantCreated, onManualAdd
         logger.warn('Failed to log activity:', activityErr);
       }
 
-      // Success - notify parent and close
-      onTenantCreated?.(newTenant);
-      handleClose();
+      // Store created tenant and move to COI upload step
+      setCreatedTenant(newTenant);
+      setStep(STEPS.COI_UPLOAD);
     } catch (err) {
       logger.error('Error saving tenant:', err);
       setError(err.message || 'Failed to save tenant');
     } finally {
       setSaving(false);
     }
+  };
+
+  // COI Upload Handlers
+  const handleCoiDrag = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === 'dragenter' || e.type === 'dragover') {
+      setCoiDragActive(true);
+    } else if (e.type === 'dragleave') {
+      setCoiDragActive(false);
+    }
+  };
+
+  const handleCoiDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setCoiDragActive(false);
+
+    const droppedFile = e.dataTransfer?.files?.[0];
+    if (droppedFile && droppedFile.type === 'application/pdf') {
+      handleCoiUpload(droppedFile);
+    } else {
+      setError('Please upload a PDF file');
+    }
+  };
+
+  const handleCoiFileChange = (e) => {
+    const selectedFile = e.target.files?.[0];
+    if (selectedFile) {
+      handleCoiUpload(selectedFile);
+    }
+  };
+
+  const handleCoiUpload = async (selectedFile) => {
+    if (!createdTenant) return;
+
+    // Validate file
+    if (selectedFile.type !== 'application/pdf') {
+      setError('Please upload a PDF file');
+      return;
+    }
+
+    if (selectedFile.size > 10 * 1024 * 1024) {
+      setError('COI file size must be less than 10MB');
+      return;
+    }
+
+    setCoiFile(selectedFile);
+    setError(null);
+    setStep(STEPS.PROCESSING_COI);
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      // Upload COI to storage
+      const coiFileName = `${user.id}/tenants/${createdTenant.id}/${Date.now()}_coi.pdf`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('coi-documents')
+        .upload(coiFileName, selectedFile, {
+          contentType: 'application/pdf',
+          upsert: false
+        });
+
+      if (uploadError) {
+        throw new Error('Failed to upload COI document');
+      }
+
+      // Convert to base64 for extraction
+      const reader = new FileReader();
+      const base64Promise = new Promise((resolve, reject) => {
+        reader.onload = () => {
+          const base64 = reader.result.split(',')[1];
+          resolve(base64);
+        };
+        reader.onerror = reject;
+      });
+      reader.readAsDataURL(selectedFile);
+      const base64Data = await base64Promise;
+
+      // Build requirements from tenant data for COI extraction
+      const requirements = {
+        general_liability: createdTenant.required_general_liability || 1000000,
+        auto_liability: createdTenant.required_auto_liability || 1000000,
+        workers_comp: createdTenant.required_workers_comp ? 'Statutory' : 0,
+        employers_liability: createdTenant.required_employers_liability || 500000
+      };
+
+      // Call extract-coi edge function
+      const { data: result, error: fnError } = await supabase.functions.invoke('extract-coi', {
+        body: { pdfBase64: base64Data, requirements }
+      });
+
+      if (fnError) {
+        throw new Error(fnError.message || 'Failed to process COI');
+      }
+
+      if (!result?.success) {
+        throw new Error(result?.error || 'Failed to extract COI data');
+      }
+
+      const coiData = result.data;
+
+      // Update tenant with COI data
+      const { error: updateError } = await supabase
+        .from('tenants')
+        .update({
+          policy_document_path: coiFileName,
+          policy_expiration_date: coiData.expirationDate,
+          insurance_company: coiData.rawData?.insuranceCompany,
+          policy_general_liability: coiData.coverage?.generalLiability?.amount,
+          policy_auto_liability: coiData.coverage?.autoLiability?.amount,
+          policy_workers_comp: coiData.coverage?.workersComp?.amount,
+          policy_employers_liability: coiData.coverage?.employersLiability?.amount,
+          insurance_status: coiData.status || 'compliant',
+          insurance_issues: coiData.issues || [],
+          coi_uploaded_at: new Date().toISOString()
+        })
+        .eq('id', createdTenant.id);
+
+      if (updateError) {
+        throw new Error('Failed to update tenant with COI data');
+      }
+
+      // Log activity
+      try {
+        await supabase.from('tenant_activity').insert({
+          tenant_id: createdTenant.id,
+          user_id: user.id,
+          activity_type: 'coi_uploaded',
+          description: `COI uploaded: ${coiData.status}`,
+          metadata: {
+            document_path: coiFileName,
+            expiration_date: coiData.expirationDate,
+            status: coiData.status
+          }
+        });
+      } catch (activityErr) {
+        logger.warn('Failed to log activity:', activityErr);
+      }
+
+      // Update created tenant with new data for success screen
+      setCreatedTenant({
+        ...createdTenant,
+        insurance_status: coiData.status,
+        policy_expiration_date: coiData.expirationDate
+      });
+
+      setStep(STEPS.SUCCESS);
+    } catch (err) {
+      logger.error('Error uploading COI:', err);
+      setError(err.message || 'Failed to process COI');
+      setStep(STEPS.COI_UPLOAD); // Go back to COI upload step
+    }
+  };
+
+  const handleSkipCoi = () => {
+    // Tenant already created with pending status, just finish
+    onTenantCreated?.(createdTenant);
+    handleClose();
+  };
+
+  const handleFinish = () => {
+    onTenantCreated?.(createdTenant);
+    handleClose();
   };
 
   const formatCurrency = (amount) => {
@@ -268,12 +456,18 @@ export function LeaseUploadModal({ isOpen, onClose, onTenantCreated, onManualAdd
               {step === STEPS.UPLOAD && 'Add Tenant from Lease'}
               {step === STEPS.EXTRACTING && 'Extracting Lease Data'}
               {step === STEPS.REVIEW && 'Review Extracted Data'}
+              {step === STEPS.COI_UPLOAD && 'Upload Certificate of Insurance'}
+              {step === STEPS.PROCESSING_COI && 'Processing COI'}
+              {step === STEPS.SUCCESS && 'Tenant Created Successfully'}
               {step === STEPS.ERROR && 'Extraction Error'}
             </h2>
             <p className="text-sm text-gray-500 mt-1">
               {step === STEPS.UPLOAD && 'Upload a commercial lease to auto-fill tenant info and insurance requirements'}
               {step === STEPS.EXTRACTING && 'AI is reading your lease document...'}
-              {step === STEPS.REVIEW && 'Verify the extracted information before creating the tenant'}
+              {step === STEPS.REVIEW && 'Verify the information and enter contact email'}
+              {step === STEPS.COI_UPLOAD && 'Upload their COI now, or skip to request it later'}
+              {step === STEPS.PROCESSING_COI && 'Analyzing certificate of insurance...'}
+              {step === STEPS.SUCCESS && 'The tenant profile has been created'}
               {step === STEPS.ERROR && 'Something went wrong during extraction'}
             </p>
           </div>
@@ -399,14 +593,32 @@ export function LeaseUploadModal({ isOpen, onClose, onTenantCreated, onManualAdd
                     </div>
                   )}
                   <div>
-                    <label className="text-gray-500">Contact</label>
+                    <label className="text-gray-500">Contact Name</label>
                     <p className="font-medium text-gray-900">{editedData.tenant?.contactName || 'Not specified'}</p>
                   </div>
                   <div>
-                    <label className="text-gray-500">Email</label>
-                    <p className="font-medium text-gray-900">{editedData.tenant?.contactEmail || 'Not specified'}</p>
+                    <label className="text-gray-500">Phone</label>
+                    <p className="font-medium text-gray-900">{editedData.tenant?.contactPhone || 'Not specified'}</p>
                   </div>
                 </div>
+              </div>
+
+              {/* Contact Email - Editable */}
+              <div className="bg-amber-50 rounded-xl p-4 border border-amber-200">
+                <div className="flex items-center gap-2 mb-3">
+                  <Mail className="text-amber-600" size={20} />
+                  <h3 className="font-semibold text-gray-900">Contact Email <span className="text-red-500">*</span></h3>
+                </div>
+                <p className="text-sm text-gray-600 mb-3">
+                  Enter the email address to send COI requests to this tenant
+                </p>
+                <input
+                  type="email"
+                  value={contactEmail}
+                  onChange={(e) => setContactEmail(e.target.value)}
+                  placeholder="tenant@company.com"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                />
               </div>
 
               {/* Property Selection */}
@@ -520,6 +732,108 @@ export function LeaseUploadModal({ isOpen, onClose, onTenantCreated, onManualAdd
               )}
             </div>
           )}
+
+          {/* COI Upload Step */}
+          {step === STEPS.COI_UPLOAD && (
+            <div className="space-y-6">
+              <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-200">
+                <div className="flex items-center gap-2 mb-2">
+                  <CheckCircle className="text-emerald-600" size={20} />
+                  <h3 className="font-semibold text-gray-900">Tenant Profile Created</h3>
+                </div>
+                <p className="text-sm text-gray-600">
+                  <strong>{createdTenant?.name}</strong> has been added. Now you can upload their Certificate of Insurance.
+                </p>
+              </div>
+
+              <div
+                onDragEnter={handleCoiDrag}
+                onDragLeave={handleCoiDrag}
+                onDragOver={handleCoiDrag}
+                onDrop={handleCoiDrop}
+                className={`border-2 border-dashed rounded-xl p-8 text-center transition-colors ${
+                  coiDragActive ? 'border-emerald-500 bg-emerald-50' : 'border-gray-300 hover:border-gray-400'
+                }`}
+              >
+                <Shield className={`mx-auto mb-4 ${coiDragActive ? 'text-emerald-500' : 'text-gray-400'}`} size={48} />
+                <p className="text-lg font-medium text-gray-900 mb-2">
+                  Upload Certificate of Insurance
+                </p>
+                <p className="text-sm text-gray-500 mb-4">
+                  Drop the tenant's COI here or click to browse
+                </p>
+                <input
+                  type="file"
+                  accept="application/pdf"
+                  onChange={handleCoiFileChange}
+                  className="hidden"
+                  id="coi-upload"
+                />
+                <label
+                  htmlFor="coi-upload"
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 font-semibold cursor-pointer transition-colors"
+                >
+                  <Upload size={20} />
+                  Select COI PDF
+                </label>
+              </div>
+
+              {error && (
+                <div className="p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
+                  <AlertCircle className="text-red-500 flex-shrink-0 mt-0.5" size={20} />
+                  <p className="text-sm text-red-700">{error}</p>
+                </div>
+              )}
+
+              <div className="bg-gray-50 rounded-xl p-4">
+                <p className="text-sm text-gray-600">
+                  <strong>Don't have their COI yet?</strong> You can skip this step and request it from the tenant later.
+                  Their profile will show as "Pending" until a COI is uploaded.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Processing COI Step */}
+          {step === STEPS.PROCESSING_COI && (
+            <div className="text-center py-12">
+              <Loader2 className="w-16 h-16 text-emerald-500 animate-spin mx-auto mb-6" />
+              <p className="text-lg font-medium text-gray-900 mb-2">Analyzing Certificate of Insurance</p>
+              <p className="text-sm text-gray-500">
+                Extracting coverage details and checking compliance...
+              </p>
+              {coiFile && (
+                <p className="text-xs text-gray-400 mt-4">
+                  {coiFile.name}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Success Step */}
+          {step === STEPS.SUCCESS && (
+            <div className="text-center py-8">
+              <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <CheckCircle className="text-emerald-600" size={32} />
+              </div>
+              <p className="text-lg font-medium text-gray-900 mb-2">All Done!</p>
+              <p className="text-sm text-gray-600 mb-4">
+                <strong>{createdTenant?.name}</strong> has been added with their COI.
+              </p>
+              <div className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 rounded-lg text-sm">
+                <span className="text-gray-600">Status:</span>
+                <span className={`font-semibold ${
+                  createdTenant?.insurance_status === 'compliant' ? 'text-emerald-600' :
+                  createdTenant?.insurance_status === 'expiring' ? 'text-amber-600' :
+                  'text-red-600'
+                }`}>
+                  {createdTenant?.insurance_status === 'compliant' ? 'Compliant' :
+                   createdTenant?.insurance_status === 'expiring' ? 'Expiring Soon' :
+                   'Non-Compliant'}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Footer */}
@@ -540,7 +854,7 @@ export function LeaseUploadModal({ isOpen, onClose, onTenantCreated, onManualAdd
               </button>
               <button
                 onClick={handleSaveTenant}
-                disabled={saving || !selectedPropertyId}
+                disabled={saving || !selectedPropertyId || !contactEmail}
                 className="px-6 py-2 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 {saving ? (
@@ -550,12 +864,35 @@ export function LeaseUploadModal({ isOpen, onClose, onTenantCreated, onManualAdd
                   </>
                 ) : (
                   <>
-                    <CheckCircle size={18} />
-                    Create Tenant
+                    <ArrowRight size={18} />
+                    Continue
                   </>
                 )}
               </button>
             </div>
+          </div>
+        )}
+
+        {step === STEPS.COI_UPLOAD && (
+          <div className="px-6 py-4 border-t border-gray-200 flex justify-end">
+            <button
+              onClick={handleSkipCoi}
+              className="px-6 py-2 text-gray-600 hover:text-gray-800 font-medium transition-colors flex items-center gap-2"
+            >
+              <SkipForward size={18} />
+              Skip for Now
+            </button>
+          </div>
+        )}
+
+        {step === STEPS.SUCCESS && (
+          <div className="px-6 py-4 border-t border-gray-200 flex justify-center">
+            <button
+              onClick={handleFinish}
+              className="px-8 py-2 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 font-medium transition-colors"
+            >
+              Done
+            </button>
           </div>
         )}
       </div>
