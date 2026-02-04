@@ -27,6 +27,7 @@ export function useTenants(propertyId = null) {
           property:properties(id, name, address)
         `, { count: 'exact' })
         .eq('user_id', user.id)
+        .is('deleted_at', null) // Exclude soft-deleted tenants
         .order('created_at', { ascending: false });
 
       if (propertyId) {
@@ -97,6 +98,33 @@ export function useTenants(propertyId = null) {
           },
           async (payload) => {
             logger.info('Realtime: tenant updated', payload.new.id);
+
+            // Handle soft delete - if deleted_at is set, remove from list
+            if (payload.new.deleted_at) {
+              logger.info('Realtime: tenant soft-deleted', payload.new.id);
+              setTenants(prev => prev.filter(t => t.id !== payload.new.id));
+              setTotalCount(prev => Math.max(0, prev - 1));
+              return;
+            }
+
+            // Handle restore - if was deleted and now isn't, add back to list
+            if (payload.old?.deleted_at && !payload.new.deleted_at) {
+              logger.info('Realtime: tenant restored', payload.new.id);
+              const { data } = await supabase
+                .from('tenants')
+                .select(`*, unit:units(id, unit_number, property_id), property:properties(id, name, address)`)
+                .eq('id', payload.new.id)
+                .single();
+              if (data) {
+                setTenants(prev => {
+                  if (prev.some(t => t.id === data.id)) return prev;
+                  return [data, ...prev];
+                });
+                setTotalCount(prev => prev + 1);
+              }
+              return;
+            }
+
             // Fetch full tenant data with relations
             const { data } = await supabase
               .from('tenants')
@@ -207,15 +235,27 @@ export function useTenants(propertyId = null) {
     }
   }, []);
 
+  // Soft delete a tenant (sets deleted_at timestamp instead of hard delete)
   const deleteTenant = useCallback(async (id) => {
     try {
-      const { error } = await supabase
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const { data, error } = await supabase
         .from('tenants')
-        .delete()
-        .eq('id', id);
+        .update({ deleted_at: new Date().toISOString() })
+        .eq('id', id)
+        .eq('user_id', user.id)
+        .is('deleted_at', null) // Only delete if not already deleted
+        .select();
 
       if (error) throw error;
 
+      if (!data || data.length === 0) {
+        throw new Error('Tenant not found or already deleted');
+      }
+
+      logger.info('Successfully soft-deleted tenant', id);
       setTenants(prev => prev.filter(t => t.id !== id));
       setTotalCount(prev => prev - 1);
     } catch (err) {
@@ -223,6 +263,36 @@ export function useTenants(propertyId = null) {
       throw err;
     }
   }, []);
+
+  // Restore a soft-deleted tenant
+  const restoreTenant = useCallback(async (id) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const { data, error } = await supabase
+        .from('tenants')
+        .update({ deleted_at: null })
+        .eq('id', id)
+        .eq('user_id', user.id)
+        .not('deleted_at', 'is', null) // Only restore if actually deleted
+        .select(`
+          *,
+          unit:units(id, unit_number, property_id),
+          property:properties(id, name, address)
+        `)
+        .single();
+
+      if (error) throw error;
+
+      logger.info('Successfully restored tenant', id);
+      await loadTenants(); // Refresh to get updated list
+      return data;
+    } catch (err) {
+      logger.error('Error restoring tenant', err);
+      throw err;
+    }
+  }, [loadTenants]);
 
   // tokenExpiryDays can be passed from settings (default: 30 days)
   const regenerateUploadToken = useCallback(async (id, tokenExpiryDays = 30) => {
@@ -271,6 +341,7 @@ export function useTenants(propertyId = null) {
     addTenant,
     updateTenant,
     deleteTenant,
+    restoreTenant,
     regenerateUploadToken,
     refreshTenants: loadTenants,
   };

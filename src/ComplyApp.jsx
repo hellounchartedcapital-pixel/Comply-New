@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
-import { Upload, CheckCircle, XCircle, AlertCircle, FileText, Calendar, X, Search, Download, Settings as SettingsIcon, Eye, Bell, FileDown, Phone, Mail, User, Send, Clock, History, FileCheck, Building2, CreditCard, Users, LayoutDashboard, Loader2, Plus } from 'lucide-react';
+import { Upload, CheckCircle, XCircle, AlertCircle, FileText, Calendar, X, Search, Download, Settings as SettingsIcon, Eye, FileDown, Phone, Mail, User, Send, Clock, History, FileCheck, Building2, CreditCard, Users, LayoutDashboard, Loader2, Plus } from 'lucide-react';
 import { useVendors } from './useVendors';
 import { useTenants } from './useTenants';
 import { useSubscription } from './useSubscription';
 import { SmartUploadModal } from './SmartUploadModal';
 import { Settings } from './Settings';
-import { NotificationSettings } from './NotificationSettings';
 import { OnboardingTutorial } from './OnboardingTutorial';
 import { AlertModal, useAlertModal } from './AlertModal';
 import { ActivityLog } from './ActivityLog';
@@ -80,7 +79,6 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [deletingVendor, setDeletingVendor] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [showNotifications, setShowNotifications] = useState(false);
   const [showActivityLog, setShowActivityLog] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboardingChecked, setOnboardingChecked] = useState(false);
@@ -991,14 +989,6 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
                 data-onboarding="settings-button"
               >
                 <SettingsIcon size={18} />
-              </button>
-              <button
-                onClick={() => setShowNotifications(true)}
-                className="p-2.5 bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 hover:text-gray-900 transition-all"
-                title="Notifications"
-                data-onboarding="notifications-button"
-              >
-                <Bell size={18} />
               </button>
               <button
                 onClick={() => setShowActivityLog(true)}
@@ -2251,11 +2241,6 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
           }}
           propertyCount={properties.length}
         />
-      )}
-
-      {/* Notification Settings Modal */}
-      {showNotifications && (
-        <NotificationSettings onClose={() => setShowNotifications(false)} />
       )}
 
       {/* Activity Log Modal */}

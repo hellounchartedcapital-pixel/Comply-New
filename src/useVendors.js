@@ -46,12 +46,14 @@ export function useVendors(propertyId = null, options = {}) {
       let countQuery = supabase
         .from('vendors')
         .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id);
+        .eq('user_id', user.id)
+        .is('deleted_at', null); // Exclude soft-deleted vendors
 
       let dataQuery = supabase
         .from('vendors')
         .select('*')
-        .eq('user_id', user.id);
+        .eq('user_id', user.id)
+        .is('deleted_at', null); // Exclude soft-deleted vendors
 
       // Filter by property if specified (check both property_id and property_ids array)
       if (propertyId) {
@@ -217,28 +219,29 @@ export function useVendors(propertyId = null, options = {}) {
     }
   };
 
-  // Delete a vendor
+  // Soft delete a vendor (sets deleted_at timestamp instead of hard delete)
   const deleteVendor = async (id) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      // Use select() to return the deleted row and verify deletion
+      // Soft delete by setting deleted_at timestamp
       const { data, error } = await supabase
         .from('vendors')
-        .delete()
+        .update({ deleted_at: new Date().toISOString() })
         .eq('id', id)
         .eq('user_id', user.id)
+        .is('deleted_at', null) // Only delete if not already deleted
         .select();
 
       if (error) throw error;
 
-      // Check if any row was actually deleted
+      // Check if any row was actually updated
       if (!data || data.length === 0) {
         throw new Error('Vendor not found or already deleted');
       }
 
-      logger.info('Successfully deleted vendor', id);
+      logger.info('Successfully soft-deleted vendor', id);
 
       // Remove from local state
       setVendors(prev => {
@@ -250,6 +253,34 @@ export function useVendors(propertyId = null, options = {}) {
       return { success: true };
     } catch (err) {
       logger.error('Error deleting vendor', err);
+      return { success: false, error: err.message };
+    }
+  };
+
+  // Restore a soft-deleted vendor
+  const restoreVendor = async (id) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const { data, error } = await supabase
+        .from('vendors')
+        .update({ deleted_at: null })
+        .eq('id', id)
+        .eq('user_id', user.id)
+        .not('deleted_at', 'is', null) // Only restore if actually deleted
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      logger.info('Successfully restored vendor', id);
+
+      // Refresh to get updated list
+      await fetchVendors(true);
+      return { success: true, data };
+    } catch (err) {
+      logger.error('Error restoring vendor', err);
       return { success: false, error: err.message };
     }
   };
@@ -302,6 +333,33 @@ export function useVendors(propertyId = null, options = {}) {
           },
           (payload) => {
             logger.info('Realtime: vendor updated', payload.new.id);
+
+            // Handle soft delete - if deleted_at is set, remove from list
+            if (payload.new.deleted_at) {
+              logger.info('Realtime: vendor soft-deleted', payload.new.id);
+              setVendors(prev => {
+                const updated = prev.filter(v => v.id !== payload.new.id);
+                vendorCountRef.current = updated.length;
+                return updated;
+              });
+              setTotalCount(prev => Math.max(0, prev - 1));
+              return;
+            }
+
+            // Handle restore - if was deleted and now isn't, add back to list
+            if (payload.old?.deleted_at && !payload.new.deleted_at) {
+              logger.info('Realtime: vendor restored', payload.new.id);
+              const restoredVendor = recalculateVendorStatus(payload.new, expiringThresholdDays);
+              setVendors(prev => {
+                if (prev.some(v => v.id === restoredVendor.id)) return prev;
+                const updated = [restoredVendor, ...prev];
+                vendorCountRef.current = updated.length;
+                return updated;
+              });
+              setTotalCount(prev => prev + 1);
+              return;
+            }
+
             const updatedVendor = recalculateVendorStatus(payload.new, expiringThresholdDays);
             setVendors(prev => prev.map(v => v.id === updatedVendor.id ? updatedVendor : v));
           }
@@ -358,6 +416,7 @@ export function useVendors(propertyId = null, options = {}) {
     addVendor,
     updateVendor,
     deleteVendor,
+    restoreVendor,
     loadMore,
     refreshVendors: () => fetchVendors(true)
   };
