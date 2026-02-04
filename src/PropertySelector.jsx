@@ -31,7 +31,7 @@ export function PropertySelector({
         onClick={() => setShowDropdown(!showDropdown)}
         className="flex items-center space-x-2 px-4 py-2.5 bg-white border border-gray-200 hover:border-gray-300 rounded-xl transition-all text-sm font-medium text-gray-700 shadow-sm"
       >
-        <Building2 size={18} className="text-purple-500" />
+        <Building2 size={18} className="text-gray-500" />
         <span className="max-w-[200px] truncate">
           {selectedProperty ? selectedProperty.name : 'All Properties'}
         </span>
@@ -53,12 +53,12 @@ export function PropertySelector({
                 }}
                 className={`w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                   !selectedProperty
-                    ? 'bg-purple-50 text-purple-700'
+                    ? 'bg-emerald-50 text-emerald-700'
                     : 'text-gray-700 hover:bg-gray-100'
                 }`}
               >
                 <div className="flex items-center space-x-2">
-                  <Building2 size={16} className={!selectedProperty ? 'text-purple-500' : 'text-gray-400'} />
+                  <Building2 size={16} className={!selectedProperty ? 'text-emerald-500' : 'text-gray-400'} />
                   <span>All Properties</span>
                 </div>
                 <p className="text-xs text-gray-500 mt-0.5 ml-6">View data from all properties</p>
@@ -75,12 +75,12 @@ export function PropertySelector({
                   }}
                   className={`w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                     selectedProperty?.id === property.id
-                      ? 'bg-purple-50 text-purple-700'
+                      ? 'bg-emerald-50 text-emerald-700'
                       : 'text-gray-700 hover:bg-gray-100'
                   }`}
                 >
                   <div className="flex items-center space-x-2">
-                    <Building2 size={16} className={selectedProperty?.id === property.id ? 'text-purple-500' : 'text-gray-400'} />
+                    <Building2 size={16} className={selectedProperty?.id === property.id ? 'text-emerald-500' : 'text-gray-400'} />
                     <span className="truncate">{property.name}</span>
                   </div>
                   {property.address && (

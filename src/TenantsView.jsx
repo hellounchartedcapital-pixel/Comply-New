@@ -1204,7 +1204,7 @@ export function TenantsView({ properties, userRequirements, selectedProperty, on
                 </p>
                 {!searchQuery && statusFilter === 'all' && (
                   <button
-                    onClick={() => { setEditingTenant(null); setShowModal(true); }}
+                    onClick={() => setShowLeaseUpload(true)}
                     className="px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 font-medium inline-flex items-center gap-2"
                   >
                     <Plus size={18} />

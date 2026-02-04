@@ -1008,14 +1008,6 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
                 <History size={18} />
               </button>
               <button
-                onClick={() => setShowSmartUpload(true)}
-                className="px-4 py-2.5 bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 text-white rounded-xl hover:shadow-lg hover:shadow-emerald-500/25 hover:-translate-y-0.5 transition-all duration-200 flex items-center space-x-2 font-semibold"
-                data-onboarding="upload-button"
-              >
-                <Upload size={18} />
-                <span>Upload COI</span>
-              </button>
-              <button
                 onClick={onSignOut}
                 className="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 text-sm font-medium transition-all"
               >
@@ -1225,66 +1217,14 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
               <option value="not-contacted-30-days">📭 Not Contacted 30+ Days ({stats.notContactedRecently})</option>
             </select>
 
-            {/* Export Buttons */}
+            {/* Add Vendor Button */}
             <button
-              onClick={exportToPDF}
-              className="px-4 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 flex items-center space-x-2 text-sm font-semibold transition-all"
-              title="Export PDF Report"
+              onClick={() => setShowSmartUpload(true)}
+              className="px-4 py-2.5 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 font-medium flex items-center gap-2"
             >
-              <FileDown size={16} />
-              <span className="hidden sm:inline">Export PDF</span>
+              <Upload size={18} />
+              <span className="hidden sm:inline">Add Vendor</span>
             </button>
-
-            <button
-              onClick={exportToCSV}
-              className="px-4 py-2.5 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 flex items-center space-x-2 text-sm font-semibold transition-all"
-              title="Export CSV"
-            >
-              <Download size={16} />
-              <span className="hidden sm:inline">Export CSV</span>
-            </button>
-
-            {/* Bulk Request COIs - only show if there are non-compliant vendors with emails */}
-            {(() => {
-              const needsAttention = filteredVendors.filter(v =>
-                (v.status === 'expired' || v.status === 'non-compliant' || v.status === 'expiring') && v.contactEmail
-              );
-              if (needsAttention.length > 0) {
-                return (
-                  <button
-                    onClick={() => handleBulkRequest(needsAttention)}
-                    disabled={bulkRequesting}
-                    className="px-4 py-2.5 bg-orange-500 text-white rounded-xl hover:bg-orange-600 flex items-center space-x-2 text-sm font-semibold transition-all disabled:opacity-50"
-                    title={`Send COI requests to ${needsAttention.length} vendors`}
-                  >
-                    {bulkRequesting ? (
-                      <>
-                        <Loader2 size={16} className="animate-spin" />
-                        <span className="hidden sm:inline">Sending...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Send size={16} />
-                        <span className="hidden sm:inline">Request COIs ({needsAttention.length})</span>
-                      </>
-                    )}
-                  </button>
-                );
-              }
-              return null;
-            })()}
-
-            {/* Bulk Assign Property - show when vendors are selected */}
-            {selectedVendorIds.size > 0 && properties.length > 0 && (
-              <button
-                onClick={() => setShowBulkAssignModal(true)}
-                className="px-4 py-2.5 bg-purple-500 text-white rounded-xl hover:bg-purple-600 flex items-center space-x-2 text-sm font-semibold transition-all"
-                title={`Assign ${selectedVendorIds.size} vendors to a property`}
-              >
-                <Building2 size={16} />
-                <span className="hidden sm:inline">Assign Property ({selectedVendorIds.size})</span>
-              </button>
-            )}
 
             {/* Clear */}
             {(searchQuery || quickFilter !== 'all' || sortBy !== 'name') && (
@@ -1318,7 +1258,7 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
                   type="checkbox"
                   checked={selectedVendorIds.size === filteredVendors.length && filteredVendors.length > 0}
                   onChange={toggleSelectAll}
-                  className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                  className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
                 />
                 <span className="text-sm font-medium text-gray-700">
                   {selectedVendorIds.size === filteredVendors.length && filteredVendors.length > 0
@@ -1327,9 +1267,66 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
                 </span>
               </label>
               {selectedVendorIds.size > 0 && (
-                <span className="text-sm text-purple-600 font-medium">
-                  {selectedVendorIds.size} selected
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-emerald-600 font-medium">
+                    {selectedVendorIds.size} selected
+                  </span>
+                  {/* Export PDF */}
+                  <button
+                    onClick={exportToPDF}
+                    className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center space-x-1.5 text-xs font-semibold transition-all"
+                    title="Export PDF Report"
+                  >
+                    <FileDown size={14} />
+                    <span className="hidden sm:inline">Export PDF</span>
+                  </button>
+                  {/* Export CSV */}
+                  <button
+                    onClick={exportToCSV}
+                    className="px-3 py-1.5 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 flex items-center space-x-1.5 text-xs font-semibold transition-all"
+                    title="Export CSV"
+                  >
+                    <Download size={14} />
+                    <span className="hidden sm:inline">Export CSV</span>
+                  </button>
+                  {/* Bulk Request COIs */}
+                  {(() => {
+                    const needsAttention = filteredVendors.filter(v =>
+                      (v.status === 'expired' || v.status === 'non-compliant' || v.status === 'expiring') && v.contactEmail
+                    );
+                    if (needsAttention.length > 0) {
+                      return (
+                        <button
+                          onClick={() => handleBulkRequest(needsAttention)}
+                          disabled={bulkRequesting}
+                          className="px-3 py-1.5 bg-orange-500 text-white rounded-lg hover:bg-orange-600 flex items-center space-x-1.5 text-xs font-semibold transition-all disabled:opacity-50"
+                          title={`Send COI requests to ${needsAttention.length} vendors`}
+                        >
+                          {bulkRequesting ? (
+                            <Loader2 size={14} className="animate-spin" />
+                          ) : (
+                            <>
+                              <Send size={14} />
+                              <span className="hidden sm:inline">Request COIs ({needsAttention.length})</span>
+                            </>
+                          )}
+                        </button>
+                      );
+                    }
+                    return null;
+                  })()}
+                  {/* Bulk Assign Property */}
+                  {properties.length > 0 && (
+                    <button
+                      onClick={() => setShowBulkAssignModal(true)}
+                      className="px-3 py-1.5 bg-gray-600 text-white rounded-lg hover:bg-gray-700 flex items-center space-x-1.5 text-xs font-semibold transition-all"
+                      title={`Assign ${selectedVendorIds.size} vendors to a property`}
+                    >
+                      <Building2 size={14} />
+                      <span className="hidden sm:inline">Assign Property</span>
+                    </button>
+                  )}
+                </div>
               )}
             </div>
           )}
@@ -1366,7 +1363,7 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
                     <h4 className="font-semibold text-emerald-900 mb-3">Quick Start:</h4>
                     <ol className="space-y-2 text-sm text-emerald-800">
                       <li>1. Click <strong>"Settings"</strong> to customize your requirements</li>
-                      <li>2. Click <strong>"Upload COI"</strong> to add your first certificate</li>
+                      <li>2. Click <strong>"Add Vendor"</strong> to upload your first certificate</li>
                       <li>3. Our AI will extract all the data automatically!</li>
                     </ol>
                   </div>
@@ -1374,7 +1371,7 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
               </div>
             ) : (
               filteredVendors.map((vendor) => (
-                <div key={vendor.id} className={`p-5 hover:bg-gray-50 transition-colors ${selectedVendorIds.has(vendor.id) ? 'bg-purple-50' : ''}`}>
+                <div key={vendor.id} className={`p-5 hover:bg-gray-50 transition-colors ${selectedVendorIds.has(vendor.id) ? 'bg-emerald-50' : ''}`}>
                   <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between space-y-3 sm:space-y-0">
                     <div className="flex items-start space-x-4 flex-1">
                       {/* Checkbox for bulk selection */}
@@ -1383,7 +1380,7 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
                           type="checkbox"
                           checked={selectedVendorIds.has(vendor.id)}
                           onChange={() => toggleVendorSelection(vendor.id)}
-                          className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500 cursor-pointer"
+                          className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500 cursor-pointer"
                           title="Select for bulk actions"
                         />
                       </div>
@@ -2309,7 +2306,7 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-xl font-bold text-gray-900 flex items-center space-x-2">
-                <Building2 size={24} className="text-purple-600" />
+                <Building2 size={24} className="text-gray-600" />
                 <span>Assign Property</span>
               </h3>
               <button
@@ -2323,8 +2320,8 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
               </button>
             </div>
 
-            <div className="mb-4 p-4 bg-purple-50 border border-purple-200 rounded-xl">
-              <p className="text-sm text-purple-800">
+            <div className="mb-4 p-4 bg-gray-50 border border-gray-200 rounded-xl">
+              <p className="text-sm text-gray-800">
                 <strong>{selectedVendorIds.size}</strong> vendor{selectedVendorIds.size !== 1 ? 's' : ''} selected
               </p>
             </div>
@@ -2336,7 +2333,7 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
               <select
                 value={bulkAssignPropertyId}
                 onChange={(e) => setBulkAssignPropertyId(e.target.value)}
-                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-gray-50"
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent bg-gray-50"
               >
                 <option value="">No Property (Unassign)</option>
                 {properties.map((property) => (
@@ -2356,7 +2353,7 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
               <button
                 onClick={handleBulkPropertyAssign}
                 disabled={bulkAssigning}
-                className="flex-1 px-4 py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 font-semibold flex items-center justify-center space-x-2 disabled:opacity-50 transition-all"
+                className="flex-1 px-4 py-3 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 font-semibold flex items-center justify-center space-x-2 disabled:opacity-50 transition-all"
               >
                 {bulkAssigning ? (
                   <>

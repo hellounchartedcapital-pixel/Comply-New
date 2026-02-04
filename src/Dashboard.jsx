@@ -216,7 +216,7 @@ export function Dashboard({
                 className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 font-semibold transition-colors"
               >
                 <Upload size={20} />
-                Upload COI
+                Add Vendor
               </button>
             )}
             {onAddTenant && (
@@ -417,11 +417,11 @@ export function Dashboard({
               >
                 <div className="flex items-center gap-3">
                   <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                    item.type === 'vendor' ? 'bg-blue-100' : 'bg-purple-100'
+                    item.type === 'vendor' ? 'bg-blue-100' : 'bg-emerald-100'
                   }`}>
                     {item.type === 'vendor'
                       ? <FileText size={16} className="text-blue-600" />
-                      : <Users size={16} className="text-purple-600" />
+                      : <Users size={16} className="text-emerald-600" />
                     }
                   </div>
                   <div>
@@ -483,7 +483,7 @@ export function Dashboard({
                     <div className="flex items-center gap-2">
                       <p className="font-semibold text-gray-900">{item.name}</p>
                       <span className={`text-xs px-2 py-0.5 rounded-full ${
-                        item.type === 'vendor' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'
+                        item.type === 'vendor' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'
                       }`}>
                         {item.type === 'vendor' ? 'Vendor' : 'Tenant'}
                       </span>
@@ -528,19 +528,19 @@ export function Dashboard({
 
         <button
           onClick={onViewTenants}
-          className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 hover:border-purple-300 hover:shadow-md transition-all text-left group"
+          className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 hover:border-emerald-300 hover:shadow-md transition-all text-left group"
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center group-hover:bg-purple-200 transition-colors">
-                <Users size={24} className="text-purple-600" />
+              <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center group-hover:bg-emerald-200 transition-colors">
+                <Users size={24} className="text-emerald-600" />
               </div>
               <div>
                 <h4 className="font-semibold text-gray-900">Tenants</h4>
                 <p className="text-sm text-gray-500">{combinedStats.tenants.total} tenants tracked</p>
               </div>
             </div>
-            <ChevronRight size={20} className="text-gray-400 group-hover:text-purple-500 transition-colors" />
+            <ChevronRight size={20} className="text-gray-400 group-hover:text-emerald-500 transition-colors" />
           </div>
         </button>
       </div>
