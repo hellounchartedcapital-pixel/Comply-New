@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Save, X, CheckCircle, AlertCircle, Info, Mail, Bell, Clock, Building2, Users, Shield, ChevronRight } from 'lucide-react';
+import { Save, X, CheckCircle, AlertCircle, Info, Mail, Bell, Clock, Building2, ChevronRight } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import logger from './logger';
 
@@ -19,20 +19,7 @@ export function Settings({ onClose, onManageProperties, propertyCount = 0 }) {
     followUpDays: [30, 14, 7], // Days before expiration to send reminders
     followUpOnExpired: true, // Send follow-up when expired
     followUpOnNonCompliant: true, // Send follow-up when non-compliant
-    followUpFrequencyDays: 7, // Minimum days between follow-ups to same vendor
-
-    // Default Tenant Insurance Requirements
-    tenantDefaultLiabilityMin: 100000,
-    tenantDefaultAutoLiabilityMin: 0,
-    tenantDefaultWorkersComp: false,
-    tenantDefaultEmployersLiabilityMin: 0,
-    tenantDefaultRequiresAdditionalInsured: true,
-    tenantDefaultAdditionalInsuredText: '',
-    tenantDefaultCertificateHolderName: '',
-    tenantDefaultCertificateHolderAddress: '',
-    tenantDefaultCancellationNoticeDays: 30,
-    tenantDefaultRequiresDeclarationsPage: true,
-    tenantDefaultRequiresEndorsementPages: true
+    followUpFrequencyDays: 7 // Minimum days between follow-ups to same vendor
   });
 
   const [loading, setLoading] = useState(true);
@@ -73,19 +60,7 @@ export function Settings({ onClose, onManageProperties, propertyCount = 0 }) {
           followUpDays: data.follow_up_days || [30, 14, 7],
           followUpOnExpired: data.follow_up_on_expired !== false,
           followUpOnNonCompliant: data.follow_up_on_non_compliant !== false,
-          followUpFrequencyDays: data.follow_up_frequency_days || 7,
-          // Default Tenant Insurance Requirements
-          tenantDefaultLiabilityMin: data.tenant_default_liability_min || 100000,
-          tenantDefaultAutoLiabilityMin: data.tenant_default_auto_liability_min || 0,
-          tenantDefaultWorkersComp: data.tenant_default_workers_comp || false,
-          tenantDefaultEmployersLiabilityMin: data.tenant_default_employers_liability_min || 0,
-          tenantDefaultRequiresAdditionalInsured: data.tenant_default_requires_additional_insured !== false,
-          tenantDefaultAdditionalInsuredText: data.tenant_default_additional_insured_text || '',
-          tenantDefaultCertificateHolderName: data.tenant_default_certificate_holder_name || '',
-          tenantDefaultCertificateHolderAddress: data.tenant_default_certificate_holder_address || '',
-          tenantDefaultCancellationNoticeDays: data.tenant_default_cancellation_notice_days || 30,
-          tenantDefaultRequiresDeclarationsPage: data.tenant_default_requires_declarations_page !== false,
-          tenantDefaultRequiresEndorsementPages: data.tenant_default_requires_endorsement_pages !== false
+          followUpFrequencyDays: data.follow_up_frequency_days || 7
         });
       }
     } catch (err) {
@@ -117,19 +92,7 @@ export function Settings({ onClose, onManageProperties, propertyCount = 0 }) {
         follow_up_days: settings.followUpDays,
         follow_up_on_expired: settings.followUpOnExpired,
         follow_up_on_non_compliant: settings.followUpOnNonCompliant,
-        follow_up_frequency_days: settings.followUpFrequencyDays,
-        // Default Tenant Insurance Requirements
-        tenant_default_liability_min: settings.tenantDefaultLiabilityMin,
-        tenant_default_auto_liability_min: settings.tenantDefaultAutoLiabilityMin,
-        tenant_default_workers_comp: settings.tenantDefaultWorkersComp,
-        tenant_default_employers_liability_min: settings.tenantDefaultEmployersLiabilityMin,
-        tenant_default_requires_additional_insured: settings.tenantDefaultRequiresAdditionalInsured,
-        tenant_default_additional_insured_text: settings.tenantDefaultAdditionalInsuredText,
-        tenant_default_certificate_holder_name: settings.tenantDefaultCertificateHolderName,
-        tenant_default_certificate_holder_address: settings.tenantDefaultCertificateHolderAddress,
-        tenant_default_cancellation_notice_days: settings.tenantDefaultCancellationNoticeDays,
-        tenant_default_requires_declarations_page: settings.tenantDefaultRequiresDeclarationsPage,
-        tenant_default_requires_endorsement_pages: settings.tenantDefaultRequiresEndorsementPages
+        follow_up_frequency_days: settings.followUpFrequencyDays
       };
 
       const { error } = await supabase
@@ -229,28 +192,28 @@ export function Settings({ onClose, onManageProperties, propertyCount = 0 }) {
                   onManageProperties();
                 }
               }}
-              className="w-full p-4 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-lg flex items-center justify-between transition-colors"
+              className="w-full p-4 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg flex items-center justify-between transition-colors"
             >
               <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                  <Building2 className="w-5 h-5 text-purple-600" />
+                <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
+                  <Building2 className="w-5 h-5 text-gray-600" />
                 </div>
                 <div className="text-left">
                   <h4 className="font-medium text-gray-900">Manage Properties</h4>
                   <p className="text-sm text-gray-500">
                     {propertyCount === 0
-                      ? 'Add your first property to set requirements'
+                      ? 'Add your first property to set vendor requirements'
                       : `${propertyCount} propert${propertyCount === 1 ? 'y' : 'ies'} configured`}
                   </p>
                 </div>
               </div>
-              <ChevronRight size={20} className="text-purple-400" />
+              <ChevronRight size={20} className="text-gray-400" />
             </button>
 
             <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg flex items-start space-x-2">
               <Info size={16} className="text-gray-500 flex-shrink-0 mt-0.5" />
               <p className="text-sm text-gray-600">
-                Insurance requirements are managed per-property. Each property can have different coverage requirements.
+                Vendor insurance requirements are managed per-property. Tenant requirements are extracted from their leases.
               </p>
             </div>
           </div>
@@ -262,15 +225,15 @@ export function Settings({ onClose, onManageProperties, propertyCount = 0 }) {
                 <Clock className="w-5 h-5 text-amber-600" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-gray-900">Upload Link Settings</h3>
-                <p className="text-sm text-gray-500">Configure how upload links work for vendors and tenants</p>
+                <h3 className="text-lg font-semibold text-gray-900">COI Request Links</h3>
+                <p className="text-sm text-gray-500">Settings for when you request updated COIs from vendors or tenants</p>
               </div>
             </div>
 
             <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
               <div className="mb-3">
-                <h4 className="font-medium text-gray-900">Upload Link Expiration</h4>
-                <p className="text-sm text-gray-500">How long upload links remain valid before expiring</p>
+                <h4 className="font-medium text-gray-900">Link Expiration</h4>
+                <p className="text-sm text-gray-500">How long COI request links remain valid</p>
               </div>
               <select
                 value={settings.uploadTokenExpiryDays}
@@ -284,7 +247,7 @@ export function Settings({ onClose, onManageProperties, propertyCount = 0 }) {
                 <option value={90}>90 days</option>
               </select>
               <p className="mt-2 text-xs text-gray-500">
-                After this time, vendors/tenants will need a new link to upload their COI.
+                When you request an updated COI, the recipient will have this many days to upload before the link expires.
               </p>
             </div>
           </div>
@@ -330,8 +293,8 @@ export function Settings({ onClose, onManageProperties, propertyCount = 0 }) {
                 <Mail className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-gray-900">Automated Vendor Follow-Ups</h3>
-                <p className="text-sm text-gray-500">Automatically contact vendors about compliance issues</p>
+                <h3 className="text-lg font-semibold text-gray-900">Automated Follow-Ups</h3>
+                <p className="text-sm text-gray-500">Automatically contact vendors and tenants about compliance issues</p>
               </div>
             </div>
 
@@ -340,7 +303,7 @@ export function Settings({ onClose, onManageProperties, propertyCount = 0 }) {
               <div className="flex items-center justify-between">
                 <div>
                   <h4 className="font-medium text-gray-900">Enable Automated Follow-Ups</h4>
-                  <p className="text-sm text-gray-500">Send automatic emails to vendors with compliance issues</p>
+                  <p className="text-sm text-gray-500">Send automatic emails to vendors and tenants with compliance issues</p>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input
@@ -432,7 +395,7 @@ export function Settings({ onClose, onManageProperties, propertyCount = 0 }) {
                     <Clock size={18} className="text-gray-600" />
                     <h4 className="font-medium text-gray-900">Follow-Up Frequency</h4>
                   </div>
-                  <p className="text-sm text-gray-500 mb-3">Minimum days between emails to the same vendor:</p>
+                  <p className="text-sm text-gray-500 mb-3">Minimum days between emails to the same recipient:</p>
                   <div className="flex items-center space-x-4">
                     <input
                       type="range"
@@ -448,177 +411,17 @@ export function Settings({ onClose, onManageProperties, propertyCount = 0 }) {
                   </div>
                 </div>
 
-                {/* Info about vendor emails */}
+                {/* Info about emails */}
                 <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-start space-x-2">
                   <Info size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
                   <p className="text-sm text-amber-800">
-                    Follow-ups are only sent to vendors with an email address on file. Add vendor emails when uploading COIs to enable automatic follow-ups.
+                    Follow-ups are only sent to vendors and tenants with an email address on file.
                   </p>
                 </div>
               </div>
             )}
           </div>
 
-          {/* Default Tenant Insurance Requirements Section */}
-          <div className="border-t border-gray-200 pt-6">
-            <div className="flex items-center space-x-3 mb-4">
-              <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-lg flex items-center justify-center">
-                <Users className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900">Default Tenant Insurance Requirements</h3>
-                <p className="text-sm text-gray-500">Applied when uploading tenant insurance documents</p>
-              </div>
-            </div>
-
-            {/* Coverage Requirements */}
-            <div className="p-4 bg-blue-50 rounded-lg border border-blue-200 mb-4">
-              <div className="flex items-center space-x-2 mb-3">
-                <Shield size={18} className="text-blue-600" />
-                <h4 className="font-medium text-gray-900">Coverage Minimums</h4>
-              </div>
-              <div className="grid sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Personal Liability</label>
-                  <select
-                    value={settings.tenantDefaultLiabilityMin}
-                    onChange={(e) => setSettings({...settings, tenantDefaultLiabilityMin: parseInt(e.target.value)})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value={50000}>$50,000</option>
-                    <option value={100000}>$100,000</option>
-                    <option value={200000}>$200,000</option>
-                    <option value={300000}>$300,000</option>
-                    <option value={500000}>$500,000</option>
-                    <option value={1000000}>$1,000,000</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Auto Liability</label>
-                  <select
-                    value={settings.tenantDefaultAutoLiabilityMin}
-                    onChange={(e) => setSettings({...settings, tenantDefaultAutoLiabilityMin: parseInt(e.target.value)})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value={0}>Not Required</option>
-                    <option value={100000}>$100,000</option>
-                    <option value={300000}>$300,000</option>
-                    <option value={500000}>$500,000</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            {/* Additional Insured */}
-            <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 mb-4">
-              <div className="flex items-center justify-between mb-3">
-                <h4 className="font-medium text-gray-900">Additional Insured Requirement</h4>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={settings.tenantDefaultRequiresAdditionalInsured}
-                    onChange={(e) => setSettings({...settings, tenantDefaultRequiresAdditionalInsured: e.target.checked})}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-gray-300 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500"></div>
-                </label>
-              </div>
-              {settings.tenantDefaultRequiresAdditionalInsured && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Additional Insured Entities</label>
-                  <textarea
-                    value={settings.tenantDefaultAdditionalInsuredText}
-                    onChange={(e) => setSettings({...settings, tenantDefaultAdditionalInsuredText: e.target.value})}
-                    rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                    placeholder="A. Property Owner LLC&#10;B. Management Company LLC"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">List each entity on a separate line</p>
-                </div>
-              )}
-            </div>
-
-            {/* Certificate Holder */}
-            <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 mb-4">
-              <h4 className="font-medium text-gray-900 mb-3">Default Certificate Holder</h4>
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
-                  <input
-                    type="text"
-                    value={settings.tenantDefaultCertificateHolderName}
-                    onChange={(e) => setSettings({...settings, tenantDefaultCertificateHolderName: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="e.g., Property Management LLC"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
-                  <input
-                    type="text"
-                    value={settings.tenantDefaultCertificateHolderAddress}
-                    onChange={(e) => setSettings({...settings, tenantDefaultCertificateHolderAddress: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="e.g., 123 Main St, City, State 12345"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Other Requirements */}
-            <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-              <h4 className="font-medium text-gray-900 mb-3">Document Requirements</h4>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-700">Cancellation Notice</p>
-                    <p className="text-xs text-gray-500">Minimum days notice required</p>
-                  </div>
-                  <select
-                    value={settings.tenantDefaultCancellationNoticeDays}
-                    onChange={(e) => setSettings({...settings, tenantDefaultCancellationNoticeDays: parseInt(e.target.value)})}
-                    className="px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                  >
-                    <option value={10}>10 days</option>
-                    <option value={30}>30 days</option>
-                    <option value={60}>60 days</option>
-                  </select>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-700">Require Declarations Page</span>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={settings.tenantDefaultRequiresDeclarationsPage}
-                      onChange={(e) => setSettings({...settings, tenantDefaultRequiresDeclarationsPage: e.target.checked})}
-                      className="sr-only peer"
-                    />
-                    <div className="w-9 h-5 bg-gray-300 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-500"></div>
-                  </label>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-700">Require Endorsement Pages</span>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={settings.tenantDefaultRequiresEndorsementPages}
-                      onChange={(e) => setSettings({...settings, tenantDefaultRequiresEndorsementPages: e.target.checked})}
-                      className="sr-only peer"
-                    />
-                    <div className="w-9 h-5 bg-gray-300 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-500"></div>
-                  </label>
-                </div>
-              </div>
-            </div>
-
-            {/* Info box */}
-            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-start space-x-2 mt-4">
-              <Info size={16} className="text-blue-600 flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-blue-800">
-                These defaults are applied when you upload a tenant's insurance. You can adjust requirements for individual tenants if their lease terms differ.
-              </p>
-            </div>
-          </div>
         </div>
 
         {/* Footer */}
