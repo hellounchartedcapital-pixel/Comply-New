@@ -72,7 +72,6 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
   }));
 
   const [selectedVendor, setSelectedVendor] = useState(null);
-  const selectedVendorRef = React.useRef(null); // Track selected vendor to avoid stale closures
   const [searchQuery, setSearchQuery] = useState('');
   const [quickFilter, setQuickFilter] = useState('all'); // Quick filter for button interface
   const [sortBy, setSortBy] = useState('name');
@@ -241,27 +240,6 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
       setShowOnboarding(false);
     }
   };
-
-  // Keep ref in sync with state
-  React.useEffect(() => {
-    selectedVendorRef.current = selectedVendor;
-  }, [selectedVendor]);
-
-  // Update selectedVendor when vendors refresh to prevent stale data
-  // Uses ref to get current value and avoid stale closures
-  React.useEffect(() => {
-    const currentSelected = selectedVendorRef.current;
-    if (currentSelected && vendors.length > 0) {
-      const updatedVendor = vendors.find(v => v.id === currentSelected.id);
-      if (updatedVendor) {
-        // Update selectedVendor with fresh data
-        setSelectedVendor(updatedVendor);
-      } else {
-        // Vendor was deleted or filtered out - close the detail view
-        setSelectedVendor(null);
-      }
-    }
-  }, [vendors]); // Run when vendors array changes
 
   const handleOnboardingSkip = async () => {
     // Same as complete - mark as done so they don't see it again
