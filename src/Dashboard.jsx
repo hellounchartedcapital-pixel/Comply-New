@@ -2,7 +2,7 @@
 import React, { useMemo } from 'react';
 import {
   CheckCircle, XCircle, AlertCircle, Clock,
-  FileText, Users, ChevronRight, TrendingUp, Upload, Plus, Sparkles, Loader2
+  FileText, Users, ChevronRight, TrendingUp, Plus, Sparkles, Loader2
 } from 'lucide-react';
 import { formatDate } from './utils/complianceUtils';
 import { PropertySelector } from './PropertySelector';
@@ -215,7 +215,7 @@ export function Dashboard({
                 onClick={onUploadCOI}
                 className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 font-semibold transition-colors"
               >
-                <Upload size={20} />
+                <Plus size={20} />
                 Add Vendor
               </button>
             )}

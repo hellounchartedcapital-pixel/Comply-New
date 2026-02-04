@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Upload, CheckCircle, XCircle, AlertCircle, FileText, Calendar, X, Search, Download, Settings as SettingsIcon, Eye, Bell, FileDown, Phone, Mail, User, Send, Clock, History, FileCheck, Building2, CreditCard, Users, LayoutDashboard, Loader2 } from 'lucide-react';
+import { Upload, CheckCircle, XCircle, AlertCircle, FileText, Calendar, X, Search, Download, Settings as SettingsIcon, Eye, Bell, FileDown, Phone, Mail, User, Send, Clock, History, FileCheck, Building2, CreditCard, Users, LayoutDashboard, Loader2, Plus } from 'lucide-react';
 import { useVendors } from './useVendors';
 import { useTenants } from './useTenants';
 import { useSubscription } from './useSubscription';
@@ -1201,28 +1201,12 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
               <option value="last-contacted">Sort: Last Contacted</option>
             </select>
 
-            {/* Issue Filter */}
-            <select
-              value={quickFilter}
-              onChange={(e) => setQuickFilter(e.target.value)}
-              className="px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent bg-gray-50 font-medium text-gray-700"
-            >
-              <option value="all">All Vendors</option>
-              <option value="needs-attention">⚠️ Needs Attention ({stats.needsAttention})</option>
-              <option value="expired">🔴 Expired ({stats.expired})</option>
-              <option value="expiring">🟡 Expiring Soon ({stats.expiring})</option>
-              <option value="non-compliant">🟠 Non-Compliant ({stats.nonCompliant})</option>
-              <option value="compliant">🟢 Compliant ({stats.compliant})</option>
-              <option value="missing-additional-insured">📋 Missing Add'l Insured ({stats.missingAdditionalInsured})</option>
-              <option value="not-contacted-30-days">📭 Not Contacted 30+ Days ({stats.notContactedRecently})</option>
-            </select>
-
             {/* Add Vendor Button */}
             <button
               onClick={() => setShowSmartUpload(true)}
               className="px-4 py-2.5 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 font-medium flex items-center gap-2"
             >
-              <Upload size={18} />
+              <Plus size={18} />
               <span className="hidden sm:inline">Add Vendor</span>
             </button>
 
