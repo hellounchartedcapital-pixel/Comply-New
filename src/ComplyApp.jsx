@@ -72,6 +72,7 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
   }));
 
   const [selectedVendor, setSelectedVendor] = useState(null);
+  const selectedVendorRef = React.useRef(null); // Track selected vendor to avoid stale closures
   const [searchQuery, setSearchQuery] = useState('');
   const [quickFilter, setQuickFilter] = useState('all'); // Quick filter for button interface
   const [sortBy, setSortBy] = useState('name');
@@ -241,11 +242,17 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
     }
   };
 
-  // Update selectedVendor when vendors refresh to prevent stale data
-  // We intentionally omit selectedVendor from deps to avoid infinite loop
+  // Keep ref in sync with state
   React.useEffect(() => {
-    if (selectedVendor && vendors.length > 0) {
-      const updatedVendor = vendors.find(v => v.id === selectedVendor.id);
+    selectedVendorRef.current = selectedVendor;
+  }, [selectedVendor]);
+
+  // Update selectedVendor when vendors refresh to prevent stale data
+  // Uses ref to get current value and avoid stale closures
+  React.useEffect(() => {
+    const currentSelected = selectedVendorRef.current;
+    if (currentSelected && vendors.length > 0) {
+      const updatedVendor = vendors.find(v => v.id === currentSelected.id);
       if (updatedVendor) {
         // Update selectedVendor with fresh data
         setSelectedVendor(updatedVendor);
@@ -254,7 +261,6 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
         setSelectedVendor(null);
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vendors]); // Run when vendors array changes
 
   const handleOnboardingSkip = async () => {
