@@ -672,8 +672,8 @@ export function LandingPage({ onLogin, onSignUp, onPrivacy, onTerms, onPricing }
               <p className="text-lg sm:text-xl text-gray-600 leading-relaxed mb-8 animate-fade-in-up animation-delay-200">
                 Track insurance compliance for all your vendors and tenants in one
                 dashboard. Get notified before certificates expire and automatically
-                follow up with anyone who falls out of compliance—so you never have
-                to chase down a COI again.
+                follow up with anyone who falls out of compliance. Never chase down
+                a COI again.
               </p>
 
               {/* CTA Buttons */}
