@@ -52,50 +52,31 @@ serve(async (req) => {
           },
           {
             type: 'text',
-            text: `You are an expert at extracting data from ACORD 25 Certificate of Liability Insurance forms.
+            text: `Extract insurance coverage data from this Certificate of Insurance (likely an ACORD 25 or similar form).
 
-ACORD 25 FORM LAYOUT - Read these sections carefully:
+Read the entire document to understand its structure, then extract:
 
-TOP LEFT - "INSURED" BOX:
-- Contains the company/person name that is insured
+1. INSURED/COMPANY NAME - The business or person who holds the insurance
+2. POLICY EXPIRATION DATE - When coverage ends (use earliest date if multiple policies)
+3. GENERAL LIABILITY - Look for "Each Occurrence" limit and "General Aggregate"
+4. AUTO LIABILITY - Look for "Combined Single Limit"
+5. WORKERS COMPENSATION - Usually "Statutory" plus Employers Liability amounts
+6. INSURANCE COMPANY - The carrier/insurer name
+7. CERTIFICATE HOLDER - Who the certificate was issued to
+8. ADDITIONAL INSURED - Check Description of Operations section
+9. WAIVER OF SUBROGATION - Check Description of Operations section
 
-MIDDLE SECTION - Coverage table with columns: TYPE OF INSURANCE | POLICY NUMBER | POLICY EFF | POLICY EXP | LIMITS
-
-ROW A - COMMERCIAL GENERAL LIABILITY:
-- Look for "EACH OCCURRENCE" in the LIMITS column - this is usually $1,000,000
-- Look for "GENERAL AGGREGATE" - usually $2,000,000
-- The dollar amounts appear on the RIGHT side of this row
-
-ROW B - AUTOMOBILE LIABILITY:
-- Look for "COMBINED SINGLE LIMIT (Ea accident)" - usually $1,000,000
-- Dollar amount on the RIGHT side
-
-ROW C - UMBRELLA/EXCESS LIABILITY:
-- "EACH OCCURRENCE" and "AGGREGATE" amounts
-
-ROW D - WORKERS COMPENSATION:
-- Usually shows "X" next to "STATUTORY LIMITS"
-- "E.L. EACH ACCIDENT" shows employers liability amount (often $1,000,000)
-- "E.L. DISEASE - EA EMPLOYEE" and "E.L. DISEASE - POLICY LIMIT"
-
-BOTTOM - "DESCRIPTION OF OPERATIONS":
-- May mention "Additional Insured" status
-- May mention "Waiver of Subrogation"
-
-BOTTOM RIGHT - "CERTIFICATE HOLDER":
-- Name and address of who requested the certificate
-
-EXTRACT THIS JSON:
+Return this JSON structure:
 {
-  "companyName": "Name from INSURED box",
-  "expirationDate": "YYYY-MM-DD - earliest policy expiration date",
+  "companyName": "insured company name",
+  "expirationDate": "YYYY-MM-DD",
   "generalLiability": {
-    "amount": <EACH OCCURRENCE number, e.g. 1000000>,
-    "aggregate": <GENERAL AGGREGATE number, e.g. 2000000>,
+    "amount": <each occurrence as integer, e.g. 1000000>,
+    "aggregate": <general aggregate as integer>,
     "expirationDate": "YYYY-MM-DD"
   },
   "autoLiability": {
-    "amount": <COMBINED SINGLE LIMIT number>,
+    "amount": <combined single limit as integer>,
     "expirationDate": "YYYY-MM-DD"
   },
   "workersComp": {
@@ -103,29 +84,23 @@ EXTRACT THIS JSON:
     "expirationDate": "YYYY-MM-DD"
   },
   "employersLiability": {
-    "amount": <E.L. EACH ACCIDENT number>,
+    "amount": <each accident amount as integer>,
     "expirationDate": "YYYY-MM-DD"
   },
-  "insuranceCompany": "Insurance company name from INSURER A/B/C",
-  "additionalInsured": "yes if mentioned in Description of Operations, otherwise no",
-  "certificateHolder": "Name from Certificate Holder box",
-  "waiverOfSubrogation": "yes if mentioned in Description of Operations, otherwise no"
+  "insuranceCompany": "carrier name",
+  "additionalInsured": "yes or no",
+  "certificateHolder": "name from certificate holder section",
+  "waiverOfSubrogation": "yes or no"
 }
 
-CRITICAL - NUMBER PARSING:
-- "$1,000,000" = 1000000 (one million)
-- "$2,000,000" = 2000000 (two million)
-- "$500,000" = 500000 (five hundred thousand)
-- "$100,000" = 100000 (one hundred thousand)
-- REMOVE all $ signs and commas, return plain integers
-- Most COIs have $1,000,000 per occurrence - if you see this, return 1000000
-- DO NOT return 0 unless the field is truly empty/blank
+NUMBER FORMAT: Convert dollar amounts to plain integers.
+- $1,000,000 → 1000000
+- $2,000,000 → 2000000
+- $500,000 → 500000
 
-DATE PARSING:
-- Convert MM/DD/YYYY to YYYY-MM-DD
-- Example: 01/15/2025 becomes 2025-01-15
+DATE FORMAT: Convert to YYYY-MM-DD (e.g., 01/15/2025 → 2025-01-15)
 
-Return ONLY valid JSON, no other text.`
+Return ONLY the JSON object, no other text.`
           }
         ]
       }]
