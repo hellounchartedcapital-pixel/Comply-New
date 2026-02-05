@@ -326,6 +326,23 @@ export function TenantCOIUploadModal({ isOpen, onClose, onTenantCreated, onManua
         }
       }
 
+      // Helper to safely convert to integer
+      const toInt = (val) => {
+        if (typeof val === 'number') return Math.floor(val);
+        if (typeof val === 'string') {
+          const parsed = parseInt(val.replace(/[^0-9]/g, ''), 10);
+          return isNaN(parsed) ? 0 : parsed;
+        }
+        return 0;
+      };
+
+      // Helper to convert workers comp (can be "Statutory", "Included", or a number)
+      const formatWorkersComp = (val) => {
+        if (!val) return null;
+        if (typeof val === 'string') return val;
+        return String(val);
+      };
+
       // Create tenant record
       const tenantData = {
         user_id: user.id,
@@ -338,17 +355,17 @@ export function TenantCOIUploadModal({ isOpen, onClose, onTenantCreated, onManua
         policy_document_path: permanentPath,
         policy_expiration_date: extractedData.expirationDate || null,
         insurance_company: extractedData.insuranceCompany || null,
-        policy_general_liability: extractedData.generalLiability || 0,
-        policy_general_liability_aggregate: extractedData.generalLiabilityAggregate || 0,
-        policy_auto_liability: extractedData.autoLiability || 0,
-        policy_workers_comp: extractedData.workersComp,
-        policy_employers_liability: extractedData.employersLiability || 0,
+        policy_general_liability: toInt(extractedData.generalLiability),
+        policy_general_liability_aggregate: toInt(extractedData.generalLiabilityAggregate),
+        policy_auto_liability: toInt(extractedData.autoLiability),
+        policy_workers_comp: formatWorkersComp(extractedData.workersComp),
+        policy_employers_liability: toInt(extractedData.employersLiability),
 
         // Requirements (user-entered)
-        required_general_liability: formData.required_general_liability,
-        required_auto_liability: formData.required_auto_liability,
+        required_general_liability: toInt(formData.required_general_liability),
+        required_auto_liability: toInt(formData.required_auto_liability),
         required_workers_comp: formData.required_workers_comp,
-        required_employers_liability: formData.required_employers_liability,
+        required_employers_liability: toInt(formData.required_employers_liability),
         require_additional_insured: formData.require_additional_insured,
         require_waiver_of_subrogation: formData.require_waiver_of_subrogation,
         certificate_holder_name: formData.certificate_holder_name || null,
