@@ -1598,11 +1598,12 @@ export function TenantsView({ properties, userRequirements, selectedProperty, on
                       <div>
                         <h4 className="font-bold text-gray-900 text-sm mb-2">Policy Details</h4>
                         <div className="space-y-1.5">
-                          {/* Liability Coverage */}
+                          {/* General Liability Coverage */}
                           {(() => {
                             const hasPolicy = selectedTenant.policy_expiration_date;
-                            const amount = selectedTenant.policy_liability_amount;
-                            const meetsRequirement = amount >= (selectedTenant.required_liability_min || 0);
+                            const amount = selectedTenant.policy_general_liability || 0;
+                            const required = selectedTenant.required_general_liability || 0;
+                            const meetsRequirement = amount >= required;
                             const isExpired = selectedTenant.insurance_status === 'expired';
                             const isExpiring = selectedTenant.insurance_status === 'expiring';
 
@@ -1622,7 +1623,7 @@ export function TenantsView({ properties, userRequirements, selectedProperty, on
                               statusColor = 'text-amber-600';
                               statusBg = 'bg-amber-50';
                               statusText = 'Expiring Soon';
-                            } else if (!meetsRequirement) {
+                            } else if (!meetsRequirement && required > 0) {
                               statusIcon = <AlertCircle size={14} className="text-orange-600" />;
                               statusColor = 'text-orange-600';
                               statusBg = 'bg-orange-50';
@@ -1639,19 +1640,78 @@ export function TenantsView({ properties, userRequirements, selectedProperty, on
                                 <div className="flex items-center space-x-2">
                                   {statusIcon}
                                   <div>
-                                    <p className="font-medium text-gray-900 text-sm">Liability Coverage</p>
+                                    <p className="font-medium text-gray-900 text-sm">General Liability</p>
                                     <p className={`text-xs ${statusColor}`}>{statusText}</p>
                                   </div>
                                 </div>
                                 <p className="font-semibold text-gray-900 text-sm">
-                                  {hasPolicy ? formatCurrency(amount) : 'N/A'}
+                                  {hasPolicy && amount > 0 ? formatCurrency(amount) : 'N/A'}
                                 </p>
                               </div>
                             );
                           })()}
 
+                          {/* Auto Liability */}
+                          {(selectedTenant.policy_auto_liability > 0 || selectedTenant.required_auto_liability > 0) && (
+                            <div className={`flex items-center justify-between p-2.5 rounded-lg ${
+                              selectedTenant.policy_auto_liability >= (selectedTenant.required_auto_liability || 0)
+                                ? 'bg-emerald-50' : 'bg-orange-50'
+                            }`}>
+                              <div className="flex items-center space-x-2">
+                                {selectedTenant.policy_auto_liability >= (selectedTenant.required_auto_liability || 0) ? (
+                                  <CheckCircle size={14} className="text-emerald-600" />
+                                ) : (
+                                  <AlertCircle size={14} className="text-orange-600" />
+                                )}
+                                <p className="font-medium text-gray-900 text-sm">Auto Liability</p>
+                              </div>
+                              <p className="font-semibold text-gray-900 text-sm">
+                                {selectedTenant.policy_auto_liability > 0 ? formatCurrency(selectedTenant.policy_auto_liability) : 'N/A'}
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Workers Comp */}
+                          {(selectedTenant.policy_workers_comp || selectedTenant.required_workers_comp) && (
+                            <div className={`flex items-center justify-between p-2.5 rounded-lg ${
+                              selectedTenant.policy_workers_comp ? 'bg-emerald-50' : 'bg-orange-50'
+                            }`}>
+                              <div className="flex items-center space-x-2">
+                                {selectedTenant.policy_workers_comp ? (
+                                  <CheckCircle size={14} className="text-emerald-600" />
+                                ) : (
+                                  <AlertCircle size={14} className="text-orange-600" />
+                                )}
+                                <p className="font-medium text-gray-900 text-sm">Workers Comp</p>
+                              </div>
+                              <p className="font-semibold text-gray-900 text-sm">
+                                {selectedTenant.policy_workers_comp || 'N/A'}
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Employers Liability */}
+                          {(selectedTenant.policy_employers_liability > 0 || selectedTenant.required_employers_liability > 0) && (
+                            <div className={`flex items-center justify-between p-2.5 rounded-lg ${
+                              selectedTenant.policy_employers_liability >= (selectedTenant.required_employers_liability || 0)
+                                ? 'bg-emerald-50' : 'bg-orange-50'
+                            }`}>
+                              <div className="flex items-center space-x-2">
+                                {selectedTenant.policy_employers_liability >= (selectedTenant.required_employers_liability || 0) ? (
+                                  <CheckCircle size={14} className="text-emerald-600" />
+                                ) : (
+                                  <AlertCircle size={14} className="text-orange-600" />
+                                )}
+                                <p className="font-medium text-gray-900 text-sm">Employers Liability</p>
+                              </div>
+                              <p className="font-semibold text-gray-900 text-sm">
+                                {selectedTenant.policy_employers_liability > 0 ? formatCurrency(selectedTenant.policy_employers_liability) : 'N/A'}
+                              </p>
+                            </div>
+                          )}
+
                           {/* Additional Insured */}
-                          {selectedTenant.requires_additional_insured && (
+                          {selectedTenant.require_additional_insured && (
                             <div className={`flex items-center justify-between p-2.5 rounded-lg ${
                               selectedTenant.has_additional_insured ? 'bg-emerald-50' : 'bg-orange-50'
                             }`}>
@@ -1679,24 +1739,44 @@ export function TenantsView({ properties, userRequirements, selectedProperty, on
                         <h4 className="font-bold text-gray-900 text-sm mb-2">Requirements</h4>
                         <div className="space-y-1.5 p-3 bg-gray-50 rounded-xl">
                           <div className="flex justify-between items-center text-sm">
-                            <span className="text-gray-600">Min. Liability</span>
-                            <span className="font-medium text-gray-900">{formatCurrency(selectedTenant.required_liability_min)}</span>
+                            <span className="text-gray-600">General Liability</span>
+                            <span className="font-medium text-gray-900">
+                              {selectedTenant.required_general_liability > 0 ? formatCurrency(selectedTenant.required_general_liability) : 'Not Required'}
+                            </span>
                           </div>
+                          {selectedTenant.required_auto_liability > 0 && (
+                            <div className="flex justify-between items-center text-sm">
+                              <span className="text-gray-600">Auto Liability</span>
+                              <span className="font-medium text-gray-900">{formatCurrency(selectedTenant.required_auto_liability)}</span>
+                            </div>
+                          )}
+                          {selectedTenant.required_employers_liability > 0 && (
+                            <div className="flex justify-between items-center text-sm">
+                              <span className="text-gray-600">Employers Liability</span>
+                              <span className="font-medium text-gray-900">{formatCurrency(selectedTenant.required_employers_liability)}</span>
+                            </div>
+                          )}
+                          {selectedTenant.required_workers_comp && (
+                            <div className="flex justify-between items-center text-sm">
+                              <span className="text-gray-600">Workers Comp</span>
+                              <span className="font-medium text-emerald-600">Required</span>
+                            </div>
+                          )}
                           <div className="flex justify-between items-center text-sm">
                             <span className="text-gray-600">Additional Insured</span>
-                            <span className={`font-medium ${selectedTenant.requires_additional_insured ? 'text-emerald-600' : 'text-gray-400'}`}>
-                              {selectedTenant.requires_additional_insured ? 'Required' : 'Not Required'}
+                            <span className={`font-medium ${selectedTenant.require_additional_insured ? 'text-emerald-600' : 'text-gray-400'}`}>
+                              {selectedTenant.require_additional_insured ? 'Required' : 'Not Required'}
                             </span>
                           </div>
                         </div>
                       </div>
 
                       {/* Issues */}
-                      {selectedTenant.compliance_issues && selectedTenant.compliance_issues.length > 0 && (
+                      {selectedTenant.insurance_issues && selectedTenant.insurance_issues.length > 0 && (
                         <div className="p-3 bg-red-50 border border-red-200 rounded-xl">
                           <h4 className="font-bold text-red-900 text-sm mb-2">Issues</h4>
                           <div className="space-y-1.5">
-                            {selectedTenant.compliance_issues.map((issue, idx) => (
+                            {selectedTenant.insurance_issues.map((issue, idx) => (
                               <div key={idx} className="flex items-start space-x-2 text-sm text-red-700">
                                 <AlertCircle size={14} className="mt-0.5 flex-shrink-0" />
                                 <span>{typeof issue === 'string' ? issue : issue.message}</span>
