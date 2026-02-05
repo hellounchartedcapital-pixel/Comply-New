@@ -52,25 +52,55 @@ serve(async (req) => {
           },
           {
             type: 'text',
-            text: `Extract data from this ACORD Certificate of Insurance PDF.
+            text: `Extract insurance coverage data from this Certificate of Insurance (likely an ACORD 25 or similar form).
 
-Find these values in the LIMITS column (right side of the form):
-- EACH OCCURRENCE: This is the GL limit per incident (e.g., 1,000,000)
-- GENERAL AGGREGATE: Total GL limit (e.g., 2,000,000)
-- COMBINED SINGLE LIMIT: Auto liability limit
-- E.L. EACH ACCIDENT: Employers liability
+Read the entire document to understand its structure, then extract:
 
-Check the DESCRIPTION OF OPERATIONS section for "additional insured" language.
+1. INSURED/COMPANY NAME - The business or person who holds the insurance
+2. POLICY EXPIRATION DATE - When coverage ends (use earliest date if multiple policies)
+3. GENERAL LIABILITY - Look for "Each Occurrence" limit and "General Aggregate"
+4. AUTO LIABILITY - Look for "Combined Single Limit"
+5. WORKERS COMPENSATION - Usually "Statutory" plus Employers Liability amounts
+6. INSURANCE COMPANY - The carrier/insurer name
+7. CERTIFICATE HOLDER - Who the certificate was issued to
+8. ADDITIONAL INSURED - Check Description of Operations section
+9. WAIVER OF SUBROGATION - Check Description of Operations section
 
-Return JSON in this exact format (replace values with actual data from the PDF):
+Return this JSON structure:
+{
+  "companyName": "insured company name",
+  "expirationDate": "YYYY-MM-DD",
+  "generalLiability": {
+    "amount": <each occurrence as integer, e.g. 1000000>,
+    "aggregate": <general aggregate as integer>,
+    "expirationDate": "YYYY-MM-DD"
+  },
+  "autoLiability": {
+    "amount": <combined single limit as integer>,
+    "expirationDate": "YYYY-MM-DD"
+  },
+  "workersComp": {
+    "amount": "Statutory",
+    "expirationDate": "YYYY-MM-DD"
+  },
+  "employersLiability": {
+    "amount": <each accident amount as integer>,
+    "expirationDate": "YYYY-MM-DD"
+  },
+  "insuranceCompany": "carrier name",
+  "additionalInsured": "yes or no",
+  "certificateHolder": "name from certificate holder section",
+  "waiverOfSubrogation": "yes or no"
+}
 
-{"companyName":"ABC Company Inc","expirationDate":"2025-01-06","generalLiability":{"amount":1000000,"aggregate":2000000,"expirationDate":"2025-01-06"},"autoLiability":{"amount":1000000,"expirationDate":"2025-01-06"},"workersComp":{"amount":"Statutory","expirationDate":"2025-01-06"},"employersLiability":{"amount":1000000,"expirationDate":"2025-01-06"},"insuranceCompany":"Insurance Co","additionalInsured":"yes","certificateHolder":"Holder Name","waiverOfSubrogation":"no"}
+NUMBER FORMAT: Convert dollar amounts to plain integers.
+- $1,000,000 → 1000000
+- $2,000,000 → 2000000
+- $500,000 → 500000
 
-RULES:
-- Convert "1,000,000" to 1000000 (remove commas)
-- Convert "01/06/2025" to "2025-01-06"
-- additionalInsured: "yes" if description mentions additional insured, otherwise "no"
-- Return ONLY the JSON object, no markdown, no explanation`
+DATE FORMAT: Convert to YYYY-MM-DD (e.g., 01/15/2025 → 2025-01-15)
+
+Return ONLY the JSON object, no other text.`
           }
         ]
       }]
