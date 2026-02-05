@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   Users, Plus, Search, CheckCircle, XCircle, AlertCircle, Clock,
   Mail, Phone, Calendar, Building2, X, Send,
-  ExternalLink, Shield, Loader2, FileText, History, Upload, ChevronDown
+  ExternalLink, Loader2, FileText, History, Upload
 } from 'lucide-react';
 import { useTenants } from './useTenants';
 import { supabase } from './supabaseClient';
@@ -53,99 +53,45 @@ function getStatusBadge(status, expirationDate) {
 // Add/Edit Tenant Modal
 function TenantModal({ isOpen, onClose, onSave, tenant, properties }) {
   const [formData, setFormData] = useState({
+    // Basic info
     name: '',
     email: '',
     phone: '',
     property_id: '',
-    unit_number: '', // Changed from unit_id to unit_number
-    lease_start: '',
-    lease_end: '',
-    status: 'active',
-    required_liability_min: 100000,
-    required_property_damage_min: 0,
-    required_auto_liability_min: 0,
+    unit_number: '',
+
+    // COI Coverage (what tenant has)
+    policy_expiration_date: '',
+    insurance_company: '',
+    policy_general_liability: 0,
+    policy_auto_liability: 0,
+    policy_workers_comp: '',
+    policy_employers_liability: 0,
+    has_additional_insured: false,
+    has_waiver_of_subrogation: false,
+
+    // Requirements (what you require)
+    required_general_liability: 1000000,
+    required_auto_liability: 0,
     required_workers_comp: false,
-    workers_comp_exempt: false,
-    required_employers_liability_min: 0,
-    requires_additional_insured: true,
-    additional_insured_text: '',
+    required_employers_liability: 0,
+    require_additional_insured: true,
+    require_waiver_of_subrogation: false,
     certificate_holder_name: '',
-    certificate_holder_address: '',
-    cancellation_notice_days: 30,
-    requires_declarations_page: true,
-    requires_endorsement_pages: true,
+    additional_insured_names: '',
   });
   const [saving, setSaving] = useState(false);
-  // Progressive disclosure - collapse advanced insurance requirements by default for new tenants
-  const [showInsuranceRequirements, setShowInsuranceRequirements] = useState(false);
-  // Lease extraction state
-  const [extractingFromLease, setExtractingFromLease] = useState(false);
-  const [extractionError, setExtractionError] = useState(null);
-  const leaseInputRef = React.useRef(null);
+  const [activeTab, setActiveTab] = useState('info');
 
-  // Handle lease PDF upload and requirements extraction
-  const handleExtractFromLease = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // Reset file input
-    if (leaseInputRef.current) {
-      leaseInputRef.current.value = '';
-    }
-
-    // Validate file type
-    if (!file.type.includes('pdf')) {
-      setExtractionError('Please select a PDF file');
-      return;
-    }
-
-    // Validate file size (max 10MB)
-    if (file.size > 10 * 1024 * 1024) {
-      setExtractionError('File too large. Maximum size is 10MB.');
-      return;
-    }
-
-    setExtractingFromLease(true);
-    setExtractionError(null);
-
-    try {
-      // Convert to base64
-      const arrayBuffer = await file.arrayBuffer();
-      const base64Data = btoa(
-        new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
-      );
-
-      // Call edge function
-      const { data: result, error } = await supabase.functions.invoke('extract-requirements', {
-        body: { pdfBase64: base64Data }
-      });
-
-      if (error) throw error;
-      if (!result?.success) throw new Error(result?.error || 'Extraction failed');
-
-      const reqs = result.data?.requirements;
-      if (reqs) {
-        // Auto-populate form fields from extracted requirements
-        setFormData(prev => ({
-          ...prev,
-          required_liability_min: reqs.general_liability?.amount || prev.required_liability_min,
-          required_auto_liability_min: reqs.auto_liability?.amount || prev.required_auto_liability_min,
-          required_workers_comp: reqs.workers_comp?.required || prev.required_workers_comp,
-          required_employers_liability_min: reqs.employers_liability?.amount || prev.required_employers_liability_min,
-          requires_additional_insured: reqs.special_requirements?.additional_insured ?? prev.requires_additional_insured,
-          cancellation_notice_days: reqs.special_requirements?.notice_of_cancellation_days || prev.cancellation_notice_days,
-        }));
-
-        // Expand the requirements section to show extracted values
-        setShowInsuranceRequirements(true);
-      }
-    } catch (err) {
-      logger.error('Failed to extract requirements from lease', err);
-      setExtractionError(err.message || 'Failed to extract requirements');
-    } finally {
-      setExtractingFromLease(false);
-    }
-  };
+  const COVERAGE_OPTIONS = [
+    { value: 0, label: 'Not Required' },
+    { value: 100000, label: '$100,000' },
+    { value: 300000, label: '$300,000' },
+    { value: 500000, label: '$500,000' },
+    { value: 1000000, label: '$1,000,000' },
+    { value: 2000000, label: '$2,000,000' },
+    { value: 5000000, label: '$5,000,000' },
+  ];
 
   useEffect(() => {
     if (tenant) {
@@ -154,26 +100,28 @@ function TenantModal({ isOpen, onClose, onSave, tenant, properties }) {
         email: tenant.email || '',
         phone: tenant.phone || '',
         property_id: tenant.property_id || '',
-        unit_number: tenant.unit?.unit_number || '',
-        lease_start: tenant.lease_start || '',
-        lease_end: tenant.lease_end || '',
-        status: tenant.status || 'active',
-        required_liability_min: tenant.required_liability_min || 100000,
-        required_property_damage_min: tenant.required_property_damage_min || 0,
-        required_auto_liability_min: tenant.required_auto_liability_min || 0,
+        unit_number: tenant.unit?.unit_number || tenant.suite_number || '',
+
+        // COI Coverage
+        policy_expiration_date: tenant.policy_expiration_date || '',
+        insurance_company: tenant.insurance_company || '',
+        policy_general_liability: tenant.policy_general_liability || 0,
+        policy_auto_liability: tenant.policy_auto_liability || 0,
+        policy_workers_comp: tenant.policy_workers_comp || '',
+        policy_employers_liability: tenant.policy_employers_liability || 0,
+        has_additional_insured: tenant.has_additional_insured || false,
+        has_waiver_of_subrogation: tenant.has_waiver_of_subrogation || false,
+
+        // Requirements
+        required_general_liability: tenant.required_general_liability || 1000000,
+        required_auto_liability: tenant.required_auto_liability || 0,
         required_workers_comp: tenant.required_workers_comp || false,
-        workers_comp_exempt: tenant.workers_comp_exempt || false,
-        required_employers_liability_min: tenant.required_employers_liability_min || 0,
-        requires_additional_insured: tenant.requires_additional_insured !== false,
-        additional_insured_text: tenant.additional_insured_text || '',
+        required_employers_liability: tenant.required_employers_liability || 0,
+        require_additional_insured: tenant.require_additional_insured !== false,
+        require_waiver_of_subrogation: tenant.require_waiver_of_subrogation || false,
         certificate_holder_name: tenant.certificate_holder_name || '',
-        certificate_holder_address: tenant.certificate_holder_address || '',
-        cancellation_notice_days: tenant.cancellation_notice_days || 30,
-        requires_declarations_page: tenant.requires_declarations_page !== false,
-        requires_endorsement_pages: tenant.requires_endorsement_pages !== false,
+        additional_insured_names: tenant.additional_insured_names || '',
       });
-      // Expand requirements section when editing existing tenant
-      setShowInsuranceRequirements(true);
     } else {
       setFormData({
         name: '',
@@ -181,26 +129,25 @@ function TenantModal({ isOpen, onClose, onSave, tenant, properties }) {
         phone: '',
         property_id: '',
         unit_number: '',
-        lease_start: '',
-        lease_end: '',
-        status: 'active',
-        required_liability_min: 100000,
-        required_property_damage_min: 0,
-        required_auto_liability_min: 0,
+        policy_expiration_date: '',
+        insurance_company: '',
+        policy_general_liability: 0,
+        policy_auto_liability: 0,
+        policy_workers_comp: '',
+        policy_employers_liability: 0,
+        has_additional_insured: false,
+        has_waiver_of_subrogation: false,
+        required_general_liability: 1000000,
+        required_auto_liability: 0,
         required_workers_comp: false,
-        workers_comp_exempt: false,
-        required_employers_liability_min: 0,
-        requires_additional_insured: true,
-        additional_insured_text: '',
+        required_employers_liability: 0,
+        require_additional_insured: true,
+        require_waiver_of_subrogation: false,
         certificate_holder_name: '',
-        certificate_holder_address: '',
-        cancellation_notice_days: 30,
-        requires_declarations_page: true,
-        requires_endorsement_pages: true,
+        additional_insured_names: '',
       });
-      // Collapse requirements section for new tenants
-      setShowInsuranceRequirements(false);
     }
+    setActiveTab('info');
   }, [tenant, isOpen]);
 
   const handleSubmit = async (e) => {
@@ -223,299 +170,361 @@ function TenantModal({ isOpen, onClose, onSave, tenant, properties }) {
   return (
     <div
       className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) {
-          onClose();
-        }
-      }}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="tenant-modal-title"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
         <div className="p-6 border-b border-gray-200 flex items-center justify-between">
-          <h2 id="tenant-modal-title" className="text-xl font-bold text-gray-900">
+          <h2 className="text-xl font-bold text-gray-900">
             {tenant ? 'Edit Tenant' : 'Add New Tenant'}
           </h2>
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg">
+            <X size={20} className="text-gray-500" />
+          </button>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex border-b border-gray-200">
           <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-lg"
-            aria-label="Close dialog"
+            type="button"
+            onClick={() => setActiveTab('info')}
+            className={`flex-1 px-4 py-3 text-sm font-medium ${
+              activeTab === 'info'
+                ? 'text-emerald-600 border-b-2 border-emerald-600 bg-emerald-50'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
           >
-            <X size={20} className="text-gray-500" aria-hidden="true" />
+            Tenant Info
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('coverage')}
+            className={`flex-1 px-4 py-3 text-sm font-medium ${
+              activeTab === 'coverage'
+                ? 'text-emerald-600 border-b-2 border-emerald-600 bg-emerald-50'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            COI Coverage
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('requirements')}
+            className={`flex-1 px-4 py-3 text-sm font-medium ${
+              activeTab === 'requirements'
+                ? 'text-emerald-600 border-b-2 border-emerald-600 bg-emerald-50'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            Requirements
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6">
-          <div className="space-y-6">
-            {/* Basic Info */}
-            <div>
-              <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                <Users size={16} className="text-emerald-600" />
-                Tenant Information
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Tenant Name *
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                    placeholder="John Doe"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Email
-                  </label>
-                  <input
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                    placeholder="john@example.com"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Phone
-                  </label>
-                  <input
-                    type="tel"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                    placeholder="(555) 123-4567"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Property & Unit */}
-            <div>
-              <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                <Building2 size={16} className="text-emerald-600" />
-                Property & Unit
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Property
-                  </label>
-                  <select
-                    value={formData.property_id}
-                    onChange={(e) => setFormData({ ...formData, property_id: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                  >
-                    <option value="">Select property...</option>
-                    {properties.map(p => (
-                      <option key={p.id} value={p.id}>{p.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Unit Number
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.unit_number}
-                    onChange={(e) => setFormData({ ...formData, unit_number: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                    placeholder="e.g., 101, A, 2B"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Status
-                  </label>
-                  <select
-                    value={formData.status}
-                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                  >
-                    <option value="active">Active</option>
-                    <option value="pending">Pending Move-in</option>
-                    <option value="moved_out">Moved Out</option>
-                    <option value="evicted">Evicted</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            {/* Lease Details */}
-            <div>
-              <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                <Calendar size={16} className="text-emerald-600" />
-                Lease Details
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Lease Start Date
-                  </label>
-                  <input
-                    type="date"
-                    value={formData.lease_start}
-                    onChange={(e) => setFormData({ ...formData, lease_start: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Lease End Date
-                  </label>
-                  <input
-                    type="date"
-                    value={formData.lease_end}
-                    onChange={(e) => setFormData({ ...formData, lease_end: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Extract from Lease Feature */}
-            <div className="p-4 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl border border-purple-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="font-medium text-gray-900 flex items-center gap-2">
-                    <FileText size={16} className="text-purple-600" />
-                    Extract Requirements from Lease
-                  </h4>
-                  <p className="text-sm text-gray-500 mt-1">
-                    Upload a lease PDF and we'll auto-extract insurance requirements
-                  </p>
-                </div>
-                <div>
-                  <input
-                    ref={leaseInputRef}
-                    type="file"
-                    accept=".pdf,application/pdf"
-                    onChange={handleExtractFromLease}
-                    className="hidden"
-                    id="lease-upload"
-                  />
-                  <label
-                    htmlFor="lease-upload"
-                    className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium cursor-pointer transition-colors ${
-                      extractingFromLease
-                        ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                        : 'bg-purple-600 text-white hover:bg-purple-700'
-                    }`}
-                  >
-                    {extractingFromLease ? (
-                      <>
-                        <Loader2 size={16} className="animate-spin" />
-                        <span>Extracting...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Upload size={16} />
-                        <span>Upload Lease</span>
-                      </>
-                    )}
-                  </label>
-                </div>
-              </div>
-              {extractionError && (
-                <p className="mt-2 text-sm text-red-600">{extractionError}</p>
-              )}
-            </div>
-
-            {/* Insurance Requirements - Collapsible */}
-            <div>
-              <button
-                type="button"
-                onClick={() => setShowInsuranceRequirements(!showInsuranceRequirements)}
-                className="w-full text-sm font-semibold text-gray-900 mb-3 flex items-center justify-between gap-2 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
-              >
-                <div className="flex items-center gap-2">
-                  <Shield size={16} className="text-emerald-600" />
-                  Insurance Requirements
-                  <span className="text-xs font-normal text-gray-500">(uses defaults from Settings)</span>
-                </div>
-                <ChevronDown
-                  size={16}
-                  className={`text-gray-400 transition-transform ${showInsuranceRequirements ? 'rotate-180' : ''}`}
-                />
-              </button>
-
-              {showInsuranceRequirements && (
-                <>
-                  {/* Coverage Limits */}
-                  <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                    <h4 className="text-xs font-semibold text-gray-500 uppercase mb-3">Required Coverage Limits</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          General Liability
-                        </label>
-                        <select
-                          value={formData.required_liability_min}
-                          onChange={(e) => setFormData({ ...formData, required_liability_min: parseInt(e.target.value) })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                        >
-                          <option value={0}>Per Lease</option>
-                          <option value={100000}>$100,000</option>
-                          <option value={300000}>$300,000</option>
-                          <option value={500000}>$500,000</option>
-                          <option value={1000000}>$1,000,000</option>
-                          <option value={2000000}>$2,000,000</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Business Auto Liability
-                        </label>
-                        <select
-                          value={formData.required_auto_liability_min}
-                          onChange={(e) => setFormData({ ...formData, required_auto_liability_min: parseInt(e.target.value) })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                        >
-                          <option value={0}>Not Required</option>
-                          <option value={100000}>$100,000</option>
-                          <option value={300000}>$300,000</option>
-                          <option value={500000}>$500,000</option>
-                          <option value={1000000}>$1,000,000</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    {/* Workers Compensation */}
-                    <div className="mt-4 pt-4 border-t border-gray-200">
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={formData.required_workers_comp}
-                          onChange={(e) => setFormData({ ...formData, required_workers_comp: e.target.checked, workers_comp_exempt: false })}
-                          className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
-                        />
-                        <span className="text-sm text-gray-700">Workers' Compensation Required</span>
-                      </label>
-                    </div>
+          {/* Tenant Info Tab */}
+          {activeTab === 'info' && (
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                  <Users size={16} className="text-emerald-600" />
+                  Tenant Information
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Tenant/Company Name *
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                      placeholder="Company Name or Tenant Name"
+                      required
+                    />
                   </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                    <input
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                      placeholder="tenant@company.com"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                    <input
+                      type="tel"
+                      value={formData.phone}
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                      placeholder="(555) 123-4567"
+                    />
+                  </div>
+                </div>
+              </div>
 
-                  {/* Additional Insured */}
-                  <div className="bg-gray-50 rounded-lg p-4">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                  <Building2 size={16} className="text-emerald-600" />
+                  Property & Unit
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Property</label>
+                    <select
+                      value={formData.property_id}
+                      onChange={(e) => setFormData({ ...formData, property_id: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                    >
+                      <option value="">Select property...</option>
+                      {properties.map(p => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Unit/Suite</label>
+                    <input
+                      type="text"
+                      value={formData.unit_number}
+                      onChange={(e) => setFormData({ ...formData, unit_number: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                      placeholder="e.g., Suite 100"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* COI Coverage Tab */}
+          {activeTab === 'coverage' && (
+            <div className="space-y-6">
+              <div className="bg-blue-50 rounded-xl p-4 border border-blue-200">
+                <h3 className="text-sm font-semibold text-gray-900 mb-1">Current COI Coverage</h3>
+                <p className="text-xs text-gray-500 mb-4">
+                  These values are from the tenant's Certificate of Insurance
+                </p>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Policy Expiration
+                    </label>
+                    <input
+                      type="date"
+                      value={formData.policy_expiration_date}
+                      onChange={(e) => setFormData({ ...formData, policy_expiration_date: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Insurance Company
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.insurance_company}
+                      onChange={(e) => setFormData({ ...formData, insurance_company: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                      placeholder="Insurance Co."
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      General Liability
+                    </label>
+                    <input
+                      type="number"
+                      value={formData.policy_general_liability}
+                      onChange={(e) => setFormData({ ...formData, policy_general_liability: parseInt(e.target.value) || 0 })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                      placeholder="1000000"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Auto Liability
+                    </label>
+                    <input
+                      type="number"
+                      value={formData.policy_auto_liability}
+                      onChange={(e) => setFormData({ ...formData, policy_auto_liability: parseInt(e.target.value) || 0 })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                      placeholder="1000000"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Workers Comp
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.policy_workers_comp}
+                      onChange={(e) => setFormData({ ...formData, policy_workers_comp: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                      placeholder="Statutory"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Employers Liability
+                    </label>
+                    <input
+                      type="number"
+                      value={formData.policy_employers_liability}
+                      onChange={(e) => setFormData({ ...formData, policy_employers_liability: parseInt(e.target.value) || 0 })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                      placeholder="500000"
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-4 pt-4 border-t border-blue-200 space-y-3">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.has_additional_insured}
+                      onChange={(e) => setFormData({ ...formData, has_additional_insured: e.target.checked })}
+                      className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
+                    />
+                    <span className="text-sm text-gray-700">COI includes Additional Insured</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.has_waiver_of_subrogation}
+                      onChange={(e) => setFormData({ ...formData, has_waiver_of_subrogation: e.target.checked })}
+                      className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
+                    />
+                    <span className="text-sm text-gray-700">COI includes Waiver of Subrogation</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Requirements Tab */}
+          {activeTab === 'requirements' && (
+            <div className="space-y-6">
+              <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-200">
+                <h3 className="text-sm font-semibold text-gray-900 mb-1">Your Requirements</h3>
+                <p className="text-xs text-gray-500 mb-4">
+                  Set the minimum coverage you require from this tenant
+                </p>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      General Liability Required
+                    </label>
+                    <select
+                      value={formData.required_general_liability}
+                      onChange={(e) => setFormData({ ...formData, required_general_liability: parseInt(e.target.value) })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                    >
+                      {COVERAGE_OPTIONS.map(opt => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Auto Liability Required
+                    </label>
+                    <select
+                      value={formData.required_auto_liability}
+                      onChange={(e) => setFormData({ ...formData, required_auto_liability: parseInt(e.target.value) })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                    >
+                      {COVERAGE_OPTIONS.map(opt => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Employers Liability Required
+                    </label>
+                    <select
+                      value={formData.required_employers_liability}
+                      onChange={(e) => setFormData({ ...formData, required_employers_liability: parseInt(e.target.value) })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                    >
+                      {COVERAGE_OPTIONS.map(opt => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex items-center">
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input
                         type="checkbox"
-                        checked={formData.requires_additional_insured}
-                        onChange={(e) => setFormData({ ...formData, requires_additional_insured: e.target.checked })}
+                        checked={formData.required_workers_comp}
+                        onChange={(e) => setFormData({ ...formData, required_workers_comp: e.target.checked })}
                         className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
                       />
-                      <span className="text-sm text-gray-700">Require owner as additional insured</span>
+                      <span className="text-sm text-gray-700">Workers' Comp Required</span>
                     </label>
                   </div>
-                </>
-              )}
+                </div>
+
+                <div className="mt-4 pt-4 border-t border-emerald-200 space-y-3">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.require_additional_insured}
+                      onChange={(e) => setFormData({ ...formData, require_additional_insured: e.target.checked })}
+                      className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
+                    />
+                    <span className="text-sm text-gray-700">Require Additional Insured Endorsement</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.require_waiver_of_subrogation}
+                      onChange={(e) => setFormData({ ...formData, require_waiver_of_subrogation: e.target.checked })}
+                      className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
+                    />
+                    <span className="text-sm text-gray-700">Require Waiver of Subrogation</span>
+                  </label>
+                </div>
+              </div>
+
+              <div className="bg-amber-50 rounded-xl p-4 border border-amber-200">
+                <h3 className="text-sm font-semibold text-gray-900 mb-3">Certificate Details</h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Certificate Holder Name
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.certificate_holder_name}
+                      onChange={(e) => setFormData({ ...formData, certificate_holder_name: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                      placeholder="Your Company Name, LLC"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Additional Insured Name(s)
+                    </label>
+                    <textarea
+                      value={formData.additional_insured_names}
+                      onChange={(e) => setFormData({ ...formData, additional_insured_names: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                      placeholder="Property Owner LLC&#10;Management Company Inc"
+                      rows={2}
+                    />
+                    <p className="text-xs text-gray-500 mt-1">One name per line if multiple</p>
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
+          )}
         </form>
 
         <div className="p-6 border-t border-gray-200 flex gap-3">
@@ -747,8 +756,72 @@ export function TenantsView({ properties, userRequirements, selectedProperty, on
       }
     }
 
+    // Calculate compliance status based on coverage vs requirements
+    const calculateComplianceStatus = (data) => {
+      const issues = [];
+
+      // Check expiration
+      if (data.policy_expiration_date) {
+        const today = new Date();
+        const expDate = new Date(data.policy_expiration_date);
+        const daysUntilExpiration = Math.floor((expDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+        if (daysUntilExpiration < 0) {
+          return { status: 'expired', issues: [{ type: 'critical', message: `Policy expired on ${data.policy_expiration_date}` }] };
+        } else if (daysUntilExpiration <= 30) {
+          issues.push({ type: 'warning', message: `Policy expiring in ${daysUntilExpiration} days` });
+        }
+      }
+
+      // Check coverage amounts
+      const gl = data.policy_general_liability || 0;
+      const reqGl = data.required_general_liability || 0;
+      if (reqGl > 0 && gl < reqGl) {
+        issues.push({ type: 'error', message: `General Liability $${(gl/1000000).toFixed(1)}M below required $${(reqGl/1000000).toFixed(1)}M` });
+      }
+
+      const auto = data.policy_auto_liability || 0;
+      const reqAuto = data.required_auto_liability || 0;
+      if (reqAuto > 0 && auto < reqAuto) {
+        issues.push({ type: 'error', message: `Auto Liability below required amount` });
+      }
+
+      const el = data.policy_employers_liability || 0;
+      const reqEl = data.required_employers_liability || 0;
+      if (reqEl > 0 && el < reqEl) {
+        issues.push({ type: 'error', message: `Employers Liability below required amount` });
+      }
+
+      if (data.required_workers_comp && !data.policy_workers_comp) {
+        issues.push({ type: 'error', message: `Workers Compensation required but not found` });
+      }
+
+      if (data.require_additional_insured && !data.has_additional_insured) {
+        issues.push({ type: 'error', message: `Additional Insured endorsement required but not found` });
+      }
+
+      if (data.require_waiver_of_subrogation && !data.has_waiver_of_subrogation) {
+        issues.push({ type: 'error', message: `Waiver of Subrogation required but not found` });
+      }
+
+      const hasErrors = issues.some(i => i.type === 'error' || i.type === 'critical');
+      const hasWarnings = issues.some(i => i.type === 'warning');
+
+      let status = 'compliant';
+      if (hasErrors) status = 'non-compliant';
+      else if (hasWarnings) status = 'expiring';
+      else if (!data.policy_expiration_date) status = 'pending';
+
+      return { status, issues };
+    };
+
     const saveData = { ...formData, unit_id: unitId };
     delete saveData.unit_number;
+
+    // Recalculate compliance status
+    const { status, issues } = calculateComplianceStatus(saveData);
+    saveData.insurance_status = status;
+    saveData.insurance_issues = issues;
 
     if (editingTenant) {
       await updateTenant(editingTenant.id, saveData);
