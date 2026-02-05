@@ -28,10 +28,8 @@ serve(async (req) => {
       throw new Error('No storage path provided');
     }
 
-    // Initialize Supabase client
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Download PDF from storage
     const { data: fileData, error: downloadError } = await supabase.storage
       .from('lease-documents')
       .download(storagePath);
@@ -41,7 +39,6 @@ serve(async (req) => {
       throw new Error('Failed to download lease document from storage');
     }
 
-    // Convert to base64
     const arrayBuffer = await fileData.arrayBuffer();
     const base64Data = btoa(
       new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
@@ -49,9 +46,8 @@ serve(async (req) => {
 
     const anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
 
-    // Call Claude API with commercial lease extraction prompt
     const message = await anthropic.messages.create({
-      model: model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-4-20250514',
       max_tokens: 4000,
       messages: [{
         role: 'user',
@@ -158,7 +154,6 @@ Return ONLY the JSON object, no other text.`
       }]
     });
 
-    // Parse Claude's response
     const responseText = message.content[0].type === 'text' ? message.content[0].text : '';
     const jsonMatch = responseText.match(/\{[\s\S]*\}/);
 
