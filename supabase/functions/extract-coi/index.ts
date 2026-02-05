@@ -52,39 +52,44 @@ serve(async (req) => {
           },
           {
             type: 'text',
-            text: `You are an expert at extracting data from ACORD Certificate of Insurance (COI) forms.
+            text: `You are an expert at extracting data from ACORD 25 Certificate of Insurance forms.
 
-IMPORTANT: This is likely an ACORD 25 form. Look carefully at these specific sections:
+FORM LAYOUT - Read carefully:
+The form has a table with coverage types on the LEFT and dollar limits on the RIGHT side.
 
-1. COMMERCIAL GENERAL LIABILITY section - Find:
-   - "EACH OCCURRENCE" limit (usually $1,000,000 or $2,000,000)
-   - "GENERAL AGGREGATE" limit (usually $2,000,000 or $4,000,000)
-   - Policy expiration date in the row
+LIMITS COLUMN (right side of form):
+- Look for the column labeled "LIMITS" on the far right
+- "EACH OCCURRENCE" row shows the per-incident GL limit (typically 1,000,000)
+- "GENERAL AGGREGATE" row shows total GL limit (typically 2,000,000)
+- "COMBINED SINGLE LIMIT" shows auto liability limit
+- Dollar amounts appear as "1,000,000" or "2,000,000" etc.
 
-2. AUTOMOBILE LIABILITY section - Find:
-   - "COMBINED SINGLE LIMIT" (usually $1,000,000)
-   - Policy expiration date
+POLICY DATES:
+- "POLICY EFF" = start date, "POLICY EXP" = expiration date
+- Use the EXP (expiration) date, format is MM/DD/YYYY
+- Convert to YYYY-MM-DD format
 
-3. WORKERS COMPENSATION section - Find:
-   - Usually shows "STATUTORY" or "X" in the WC STATUTORY LIMITS box
-   - "E.L. EACH ACCIDENT" amount for Employers Liability
+ADDITIONAL INSURED:
+- Check "DESCRIPTION OF OPERATIONS / LOCATIONS / VEHICLES" section
+- If it says "certificate holder is an additional insured" or similar = YES
+- If it mentions any form like "CG 20 11" or "additional insured endorsement" = YES
 
-4. Look at the "INSURED" box at top left for the company name
+CERTIFICATE HOLDER:
+- Bottom left box shows who requested this certificate
+- This is often the landlord or company requiring insurance
 
-5. Look at policy effective/expiration dates - they're in MM/DD/YYYY format
-
-Extract and return this JSON:
+Extract this JSON:
 
 {
-  "companyName": "Company name from INSURED box",
-  "expirationDate": "YYYY-MM-DD format - use the EARLIEST expiration date from all policies",
+  "companyName": "Name from INSURED box (top left, the company that has the insurance)",
+  "expirationDate": "YYYY-MM-DD - earliest POLICY EXP date",
   "generalLiability": {
-    "amount": <number - the EACH OCCURRENCE limit, e.g. 1000000 for $1,000,000>,
-    "aggregate": <number - the GENERAL AGGREGATE limit>,
+    "amount": <number from EACH OCCURRENCE row in LIMITS column>,
+    "aggregate": <number from GENERAL AGGREGATE row>,
     "expirationDate": "YYYY-MM-DD"
   },
   "autoLiability": {
-    "amount": <number - COMBINED SINGLE LIMIT>,
+    "amount": <number from COMBINED SINGLE LIMIT>,
     "expirationDate": "YYYY-MM-DD"
   },
   "workersComp": {
@@ -92,24 +97,23 @@ Extract and return this JSON:
     "expirationDate": "YYYY-MM-DD"
   },
   "employersLiability": {
-    "amount": <number - E.L. EACH ACCIDENT amount>,
+    "amount": <number from E.L. EACH ACCIDENT>,
     "expirationDate": "YYYY-MM-DD"
   },
-  "insuranceCompany": "Name of the insurance carrier",
-  "additionalInsured": "Any text in DESCRIPTION OF OPERATIONS about additional insured",
-  "certificateHolder": "Name and address from CERTIFICATE HOLDER box",
-  "waiverOfSubrogation": "yes or no - check if waiver of subrogation is mentioned"
+  "insuranceCompany": "Insurance company name from INSURER column",
+  "additionalInsured": "yes or no - YES if description mentions certificate holder as additional insured",
+  "certificateHolder": "Name from CERTIFICATE HOLDER box",
+  "waiverOfSubrogation": "yes or no"
 }
 
-CRITICAL RULES:
-- Convert ALL dollar amounts to plain numbers: $1,000,000 becomes 1000000
-- Convert dates from MM/DD/YYYY to YYYY-MM-DD format
-- If you see "1,000,000" that equals 1000000 (one million)
-- If you see "2,000,000" that equals 2000000 (two million)
-- NEVER return 0 for coverage amounts - look harder at the form
-- The EACH OCCURRENCE limit is the main GL coverage amount
+CRITICAL:
+- 1,000,000 = 1000000 (one million)
+- 2,000,000 = 2000000 (two million)
+- 500,000 = 500000
+- NEVER return 0 - the limits ARE on the form, look in the LIMITS column on the right
+- For additionalInsured: return "yes" if ANY mention of additional insured in description
 
-Return ONLY the JSON object.`
+Return ONLY the JSON.`
           }
         ]
       }]
@@ -175,7 +179,8 @@ function buildVendorData(extractedData: any, requirements: Requirements) {
     },
     rawData: extractedData,
     requirements: requirements,
-    additionalInsured: extractedData.additionalInsured || '',
+    additionalInsured: extractedData.additionalInsured || 'no',
+    hasAdditionalInsured: (extractedData.additionalInsured || '').toLowerCase() === 'yes',
     certificateHolder: extractedData.certificateHolder || '',
     waiverOfSubrogation: extractedData.waiverOfSubrogation || '',
     insuranceCompany: extractedData.insuranceCompany || ''
