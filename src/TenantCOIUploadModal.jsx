@@ -2,7 +2,7 @@
 import React, { useState, useCallback } from 'react';
 import {
   X, Upload, FileText, Loader2, CheckCircle, AlertCircle,
-  Building2, User, Shield, Mail, Phone, ArrowRight, Edit2
+  Building2, User, Shield, ArrowRight
 } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import logger from './logger';
