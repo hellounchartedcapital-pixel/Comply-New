@@ -52,68 +52,25 @@ serve(async (req) => {
           },
           {
             type: 'text',
-            text: `You are an expert at extracting data from ACORD 25 Certificate of Insurance forms.
+            text: `Extract data from this ACORD Certificate of Insurance PDF.
 
-FORM LAYOUT - Read carefully:
-The form has a table with coverage types on the LEFT and dollar limits on the RIGHT side.
+Find these values in the LIMITS column (right side of the form):
+- EACH OCCURRENCE: This is the GL limit per incident (e.g., 1,000,000)
+- GENERAL AGGREGATE: Total GL limit (e.g., 2,000,000)
+- COMBINED SINGLE LIMIT: Auto liability limit
+- E.L. EACH ACCIDENT: Employers liability
 
-LIMITS COLUMN (right side of form):
-- Look for the column labeled "LIMITS" on the far right
-- "EACH OCCURRENCE" row shows the per-incident GL limit (typically 1,000,000)
-- "GENERAL AGGREGATE" row shows total GL limit (typically 2,000,000)
-- "COMBINED SINGLE LIMIT" shows auto liability limit
-- Dollar amounts appear as "1,000,000" or "2,000,000" etc.
+Check the DESCRIPTION OF OPERATIONS section for "additional insured" language.
 
-POLICY DATES:
-- "POLICY EFF" = start date, "POLICY EXP" = expiration date
-- Use the EXP (expiration) date, format is MM/DD/YYYY
-- Convert to YYYY-MM-DD format
+Return JSON in this exact format (replace values with actual data from the PDF):
 
-ADDITIONAL INSURED:
-- Check "DESCRIPTION OF OPERATIONS / LOCATIONS / VEHICLES" section
-- If it says "certificate holder is an additional insured" or similar = YES
-- If it mentions any form like "CG 20 11" or "additional insured endorsement" = YES
+{"companyName":"ABC Company Inc","expirationDate":"2025-01-06","generalLiability":{"amount":1000000,"aggregate":2000000,"expirationDate":"2025-01-06"},"autoLiability":{"amount":1000000,"expirationDate":"2025-01-06"},"workersComp":{"amount":"Statutory","expirationDate":"2025-01-06"},"employersLiability":{"amount":1000000,"expirationDate":"2025-01-06"},"insuranceCompany":"Insurance Co","additionalInsured":"yes","certificateHolder":"Holder Name","waiverOfSubrogation":"no"}
 
-CERTIFICATE HOLDER:
-- Bottom left box shows who requested this certificate
-- This is often the landlord or company requiring insurance
-
-Extract this JSON:
-
-{
-  "companyName": "Name from INSURED box (top left, the company that has the insurance)",
-  "expirationDate": "YYYY-MM-DD - earliest POLICY EXP date",
-  "generalLiability": {
-    "amount": <number from EACH OCCURRENCE row in LIMITS column>,
-    "aggregate": <number from GENERAL AGGREGATE row>,
-    "expirationDate": "YYYY-MM-DD"
-  },
-  "autoLiability": {
-    "amount": <number from COMBINED SINGLE LIMIT>,
-    "expirationDate": "YYYY-MM-DD"
-  },
-  "workersComp": {
-    "amount": "Statutory",
-    "expirationDate": "YYYY-MM-DD"
-  },
-  "employersLiability": {
-    "amount": <number from E.L. EACH ACCIDENT>,
-    "expirationDate": "YYYY-MM-DD"
-  },
-  "insuranceCompany": "Insurance company name from INSURER column",
-  "additionalInsured": "yes or no - YES if description mentions certificate holder as additional insured",
-  "certificateHolder": "Name from CERTIFICATE HOLDER box",
-  "waiverOfSubrogation": "yes or no"
-}
-
-CRITICAL:
-- 1,000,000 = 1000000 (one million)
-- 2,000,000 = 2000000 (two million)
-- 500,000 = 500000
-- NEVER return 0 - the limits ARE on the form, look in the LIMITS column on the right
-- For additionalInsured: return "yes" if ANY mention of additional insured in description
-
-Return ONLY the JSON.`
+RULES:
+- Convert "1,000,000" to 1000000 (remove commas)
+- Convert "01/06/2025" to "2025-01-06"
+- additionalInsured: "yes" if description mentions additional insured, otherwise "no"
+- Return ONLY the JSON object, no markdown, no explanation`
           }
         ]
       }]
