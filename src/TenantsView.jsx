@@ -9,7 +9,7 @@ import { supabase } from './supabaseClient';
 import { formatCurrency, formatDate, formatRelativeDate, getStatusConfig, getDaysUntil } from './utils/complianceUtils';
 import { AlertModal, useAlertModal } from './AlertModal';
 import { PropertySelector } from './PropertySelector';
-import { LeaseUploadModal } from './LeaseUploadModal';
+import { TenantCOIUploadModal } from './TenantCOIUploadModal';
 import logger from './logger';
 import { showSuccess, showError } from './toast';
 
@@ -567,7 +567,7 @@ export function TenantsView({ properties, userRequirements, selectedProperty, on
   const [coiPreviewUrl, setCoiPreviewUrl] = useState(null);
   const [tenantActivity, setTenantActivity] = useState([]);
   const [loadingActivity, setLoadingActivity] = useState(false);
-  const [showLeaseUpload, setShowLeaseUpload] = useState(false);
+  const [showCOIUpload, setShowCOIUpload] = useState(false);
 
   // Calculate tenants that need attention (non-compliant with email)
   const tenantsNeedingAttention = tenants.filter(t =>
@@ -1124,7 +1124,7 @@ export function TenantsView({ properties, userRequirements, selectedProperty, on
 
           {/* Add Tenant Button - Opens Lease Upload Modal */}
           <button
-            onClick={() => setShowLeaseUpload(true)}
+            onClick={() => setShowCOIUpload(true)}
             className="px-4 py-2.5 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 font-medium flex items-center gap-2"
             aria-label="Add new tenant from lease"
           >
@@ -1211,7 +1211,7 @@ export function TenantsView({ properties, userRequirements, selectedProperty, on
                 </p>
                 {!searchQuery && statusFilter === 'all' && (
                   <button
-                    onClick={() => setShowLeaseUpload(true)}
+                    onClick={() => setShowCOIUpload(true)}
                     className="px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 font-medium inline-flex items-center gap-2"
                   >
                     <Plus size={18} />
@@ -1324,13 +1324,13 @@ export function TenantsView({ properties, userRequirements, selectedProperty, on
         properties={properties}
       />
 
-      {/* Lease Upload Modal - AI-powered tenant creation from lease */}
-      <LeaseUploadModal
-        isOpen={showLeaseUpload}
-        onClose={() => setShowLeaseUpload(false)}
+      {/* COI Upload Modal - Simplified tenant creation with COI */}
+      <TenantCOIUploadModal
+        isOpen={showCOIUpload}
+        onClose={() => setShowCOIUpload(false)}
         properties={properties}
         onTenantCreated={(newTenant) => {
-          showSuccess(`Tenant "${newTenant.name}" created from lease`);
+          showSuccess(`Tenant "${newTenant.name}" added successfully`);
           refreshTenants();
         }}
         onManualAdd={() => {
