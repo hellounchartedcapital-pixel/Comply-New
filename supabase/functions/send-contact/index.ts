@@ -7,6 +7,16 @@ import { getCorsHeaders, handleCorsPreflightRequest } from '../_shared/cors.ts';
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
 const CONTACT_EMAIL = 'contact@smartcoi.io';
 
+// HTML escape function to prevent injection attacks
+function escapeHtml(unsafe: string): string {
+  return unsafe
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -25,6 +35,11 @@ serve(async (req) => {
       );
     }
 
+    // Escape user input to prevent HTML injection
+    const safeName = escapeHtml(name);
+    const safeEmail = escapeHtml(email);
+    const safeMessage = escapeHtml(message);
+
     // Send email via Resend
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
@@ -36,7 +51,7 @@ serve(async (req) => {
         from: 'SmartCOI Contact <noreply@smartcoi.io>',
         to: CONTACT_EMAIL,
         reply_to: email,
-        subject: `Contact Form: ${name}`,
+        subject: `Contact Form: ${safeName}`,
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
             <div style="background: linear-gradient(135deg, #059669 0%, #0d9488 100%); padding: 30px; border-radius: 12px 12px 0 0;">
@@ -45,18 +60,18 @@ serve(async (req) => {
             <div style="padding: 30px; background: #f9fafb; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px;">
               <div style="margin-bottom: 20px;">
                 <p style="margin: 0 0 5px 0; font-size: 12px; color: #6b7280; text-transform: uppercase;">From</p>
-                <p style="margin: 0; font-size: 16px; color: #111827; font-weight: 600;">${name}</p>
+                <p style="margin: 0; font-size: 16px; color: #111827; font-weight: 600;">${safeName}</p>
               </div>
               <div style="margin-bottom: 20px;">
                 <p style="margin: 0 0 5px 0; font-size: 12px; color: #6b7280; text-transform: uppercase;">Email</p>
                 <p style="margin: 0; font-size: 16px; color: #111827;">
-                  <a href="mailto:${email}" style="color: #059669; text-decoration: none;">${email}</a>
+                  <a href="mailto:${safeEmail}" style="color: #059669; text-decoration: none;">${safeEmail}</a>
                 </p>
               </div>
               <div style="margin-bottom: 20px;">
                 <p style="margin: 0 0 5px 0; font-size: 12px; color: #6b7280; text-transform: uppercase;">Message</p>
                 <div style="background: white; padding: 15px; border-radius: 8px; border: 1px solid #e5e7eb;">
-                  <p style="margin: 0; font-size: 14px; color: #374151; white-space: pre-wrap;">${message}</p>
+                  <p style="margin: 0; font-size: 14px; color: #374151; white-space: pre-wrap;">${safeMessage}</p>
                 </div>
               </div>
               <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;" />

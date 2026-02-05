@@ -1,33 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import Anthropic from 'https://esm.sh/@anthropic-ai/sdk@0.52.0';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-
-// CORS handling
-const ALLOWED_ORIGINS = [
-  'http://localhost:3000',
-  'http://localhost:5173',
-  'https://smartcoi.io',
-  'https://www.smartcoi.io',
-];
-
-function getCorsHeaders(req: Request): Record<string, string> {
-  const origin = req.headers.get('origin') || '';
-  const allowedOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
-
-  return {
-    'Access-Control-Allow-Origin': allowedOrigin,
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-    'Access-Control-Max-Age': '86400',
-  };
-}
-
-function handleCorsPreflightRequest(req: Request): Response {
-  return new Response(null, {
-    status: 204,
-    headers: getCorsHeaders(req),
-  });
-}
+import { getCorsHeaders, handleCorsPreflightRequest } from '../_shared/cors.ts';
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -77,7 +51,7 @@ serve(async (req) => {
 
     // Call Claude API with commercial lease extraction prompt
     const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-3-5-sonnet-20241022',
       max_tokens: 4000,
       messages: [{
         role: 'user',
