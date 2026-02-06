@@ -197,8 +197,12 @@ export function SmartUploadModal({
         requirements = {
           general_liability: selectedProp?.general_liability || userRequirements?.general_liability || 1000000,
           auto_liability: selectedProp?.auto_liability || userRequirements?.auto_liability || 1000000,
+          auto_liability_required: selectedProp?.auto_liability_required || false,
           workers_comp: selectedProp?.workers_comp_required ? 'Statutory' : null,
-          require_additional_insured: selectedProp?.require_additional_insured !== false
+          workers_comp_required: selectedProp?.workers_comp_required || false,
+          employers_liability: selectedProp?.employers_liability || userRequirements?.employers_liability || 500000,
+          require_additional_insured: selectedProp?.require_additional_insured !== false,
+          require_waiver_of_subrogation: selectedProp?.require_waiver_of_subrogation || false
         };
       } else {
         requirements = {
@@ -443,7 +447,7 @@ export function SmartUploadModal({
         // Policy data
         policy_expiration_date: data.expirationDate || null,
         policy_liability_amount: liabilityAmount,
-        policy_coverage: data.coverage || null,
+        policy_coverage: data.coverage ? { ...data.coverage, additionalCoverages: data.additionalCoverages || [] } : null,
         policy_additional_insured: data.additionalInsured || null,
         has_additional_insured: !!data.additionalInsured,
         policy_document_path: filePath,

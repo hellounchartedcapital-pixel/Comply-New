@@ -249,7 +249,11 @@ export function TenantUploadPortal({ token, onBack }) {
         updateData.policy_expiration_date = extractedData.expirationDate;
       }
       if (extractedData.coverage) {
-        updateData.policy_coverage = extractedData.coverage;
+        // Include additionalCoverages inside policy_coverage so detail views can access them
+        updateData.policy_coverage = {
+          ...extractedData.coverage,
+          additionalCoverages: extractedData.additionalCoverages || []
+        };
         if (extractedData.coverage.generalLiability?.amount) {
           updateData.policy_liability_amount = extractedData.coverage.generalLiability.amount;
         }
