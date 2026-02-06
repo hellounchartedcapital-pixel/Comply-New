@@ -302,6 +302,7 @@ export function TenantUploadPortal({ token, onBack }) {
         status: insuranceStatus,
         issues: issues,
         coverage: extractedData.coverage || {},
+        additionalCoverages: extractedData.additionalCoverages || [],
         expirationDate: extractedData.expirationDate
       });
       setUploadSuccess(true);
@@ -398,19 +399,56 @@ export function TenantUploadPortal({ token, onBack }) {
           </div>
 
           {/* Policy Details */}
-          {uploadResult?.coverage?.generalLiability && (
+          {uploadResult?.coverage && Object.keys(uploadResult.coverage).length > 0 && (
             <div className="bg-gray-50 rounded-lg p-4 mb-6">
               <h2 className="font-medium text-gray-900 mb-3">Policy Summary</h2>
               <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Personal Liability:</span>
-                  <span className="font-medium text-gray-900">
-                    {formatCurrency(uploadResult.coverage.generalLiability?.amount || 0)}
-                  </span>
-                </div>
-                {uploadResult.expirationDate && (
+                {uploadResult.coverage.generalLiability && !uploadResult.coverage.generalLiability.notFound && (
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Expires:</span>
+                    <span className="text-gray-600">Personal Liability:</span>
+                    <span className="font-medium text-gray-900">
+                      {formatCurrency(uploadResult.coverage.generalLiability?.amount || 0)}
+                    </span>
+                  </div>
+                )}
+                {uploadResult.coverage.autoLiability && !uploadResult.coverage.autoLiability.notFound && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Auto Liability:</span>
+                    <span className="font-medium text-gray-900">
+                      {formatCurrency(uploadResult.coverage.autoLiability?.amount || 0)}
+                    </span>
+                  </div>
+                )}
+                {uploadResult.coverage.workersComp && !uploadResult.coverage.workersComp.notFound && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Workers Comp:</span>
+                    <span className="font-medium text-gray-900">
+                      {uploadResult.coverage.workersComp.amount === 'Statutory' ? 'Statutory' : formatCurrency(uploadResult.coverage.workersComp.amount)}
+                    </span>
+                  </div>
+                )}
+                {uploadResult.coverage.employersLiability && !uploadResult.coverage.employersLiability.notFound && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Employers Liability:</span>
+                    <span className="font-medium text-gray-900">
+                      {formatCurrency(uploadResult.coverage.employersLiability?.amount || 0)}
+                    </span>
+                  </div>
+                )}
+                {/* Additional Coverages */}
+                {uploadResult.additionalCoverages && uploadResult.additionalCoverages.length > 0 && (
+                  <>
+                    {uploadResult.additionalCoverages.map((cov, idx) => (
+                      <div key={idx} className="flex justify-between">
+                        <span className="text-gray-600">{cov.type}:</span>
+                        <span className="font-medium text-gray-900">{formatCurrency(cov.amount)}</span>
+                      </div>
+                    ))}
+                  </>
+                )}
+                {uploadResult.expirationDate && (
+                  <div className="flex justify-between pt-2 border-t border-gray-200 mt-2">
+                    <span className="text-gray-600">Earliest Expiration:</span>
                     <span className="font-medium text-gray-900">
                       {new Date(uploadResult.expirationDate).toLocaleDateString()}
                     </span>

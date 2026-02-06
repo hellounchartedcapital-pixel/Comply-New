@@ -42,7 +42,7 @@ serve(async (req) => {
 
     const message = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 2000,
+      max_tokens: 4000,
       messages: [{
         role: 'user',
         content: [
@@ -52,26 +52,40 @@ serve(async (req) => {
           },
           {
             type: 'text',
-            text: `Extract insurance coverage data from this Certificate of Insurance (likely an ACORD 25 or similar form).
+            text: `Extract ALL insurance coverage data from this Certificate of Insurance (likely an ACORD 25 or similar form).
 
-Read the entire document to understand its structure, then extract:
+Read the entire document carefully and extract EVERY policy and coverage type listed, not just the common ones.
 
+ALWAYS EXTRACT:
 1. INSURED/COMPANY NAME - The business or person who holds the insurance
-2. POLICY EXPIRATION DATE - When coverage ends (use earliest date if multiple policies)
-3. GENERAL LIABILITY - Look for "Each Occurrence" limit and "General Aggregate"
-4. AUTO LIABILITY - Look for "Combined Single Limit"
-5. WORKERS COMPENSATION - Usually "Statutory" plus Employers Liability amounts
-6. INSURANCE COMPANY - The carrier/insurer name
-7. CERTIFICATE HOLDER - Who the certificate was issued to
-8. ADDITIONAL INSURED - Check Description of Operations section
-9. WAIVER OF SUBROGATION - Check Description of Operations section
+2. INSURANCE COMPANY - The carrier/insurer name
+3. CERTIFICATE HOLDER - Who the certificate was issued to
+4. ADDITIONAL INSURED - Check Description of Operations section
+5. WAIVER OF SUBROGATION - Check Description of Operations section
+
+STANDARD COVERAGES (extract if present on the certificate):
+- GENERAL LIABILITY - "Each Occurrence" limit and "General Aggregate"
+- AUTOMOBILE LIABILITY - "Combined Single Limit"
+- WORKERS COMPENSATION - Usually "Statutory"
+- EMPLOYERS LIABILITY - "Each Accident" amount
+
+ADDITIONAL COVERAGES (extract ANY other coverage types found, such as):
+- Umbrella/Excess Liability
+- Professional Liability / Errors & Omissions
+- Cyber Liability
+- Inland Marine
+- Property Insurance
+- Pollution Liability
+- Builders Risk
+- Crime / Fidelity Bond
+- Any other coverage type listed on the certificate
 
 Return this JSON structure:
 {
   "companyName": "insured company name",
-  "expirationDate": "YYYY-MM-DD",
+  "expirationDate": "YYYY-MM-DD (earliest expiration across all policies)",
   "generalLiability": {
-    "amount": <each occurrence as integer, e.g. 1000000>,
+    "amount": <each occurrence as integer>,
     "aggregate": <general aggregate as integer>,
     "expirationDate": "YYYY-MM-DD"
   },
@@ -87,11 +101,25 @@ Return this JSON structure:
     "amount": <each accident amount as integer>,
     "expirationDate": "YYYY-MM-DD"
   },
+  "additionalCoverages": [
+    {
+      "type": "coverage type name (e.g. Umbrella Liability)",
+      "amount": <limit as integer>,
+      "aggregate": <aggregate limit as integer if listed, otherwise null>,
+      "expirationDate": "YYYY-MM-DD"
+    }
+  ],
   "insuranceCompany": "carrier name",
   "additionalInsured": "yes or no",
   "certificateHolder": "name from certificate holder section",
   "waiverOfSubrogation": "yes or no"
 }
+
+IMPORTANT RULES:
+- Include ALL coverage types found on the certificate
+- If a standard coverage (GL, Auto, WC, EL) is NOT on the certificate, set it to null instead of guessing
+- Put any non-standard coverages in the "additionalCoverages" array
+- If no additional coverages exist, return an empty array []
 
 NUMBER FORMAT: Convert dollar amounts to plain integers.
 - $1,000,000 → 1000000
@@ -135,39 +163,96 @@ Return ONLY the JSON object, no other text.`
 });
 
 function buildVendorData(extractedData: any, requirements: Requirements) {
-  const glAmount = extractedData.generalLiability?.amount || 0;
-  const glAggregate = extractedData.generalLiability?.aggregate || (glAmount * 2);
+  // Build coverage object - only include coverages that were actually found on the COI
+  const coverage: any = {};
+
+  // General Liability
+  if (extractedData.generalLiability) {
+    const glAmount = extractedData.generalLiability.amount || 0;
+    const glAggregate = extractedData.generalLiability.aggregate || (glAmount * 2);
+    coverage.generalLiability = {
+      amount: glAmount,
+      aggregate: glAggregate,
+      expirationDate: extractedData.generalLiability.expirationDate,
+      compliant: glAmount >= requirements.general_liability
+    };
+  } else {
+    // GL not found on COI - mark as non-compliant if required
+    coverage.generalLiability = {
+      amount: 0,
+      aggregate: 0,
+      expirationDate: null,
+      compliant: requirements.general_liability <= 0,
+      notFound: true
+    };
+  }
+
+  // Auto Liability
+  if (extractedData.autoLiability) {
+    coverage.autoLiability = {
+      amount: extractedData.autoLiability.amount || 0,
+      expirationDate: extractedData.autoLiability.expirationDate,
+      compliant: (extractedData.autoLiability.amount || 0) >= requirements.auto_liability
+    };
+  } else {
+    coverage.autoLiability = {
+      amount: 0,
+      expirationDate: null,
+      compliant: requirements.auto_liability <= 0,
+      notFound: true
+    };
+  }
+
+  // Workers Comp
+  if (extractedData.workersComp) {
+    coverage.workersComp = {
+      amount: extractedData.workersComp.amount || 'Statutory',
+      expirationDate: extractedData.workersComp.expirationDate,
+      compliant: true
+    };
+  } else {
+    coverage.workersComp = {
+      amount: null,
+      expirationDate: null,
+      compliant: true,
+      notFound: true
+    };
+  }
+
+  // Employers Liability
+  if (extractedData.employersLiability) {
+    coverage.employersLiability = {
+      amount: extractedData.employersLiability.amount || 0,
+      expirationDate: extractedData.employersLiability.expirationDate,
+      compliant: (extractedData.employersLiability.amount || 0) >= requirements.employers_liability
+    };
+  } else {
+    coverage.employersLiability = {
+      amount: 0,
+      expirationDate: null,
+      compliant: requirements.employers_liability <= 0,
+      notFound: true
+    };
+  }
+
+  // Process additional coverages extracted from the COI
+  const additionalCoverages = (extractedData.additionalCoverages || []).map((cov: any) => ({
+    type: cov.type || 'Unknown Coverage',
+    amount: cov.amount || 0,
+    aggregate: cov.aggregate || null,
+    expirationDate: cov.expirationDate || null
+  }));
 
   const vendorData: any = {
     name: extractedData.companyName || 'Unknown Company',
     expirationDate: extractedData.expirationDate || new Date().toISOString().split('T')[0],
-    coverage: {
-      generalLiability: {
-        amount: glAmount,
-        aggregate: glAggregate,
-        expirationDate: extractedData.generalLiability?.expirationDate,
-        compliant: glAmount >= requirements.general_liability
-      },
-      autoLiability: {
-        amount: extractedData.autoLiability?.amount || 0,
-        expirationDate: extractedData.autoLiability?.expirationDate,
-        compliant: (extractedData.autoLiability?.amount || 0) >= requirements.auto_liability
-      },
-      workersComp: {
-        amount: extractedData.workersComp?.amount || 'Statutory',
-        expirationDate: extractedData.workersComp?.expirationDate,
-        compliant: true
-      },
-      employersLiability: {
-        amount: extractedData.employersLiability?.amount || 0,
-        expirationDate: extractedData.employersLiability?.expirationDate,
-        compliant: (extractedData.employersLiability?.amount || 0) >= requirements.employers_liability
-      }
-    },
+    coverage: coverage,
+    additionalCoverages: additionalCoverages,
     rawData: extractedData,
     requirements: requirements,
     additionalInsured: extractedData.additionalInsured || 'no',
     hasAdditionalInsured: (extractedData.additionalInsured || '').toLowerCase() === 'yes',
+    hasWaiverOfSubrogation: (extractedData.waiverOfSubrogation || '').toLowerCase() === 'yes',
     certificateHolder: extractedData.certificateHolder || '',
     waiverOfSubrogation: extractedData.waiverOfSubrogation || '',
     insuranceCompany: extractedData.insuranceCompany || ''
@@ -188,19 +273,32 @@ function buildVendorData(extractedData: any, requirements: Requirements) {
     vendorData.status = 'compliant';
   }
 
-  if (!vendorData.coverage.generalLiability.compliant && vendorData.coverage.generalLiability.amount > 0) {
+  // Check standard coverage compliance
+  if (!coverage.generalLiability.compliant) {
     if (vendorData.status === 'compliant') vendorData.status = 'non-compliant';
-    issues.push({ type: 'error', message: `General Liability $${(vendorData.coverage.generalLiability.amount/1000000).toFixed(1)}M below required $${(requirements.general_liability/1000000).toFixed(1)}M` });
+    if (coverage.generalLiability.notFound) {
+      issues.push({ type: 'error', message: `General Liability not found on certificate (required $${(requirements.general_liability/1000000).toFixed(1)}M)` });
+    } else {
+      issues.push({ type: 'error', message: `General Liability $${(coverage.generalLiability.amount/1000000).toFixed(1)}M below required $${(requirements.general_liability/1000000).toFixed(1)}M` });
+    }
   }
 
-  if (!vendorData.coverage.autoLiability.compliant && vendorData.coverage.autoLiability.amount > 0) {
+  if (!coverage.autoLiability.compliant) {
     if (vendorData.status === 'compliant') vendorData.status = 'non-compliant';
-    issues.push({ type: 'error', message: `Auto Liability below requirement` });
+    if (coverage.autoLiability.notFound) {
+      issues.push({ type: 'error', message: `Auto Liability not found on certificate (required $${(requirements.auto_liability/1000000).toFixed(1)}M)` });
+    } else {
+      issues.push({ type: 'error', message: `Auto Liability $${(coverage.autoLiability.amount/1000000).toFixed(1)}M below required $${(requirements.auto_liability/1000000).toFixed(1)}M` });
+    }
   }
 
-  if (!vendorData.coverage.employersLiability.compliant && vendorData.coverage.employersLiability.amount > 0) {
+  if (!coverage.employersLiability.compliant) {
     if (vendorData.status === 'compliant') vendorData.status = 'non-compliant';
-    issues.push({ type: 'error', message: `Employers Liability below requirement` });
+    if (coverage.employersLiability.notFound) {
+      issues.push({ type: 'error', message: `Employers Liability not found on certificate (required $${(requirements.employers_liability/1000).toFixed(0)}K)` });
+    } else {
+      issues.push({ type: 'error', message: `Employers Liability $${(coverage.employersLiability.amount/1000).toFixed(0)}K below required $${(requirements.employers_liability/1000).toFixed(0)}K` });
+    }
   }
 
   vendorData.issues = issues;

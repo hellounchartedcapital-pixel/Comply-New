@@ -305,11 +305,12 @@ export function SmartUploadModal({
         status: status,
         expiration_date: data.expirationDate || null,
         coverage: data.coverage || {},
+        additional_coverages: data.additionalCoverages || [],
         issues: issues,
         additional_insured: data.additionalInsured || null,
-        has_additional_insured: !!data.additionalInsured,
+        has_additional_insured: !!data.hasAdditionalInsured,
         waiver_of_subrogation: data.waiverOfSubrogation || null,
-        has_waiver_of_subrogation: !!data.waiverOfSubrogation,
+        has_waiver_of_subrogation: !!data.hasWaiverOfSubrogation,
         raw_data: {
           ...data.rawData,
           documentPath: filePath,
@@ -334,6 +335,8 @@ export function SmartUploadModal({
         name: newVendor.name,
         status: status,
         issues: issues,
+        coverage: data.coverage || {},
+        additionalCoverages: data.additionalCoverages || [],
         data: newVendor
       });
       setStep(3);
@@ -469,6 +472,8 @@ export function SmartUploadModal({
         name: newTenant.name,
         status: insuranceStatus,
         issues: issues,
+        coverage: data.coverage || {},
+        additionalCoverages: data.additionalCoverages || [],
         data: newTenant
       });
       setStep(3);
@@ -826,6 +831,58 @@ export function SmartUploadModal({
                 {result.status !== 'compliant' && <AlertCircle size={16} />}
                 <span className="font-medium capitalize">{result.status.replace('-', ' ')}</span>
               </div>
+
+              {/* Extracted Coverages Summary */}
+              {result.coverage && Object.keys(result.coverage).length > 0 && (
+                <div className="text-left bg-gray-50 rounded-lg p-4 mb-4">
+                  <h4 className="font-medium text-gray-900 mb-2">Coverages Found:</h4>
+                  <div className="space-y-1 text-sm">
+                    {result.coverage.generalLiability && !result.coverage.generalLiability.notFound && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">General Liability:</span>
+                        <span className={`font-medium ${result.coverage.generalLiability.compliant === false ? 'text-red-600' : 'text-gray-900'}`}>
+                          {formatCurrency(result.coverage.generalLiability.amount)}
+                        </span>
+                      </div>
+                    )}
+                    {result.coverage.autoLiability && !result.coverage.autoLiability.notFound && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Auto Liability:</span>
+                        <span className={`font-medium ${result.coverage.autoLiability.compliant === false ? 'text-red-600' : 'text-gray-900'}`}>
+                          {formatCurrency(result.coverage.autoLiability.amount)}
+                        </span>
+                      </div>
+                    )}
+                    {result.coverage.workersComp && !result.coverage.workersComp.notFound && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Workers Comp:</span>
+                        <span className="font-medium text-gray-900">
+                          {result.coverage.workersComp.amount === 'Statutory' ? 'Statutory' : formatCurrency(result.coverage.workersComp.amount)}
+                        </span>
+                      </div>
+                    )}
+                    {result.coverage.employersLiability && !result.coverage.employersLiability.notFound && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Employers Liability:</span>
+                        <span className={`font-medium ${result.coverage.employersLiability.compliant === false ? 'text-red-600' : 'text-gray-900'}`}>
+                          {formatCurrency(result.coverage.employersLiability.amount)}
+                        </span>
+                      </div>
+                    )}
+                    {/* Additional Coverages */}
+                    {result.additionalCoverages && result.additionalCoverages.length > 0 && (
+                      <>
+                        {result.additionalCoverages.map((cov, idx) => (
+                          <div key={idx} className="flex justify-between">
+                            <span className="text-gray-600">{cov.type}:</span>
+                            <span className="font-medium text-gray-900">{formatCurrency(cov.amount)}</span>
+                          </div>
+                        ))}
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Issues */}
               {result.issues && result.issues.length > 0 && (

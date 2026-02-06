@@ -6,7 +6,7 @@ import { Upload, CheckCircle, AlertCircle, FileText, Loader2, Shield } from 'luc
 import { supabase } from './supabaseClient';
 import { Logo } from './Logo';
 import { AlertModal, useAlertModal } from './AlertModal';
-import { determineVendorStatus, checkCoverageExpiration as checkExpiration } from './utils/complianceUtils';
+import { determineVendorStatus, checkCoverageExpiration as checkExpiration, formatCurrency } from './utils/complianceUtils';
 import logger from './logger';
 
 export function VendorUploadPortal({ token, onBack }) {
@@ -296,6 +296,7 @@ export function VendorUploadPortal({ token, onBack }) {
         status: vendorStatus,
         issues: normalizedIssues,
         coverage: extractedData.coverage || {},
+        additionalCoverages: extractedData.additionalCoverages || [],
         extractionWarning: extractionWarning
       });
       setUploadSuccess(true);
@@ -400,6 +401,58 @@ export function VendorUploadPortal({ token, onBack }) {
               {!isCompliant && !isExpired && !isExpiring && '⚠ Your COI has compliance issues'}
             </p>
           </div>
+
+          {/* Coverage Summary */}
+          {uploadResult?.coverage && Object.keys(uploadResult.coverage).length > 0 && (
+            <div className="bg-gray-50 rounded-lg p-4 mb-6">
+              <h2 className="font-medium text-gray-900 mb-3">Coverages Found</h2>
+              <div className="space-y-2 text-sm">
+                {uploadResult.coverage.generalLiability && !uploadResult.coverage.generalLiability.notFound && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">General Liability:</span>
+                    <span className={`font-medium ${uploadResult.coverage.generalLiability.compliant === false ? 'text-red-600' : 'text-gray-900'}`}>
+                      {formatCurrency(uploadResult.coverage.generalLiability.amount)}
+                    </span>
+                  </div>
+                )}
+                {uploadResult.coverage.autoLiability && !uploadResult.coverage.autoLiability.notFound && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Auto Liability:</span>
+                    <span className={`font-medium ${uploadResult.coverage.autoLiability.compliant === false ? 'text-red-600' : 'text-gray-900'}`}>
+                      {formatCurrency(uploadResult.coverage.autoLiability.amount)}
+                    </span>
+                  </div>
+                )}
+                {uploadResult.coverage.workersComp && !uploadResult.coverage.workersComp.notFound && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Workers Comp:</span>
+                    <span className="font-medium text-gray-900">
+                      {uploadResult.coverage.workersComp.amount === 'Statutory' ? 'Statutory' : formatCurrency(uploadResult.coverage.workersComp.amount)}
+                    </span>
+                  </div>
+                )}
+                {uploadResult.coverage.employersLiability && !uploadResult.coverage.employersLiability.notFound && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Employers Liability:</span>
+                    <span className={`font-medium ${uploadResult.coverage.employersLiability.compliant === false ? 'text-red-600' : 'text-gray-900'}`}>
+                      {formatCurrency(uploadResult.coverage.employersLiability.amount)}
+                    </span>
+                  </div>
+                )}
+                {/* Additional Coverages */}
+                {uploadResult.additionalCoverages && uploadResult.additionalCoverages.length > 0 && (
+                  <>
+                    {uploadResult.additionalCoverages.map((cov, idx) => (
+                      <div key={idx} className="flex justify-between">
+                        <span className="text-gray-600">{cov.type}:</span>
+                        <span className="font-medium text-gray-900">{formatCurrency(cov.amount)}</span>
+                      </div>
+                    ))}
+                  </>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Issues List */}
           {!isCompliant && (issues.length > 0 || isExpired || isExpiring) && (

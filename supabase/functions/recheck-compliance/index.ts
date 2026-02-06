@@ -159,34 +159,80 @@ serve(async (req) => {
 });
 
 function buildVendorData(extractedData: any, requirements: Requirements) {
+  // Build coverage object - handle cases where coverages may not be present on the COI
+  const coverage: any = {};
+
+  // General Liability
+  if (extractedData.generalLiability) {
+    coverage.generalLiability = {
+      amount: extractedData.generalLiability.amount || 0,
+      aggregate: extractedData.generalLiability.aggregate || 0,
+      expirationDate: extractedData.generalLiability.expirationDate,
+      compliant: (extractedData.generalLiability.amount || 0) >= requirements.general_liability
+    };
+  } else {
+    coverage.generalLiability = {
+      amount: 0,
+      aggregate: 0,
+      expirationDate: null,
+      compliant: requirements.general_liability <= 0,
+      notFound: true
+    };
+  }
+
+  // Auto Liability
+  if (extractedData.autoLiability) {
+    coverage.autoLiability = {
+      amount: extractedData.autoLiability.amount || 0,
+      expirationDate: extractedData.autoLiability.expirationDate,
+      compliant: !requirements.auto_liability_required || (extractedData.autoLiability.amount || 0) >= requirements.auto_liability
+    };
+  } else {
+    coverage.autoLiability = {
+      amount: 0,
+      expirationDate: null,
+      compliant: !requirements.auto_liability_required,
+      notFound: true
+    };
+  }
+
+  // Workers Comp
+  if (extractedData.workersComp) {
+    coverage.workersComp = {
+      amount: extractedData.workersComp.amount || 'Statutory',
+      expirationDate: extractedData.workersComp.expirationDate,
+      compliant: !requirements.workers_comp_required || (extractedData.workersComp.amount === 'Statutory' || extractedData.workersComp.amount > 0)
+    };
+  } else {
+    coverage.workersComp = {
+      amount: null,
+      expirationDate: null,
+      compliant: !requirements.workers_comp_required,
+      notFound: true
+    };
+  }
+
+  // Employers Liability
+  if (extractedData.employersLiability) {
+    coverage.employersLiability = {
+      amount: extractedData.employersLiability.amount || 0,
+      expirationDate: extractedData.employersLiability.expirationDate,
+      compliant: !requirements.workers_comp_required || (extractedData.employersLiability.amount || 0) >= requirements.employers_liability
+    };
+  } else {
+    coverage.employersLiability = {
+      amount: 0,
+      expirationDate: null,
+      compliant: !requirements.workers_comp_required,
+      notFound: true
+    };
+  }
+
   const vendorData: any = {
     name: extractedData.companyName || 'Unknown Company',
     dba: extractedData.dba,
     expirationDate: extractedData.expirationDate || new Date().toISOString().split('T')[0],
-    coverage: {
-      generalLiability: {
-        amount: extractedData.generalLiability?.amount || 0,
-        expirationDate: extractedData.generalLiability?.expirationDate,
-        compliant: (extractedData.generalLiability?.amount || 0) >= requirements.general_liability
-      },
-      autoLiability: {
-        amount: extractedData.autoLiability?.amount || 0,
-        expirationDate: extractedData.autoLiability?.expirationDate,
-        // Only check auto if required
-        compliant: !requirements.auto_liability_required || (extractedData.autoLiability?.amount || 0) >= requirements.auto_liability
-      },
-      workersComp: {
-        amount: extractedData.workersComp?.amount || 'Statutory',
-        expirationDate: extractedData.workersComp?.expirationDate,
-        // Only check workers comp if required
-        compliant: !requirements.workers_comp_required || (extractedData.workersComp?.amount === 'Statutory' || extractedData.workersComp?.amount > 0)
-      },
-      employersLiability: {
-        amount: extractedData.employersLiability?.amount || 0,
-        expirationDate: extractedData.employersLiability?.expirationDate,
-        compliant: !requirements.workers_comp_required || (extractedData.employersLiability?.amount || 0) >= requirements.employers_liability
-      }
-    },
+    coverage: coverage,
     additionalCoverages: extractedData.additionalCoverages || [],
     rawData: extractedData,
     requirements: requirements,
@@ -222,28 +268,38 @@ function buildVendorData(extractedData: any, requirements: Requirements) {
   }
 
   // Check coverage compliance
-  if (!vendorData.coverage.generalLiability.compliant) {
+  if (!coverage.generalLiability.compliant) {
     vendorData.status = 'non-compliant';
-    issues.push({
-      type: 'error',
-      message: `General Liability below requirement: $${(vendorData.coverage.generalLiability.amount / 1000000).toFixed(1)}M (requires $${(requirements.general_liability / 1000000).toFixed(1)}M)`
-    });
+    if (coverage.generalLiability.notFound) {
+      issues.push({ type: 'error', message: `General Liability not found on certificate (required $${(requirements.general_liability / 1000000).toFixed(1)}M)` });
+    } else {
+      issues.push({ type: 'error', message: `General Liability below requirement: $${(coverage.generalLiability.amount / 1000000).toFixed(1)}M (requires $${(requirements.general_liability / 1000000).toFixed(1)}M)` });
+    }
   }
 
-  if (requirements.auto_liability_required && !vendorData.coverage.autoLiability.compliant) {
+  if (!coverage.autoLiability.compliant) {
     vendorData.status = 'non-compliant';
-    issues.push({
-      type: 'error',
-      message: `Auto Liability below requirement: $${(vendorData.coverage.autoLiability.amount / 1000000).toFixed(1)}M (requires $${(requirements.auto_liability / 1000000).toFixed(1)}M)`
-    });
+    if (coverage.autoLiability.notFound) {
+      issues.push({ type: 'error', message: `Auto Liability not found on certificate (required $${(requirements.auto_liability / 1000000).toFixed(1)}M)` });
+    } else {
+      issues.push({ type: 'error', message: `Auto Liability below requirement: $${(coverage.autoLiability.amount / 1000000).toFixed(1)}M (requires $${(requirements.auto_liability / 1000000).toFixed(1)}M)` });
+    }
   }
 
-  if (requirements.workers_comp_required && !vendorData.coverage.employersLiability.compliant) {
+  if (!coverage.workersComp.compliant) {
     vendorData.status = 'non-compliant';
-    issues.push({
-      type: 'error',
-      message: `Employers Liability below requirement: $${(vendorData.coverage.employersLiability.amount / 1000).toFixed(1)}K (requires $${(requirements.employers_liability / 1000).toFixed(1)}K)`
-    });
+    if (coverage.workersComp.notFound) {
+      issues.push({ type: 'error', message: 'Workers Compensation not found on certificate (required)' });
+    }
+  }
+
+  if (!coverage.employersLiability.compliant) {
+    vendorData.status = 'non-compliant';
+    if (coverage.employersLiability.notFound) {
+      issues.push({ type: 'error', message: `Employers Liability not found on certificate (required $${(requirements.employers_liability / 1000).toFixed(0)}K)` });
+    } else {
+      issues.push({ type: 'error', message: `Employers Liability below requirement: $${(coverage.employersLiability.amount / 1000).toFixed(0)}K (requires $${(requirements.employers_liability / 1000).toFixed(0)}K)` });
+    }
   }
 
   // Check waiver of subrogation requirement
