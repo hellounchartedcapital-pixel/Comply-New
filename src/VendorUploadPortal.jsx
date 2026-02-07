@@ -231,26 +231,9 @@ export function VendorUploadPortal({ token, onBack }) {
           updateCoverageFlags(extractedData.coverage.employersLiability);
         }
 
-        // Check for additional insured / waiver of subrogation requirements
-        // Helper to check if issue already exists (handles both string and object formats)
-        const hasIssue = (issues, message) => {
-          return issues.some(i => (typeof i === 'string' ? i : i.message) === message);
-        };
-
-        if (requirements.require_additional_insured && !extractedData.hasAdditionalInsured) {
-          extractedData.issues = extractedData.issues || [];
-          if (!hasIssue(extractedData.issues, 'Missing Additional Insured endorsement')) {
-            extractedData.issues.push('Missing Additional Insured endorsement');
-          }
-        }
-        if (requirements.require_waiver_of_subrogation && !extractedData.hasWaiverOfSubrogation) {
-          extractedData.issues = extractedData.issues || [];
-          if (!hasIssue(extractedData.issues, 'Missing Waiver of Subrogation endorsement')) {
-            extractedData.issues.push('Missing Waiver of Subrogation endorsement');
-          }
-        }
-
-        vendorStatus = determineVendorStatus(extractedData);
+        // Use status from edge function -- it already checks GL, Auto, EL, WC,
+        // custom coverages, additional insured, and waiver of subrogation
+        vendorStatus = extractedData.status || determineVendorStatus(extractedData);
       }
 
       // Step 3: Update vendor with extracted data

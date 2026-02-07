@@ -325,6 +325,26 @@ function buildVendorData(extractedData: any, requirements: Requirements) {
     });
   }
 
+  // Check waiver of subrogation requirement
+  if (requirements.require_waiver_of_subrogation) {
+    if (vendorData.hasWaiverOfSubrogation) {
+      // Already set to true above
+    } else {
+      if (vendorData.status === 'compliant') vendorData.status = 'non-compliant';
+      vendorData.missingWaiverOfSubrogation = true;
+      issues.push({ type: 'error', message: 'Waiver of Subrogation not included' });
+    }
+  }
+
+  // Check additional insured requirement
+  if (requirements.require_additional_insured) {
+    if (!vendorData.hasAdditionalInsured) {
+      if (vendorData.status === 'compliant') vendorData.status = 'non-compliant';
+      vendorData.missingAdditionalInsured = true;
+      issues.push({ type: 'error', message: 'Missing Additional Insured endorsement' });
+    }
+  }
+
   vendorData.issues = issues;
   return vendorData;
 }
