@@ -202,7 +202,9 @@ export function SmartUploadModal({
           workers_comp_required: selectedProp?.workers_comp_required || false,
           employers_liability: selectedProp?.employers_liability || userRequirements?.employers_liability || 500000,
           require_additional_insured: selectedProp?.require_additional_insured !== false,
-          require_waiver_of_subrogation: selectedProp?.require_waiver_of_subrogation || false
+          require_waiver_of_subrogation: selectedProp?.require_waiver_of_subrogation || false,
+          custom_coverages: selectedProp?.custom_coverages || [],
+          company_name: selectedProp?.company_name || ''
         };
       } else {
         requirements = {
@@ -260,37 +262,11 @@ export function SmartUploadModal({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      // Determine compliance status
-      let status = 'compliant';
-      const issues = [];
-
-      // Check general liability
-      const glRequired = property?.general_liability || userRequirements?.general_liability || 1000000;
-      const glAmount = data.coverage?.generalLiability?.amount || 0;
-      if (glAmount < glRequired) {
-        issues.push({ type: 'coverage', message: `General Liability ${formatCurrency(glAmount)} is below required ${formatCurrency(glRequired)}` });
-      }
-
-      // Check additional insured
-      if (property?.require_additional_insured !== false && !data.additionalInsured) {
-        issues.push({ type: 'endorsement', message: 'Additional Insured endorsement not found' });
-      }
-
-      // Check expiration
-      if (data.expirationDate) {
-        const expDate = new Date(data.expirationDate);
-        const today = new Date();
-        const daysUntil = Math.floor((expDate - today) / (1000 * 60 * 60 * 24));
-        if (daysUntil < 0) {
-          status = 'expired';
-        } else if (daysUntil <= 30) {
-          status = 'expiring';
-        } else if (issues.length > 0) {
-          status = 'non-compliant';
-        }
-      } else if (issues.length > 0) {
-        status = 'non-compliant';
-      }
+      // Use compliance status and issues from the edge function's buildVendorData
+      // which checks GL, Auto, EL, WC, custom coverages, additional insured,
+      // waiver of subrogation, and expiration dates
+      const status = data.status || 'compliant';
+      const issues = data.issues || [];
 
       // Generate upload token
       const uploadToken = crypto.randomUUID();
