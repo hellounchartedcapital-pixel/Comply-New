@@ -1667,9 +1667,17 @@ export function TenantsView({ properties, userRequirements, selectedProperty, on
                         </div>
                       )}
 
-                      {/* Current Policy / Coverage Details */}
+                      {/* Coverage Details - Required vs Found */}
                       <div>
-                        <h4 className="font-bold text-gray-900 text-sm mb-2">Policy Details</h4>
+                        <h4 className="font-bold text-gray-900 text-sm mb-2">Coverage — Required vs Found</h4>
+                        {/* Column headers */}
+                        <div className="flex items-center justify-between px-2.5 pb-1 text-xs text-gray-500 font-medium">
+                          <span>Coverage</span>
+                          <div className="flex items-center space-x-4">
+                            <span className="w-20 text-right">Found</span>
+                            <span className="w-20 text-right">Required</span>
+                          </div>
+                        </div>
                         <div className="space-y-1.5">
                           {/* General Liability Coverage */}
                           {(() => {
@@ -1717,9 +1725,14 @@ export function TenantsView({ properties, userRequirements, selectedProperty, on
                                     <p className={`text-xs ${statusColor}`}>{statusText}</p>
                                   </div>
                                 </div>
-                                <p className="font-semibold text-gray-900 text-sm">
-                                  {hasPolicy && amount > 0 ? formatCurrency(amount) : 'N/A'}
-                                </p>
+                                <div className="flex items-center space-x-4">
+                                  <p className="font-semibold text-gray-900 text-sm w-20 text-right">
+                                    {hasPolicy && amount > 0 ? formatCurrency(amount) : 'N/A'}
+                                  </p>
+                                  <p className="text-xs text-gray-500 w-20 text-right">
+                                    {required > 0 ? formatCurrency(required) : '—'}
+                                  </p>
+                                </div>
                               </div>
                             );
                           })()}
@@ -1738,9 +1751,14 @@ export function TenantsView({ properties, userRequirements, selectedProperty, on
                                 )}
                                 <p className="font-medium text-gray-900 text-sm">Auto Liability</p>
                               </div>
-                              <p className="font-semibold text-gray-900 text-sm">
-                                {selectedTenant.policy_auto_liability > 0 ? formatCurrency(selectedTenant.policy_auto_liability) : 'N/A'}
-                              </p>
+                              <div className="flex items-center space-x-4">
+                                <p className="font-semibold text-gray-900 text-sm w-20 text-right">
+                                  {selectedTenant.policy_auto_liability > 0 ? formatCurrency(selectedTenant.policy_auto_liability) : 'N/A'}
+                                </p>
+                                <p className="text-xs text-gray-500 w-20 text-right">
+                                  {selectedTenant.required_auto_liability > 0 ? formatCurrency(selectedTenant.required_auto_liability) : '—'}
+                                </p>
+                              </div>
                             </div>
                           )}
 
@@ -1757,9 +1775,14 @@ export function TenantsView({ properties, userRequirements, selectedProperty, on
                                 )}
                                 <p className="font-medium text-gray-900 text-sm">Workers Comp</p>
                               </div>
-                              <p className="font-semibold text-gray-900 text-sm">
-                                {selectedTenant.policy_workers_comp || 'N/A'}
-                              </p>
+                              <div className="flex items-center space-x-4">
+                                <p className="font-semibold text-gray-900 text-sm w-20 text-right">
+                                  {selectedTenant.policy_workers_comp || 'N/A'}
+                                </p>
+                                <p className="text-xs text-gray-500 w-20 text-right">
+                                  {selectedTenant.required_workers_comp ? 'Required' : '—'}
+                                </p>
+                              </div>
                             </div>
                           )}
 
@@ -1777,9 +1800,14 @@ export function TenantsView({ properties, userRequirements, selectedProperty, on
                                 )}
                                 <p className="font-medium text-gray-900 text-sm">Employers Liability</p>
                               </div>
-                              <p className="font-semibold text-gray-900 text-sm">
-                                {selectedTenant.policy_employers_liability > 0 ? formatCurrency(selectedTenant.policy_employers_liability) : 'N/A'}
-                              </p>
+                              <div className="flex items-center space-x-4">
+                                <p className="font-semibold text-gray-900 text-sm w-20 text-right">
+                                  {selectedTenant.policy_employers_liability > 0 ? formatCurrency(selectedTenant.policy_employers_liability) : 'N/A'}
+                                </p>
+                                <p className="text-xs text-gray-500 w-20 text-right">
+                                  {selectedTenant.required_employers_liability > 0 ? formatCurrency(selectedTenant.required_employers_liability) : '—'}
+                                </p>
+                              </div>
                             </div>
                           )}
 
@@ -1792,9 +1820,12 @@ export function TenantsView({ properties, userRequirements, selectedProperty, on
                                     <CheckCircle size={14} className="text-emerald-600" />
                                     <p className="font-medium text-gray-900 text-sm">{cov.type}</p>
                                   </div>
-                                  <p className="font-semibold text-gray-900 text-sm">
-                                    {formatCurrency(cov.amount)}
-                                  </p>
+                                  <div className="flex items-center space-x-4">
+                                    <p className="font-semibold text-gray-900 text-sm w-20 text-right">
+                                      {formatCurrency(cov.amount)}
+                                    </p>
+                                    <p className="text-xs text-gray-500 w-20 text-right">—</p>
+                                  </div>
                                 </div>
                               ))}
                             </>
@@ -1821,43 +1852,6 @@ export function TenantsView({ properties, userRequirements, selectedProperty, on
                               <p className="font-semibold text-gray-900 text-sm">Required</p>
                             </div>
                           )}
-                        </div>
-                      </div>
-
-                      {/* Insurance Requirements */}
-                      <div>
-                        <h4 className="font-bold text-gray-900 text-sm mb-2">Requirements</h4>
-                        <div className="space-y-1.5 p-3 bg-gray-50 rounded-xl">
-                          <div className="flex justify-between items-center text-sm">
-                            <span className="text-gray-600">General Liability</span>
-                            <span className="font-medium text-gray-900">
-                              {selectedTenant.required_general_liability > 0 ? formatCurrency(selectedTenant.required_general_liability) : 'Not Required'}
-                            </span>
-                          </div>
-                          {selectedTenant.required_auto_liability > 0 && (
-                            <div className="flex justify-between items-center text-sm">
-                              <span className="text-gray-600">Auto Liability</span>
-                              <span className="font-medium text-gray-900">{formatCurrency(selectedTenant.required_auto_liability)}</span>
-                            </div>
-                          )}
-                          {selectedTenant.required_employers_liability > 0 && (
-                            <div className="flex justify-between items-center text-sm">
-                              <span className="text-gray-600">Employers Liability</span>
-                              <span className="font-medium text-gray-900">{formatCurrency(selectedTenant.required_employers_liability)}</span>
-                            </div>
-                          )}
-                          {selectedTenant.required_workers_comp && (
-                            <div className="flex justify-between items-center text-sm">
-                              <span className="text-gray-600">Workers Comp</span>
-                              <span className="font-medium text-emerald-600">Required</span>
-                            </div>
-                          )}
-                          <div className="flex justify-between items-center text-sm">
-                            <span className="text-gray-600">Additional Insured</span>
-                            <span className={`font-medium ${selectedTenant.require_additional_insured ? 'text-emerald-600' : 'text-gray-400'}`}>
-                              {selectedTenant.require_additional_insured ? 'Required' : 'Not Required'}
-                            </span>
-                          </div>
                         </div>
                       </div>
 

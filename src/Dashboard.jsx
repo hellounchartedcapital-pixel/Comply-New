@@ -242,6 +242,7 @@ export function Dashboard({
               <div>
                 <p className="text-sm text-gray-500 font-medium">Total Tracked</p>
                 <p className="text-3xl font-bold text-gray-900 mt-1" aria-live="polite">{combinedStats.total}</p>
+                <p className="text-xs text-gray-400 mt-0.5">{combinedStats.vendors.total} vendors / {combinedStats.tenants.total} tenants</p>
               </div>
               <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center" aria-hidden="true">
                 <TrendingUp className="text-gray-500" size={24} />
@@ -254,6 +255,7 @@ export function Dashboard({
               <div>
                 <p className="text-sm text-gray-500 font-medium">Compliant</p>
                 <p className="text-3xl font-bold text-emerald-600 mt-1" aria-live="polite">{combinedStats.compliant}</p>
+                <p className="text-xs text-gray-400 mt-0.5">{combinedStats.vendors.compliant} vendors / {combinedStats.tenants.compliant} tenants</p>
               </div>
               <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center" aria-hidden="true">
                 <CheckCircle className="text-emerald-500" size={24} />
@@ -266,6 +268,7 @@ export function Dashboard({
               <div>
                 <p className="text-sm text-gray-500 font-medium">Expired</p>
                 <p className="text-3xl font-bold text-red-600 mt-1" aria-live="polite">{combinedStats.expired}</p>
+                <p className="text-xs text-gray-400 mt-0.5">{combinedStats.vendors.expired} vendors / {combinedStats.tenants.expired} tenants</p>
               </div>
               <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center" aria-hidden="true">
                 <XCircle className="text-red-500" size={24} />
@@ -278,6 +281,7 @@ export function Dashboard({
               <div>
                 <p className="text-sm text-gray-500 font-medium">Non-Compliant</p>
                 <p className="text-3xl font-bold text-orange-600 mt-1" aria-live="polite">{combinedStats.nonCompliant}</p>
+                <p className="text-xs text-gray-400 mt-0.5">{combinedStats.vendors.nonCompliant} vendors / {combinedStats.tenants.nonCompliant} tenants</p>
               </div>
               <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center" aria-hidden="true">
                 <AlertCircle className="text-orange-500" size={24} />
@@ -290,6 +294,7 @@ export function Dashboard({
               <div>
                 <p className="text-sm text-gray-500 font-medium">Expiring Soon</p>
                 <p className="text-3xl font-bold text-amber-600 mt-1" aria-live="polite">{combinedStats.expiring}</p>
+                <p className="text-xs text-gray-400 mt-0.5">{combinedStats.vendors.expiring} vendors / {combinedStats.tenants.expiring} tenants</p>
               </div>
               <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center" aria-hidden="true">
                 <Clock className="text-amber-500" size={24} />
