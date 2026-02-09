@@ -281,7 +281,7 @@ export function SmartUploadModal({
         property_id: selectedPropertyId || null,
         name: vendorName,
         dba: data.dba || null,
-        email: contactEmail || null,  // Save email from upload form
+        contact_email: contactEmail || null,
         status: status,
         expiration_date: data.expirationDate || null,
         coverage: data.coverage || {},
