@@ -880,14 +880,14 @@ export function TenantsView({ properties, userRequirements, selectedProperty, on
       // Get tenant's property for requirements
       const tenantProperty = properties?.find(p => p.id === tenant.property_id);
 
-      // Build requirements from tenant overrides → property settings → user settings
+      // Build requirements from tenant's lease terms (stored on tenant record)
       const requirements = {
-        generalLiability: tenant.required_liability_min || tenantProperty?.general_liability || userRequirements?.general_liability || 100000,
-        autoLiability: tenant.required_auto_liability_min || (tenantProperty?.auto_liability_required ? (tenantProperty?.auto_liability || userRequirements?.auto_liability || 1000000) : null),
-        workersComp: tenant.required_workers_comp || tenantProperty?.workers_comp_required || false,
-        employersLiability: tenant.required_employers_liability_min || (tenantProperty?.workers_comp_required ? (tenantProperty?.employers_liability || userRequirements?.employers_liability || 500000) : null),
-        additionalInsured: tenant.requires_additional_insured ?? tenantProperty?.require_additional_insured ?? userRequirements?.require_additional_insured ?? false,
-        waiverOfSubrogation: tenantProperty?.require_waiver_of_subrogation ?? userRequirements?.require_waiver_of_subrogation ?? false,
+        generalLiability: tenant.required_general_liability || 100000,
+        autoLiability: tenant.required_auto_liability || null,
+        workersComp: tenant.required_workers_comp || false,
+        employersLiability: tenant.required_employers_liability || null,
+        additionalInsured: tenant.requires_additional_insured ?? false,
+        waiverOfSubrogation: false,
       };
 
       // Determine issues based on status
@@ -996,14 +996,14 @@ export function TenantsView({ properties, userRequirements, selectedProperty, on
           // Get tenant's property
           const tenantProperty = properties?.find(p => p.id === tenant.property_id);
 
-          // Build requirements from tenant overrides → property settings → user settings
+          // Build requirements from tenant's lease terms (stored on tenant record)
           const requirements = {
-            generalLiability: tenant.required_liability_min || tenantProperty?.general_liability || userRequirements?.general_liability || 100000,
-            autoLiability: tenant.required_auto_liability_min || (tenantProperty?.auto_liability_required ? (tenantProperty?.auto_liability || userRequirements?.auto_liability || 1000000) : null),
-            workersComp: tenant.required_workers_comp || tenantProperty?.workers_comp_required || false,
-            employersLiability: tenant.required_employers_liability_min || (tenantProperty?.workers_comp_required ? (tenantProperty?.employers_liability || userRequirements?.employers_liability || 500000) : null),
-            additionalInsured: tenant.requires_additional_insured ?? tenantProperty?.require_additional_insured ?? userRequirements?.require_additional_insured ?? false,
-            waiverOfSubrogation: tenantProperty?.require_waiver_of_subrogation ?? userRequirements?.require_waiver_of_subrogation ?? false,
+            generalLiability: tenant.required_general_liability || 100000,
+            autoLiability: tenant.required_auto_liability || null,
+            workersComp: tenant.required_workers_comp || false,
+            employersLiability: tenant.required_employers_liability || null,
+            additionalInsured: tenant.requires_additional_insured ?? false,
+            waiverOfSubrogation: false,
           };
 
           // Determine issues
