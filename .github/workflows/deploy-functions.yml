@@ -30,6 +30,11 @@ jobs:
           supabase functions deploy extract-requirements --no-verify-jwt
           supabase functions deploy send-contact --no-verify-jwt
           supabase functions deploy send-notifications --no-verify-jwt
+          supabase functions deploy send-coi-request --no-verify-jwt
+          supabase functions deploy recheck-compliance --no-verify-jwt
+          supabase functions deploy auto-follow-up --no-verify-jwt
           supabase functions deploy stripe-webhook --no-verify-jwt
+          supabase functions deploy create-checkout-session --no-verify-jwt
+          supabase functions deploy create-portal-session --no-verify-jwt
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
