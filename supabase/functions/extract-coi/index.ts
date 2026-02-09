@@ -43,21 +43,73 @@ serve(async (req) => {
       employers_liability: 500000
     };
 
-    const anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
+    const isTenantPolicy = requirements?.is_tenant_policy === true;
 
-    const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 4000,
-      messages: [{
-        role: 'user',
-        content: [
-          {
-            type: 'document',
-            source: { type: 'base64', media_type: 'application/pdf', data: pdfBase64 }
-          },
-          {
-            type: 'text',
-            text: `Extract ALL insurance coverage data from this Certificate of Insurance (likely an ACORD 25 or similar form).
+    const extractionPrompt = isTenantPolicy
+      ? `Extract insurance coverage data from this document. This is a TENANT/RENTERS insurance policy or certificate.
+
+Read the ENTIRE document carefully. Only extract amounts that are EXPLICITLY written on the document. Do NOT guess or assume any amounts.
+
+TENANT POLICIES typically include:
+- Personal Liability / Liability (this is the tenant's "General Liability")
+- Personal Property / Contents Coverage
+- Medical Payments to Others
+- Loss of Use / Additional Living Expense
+- Deductible amounts
+
+The document may be:
+- A renters insurance declarations page
+- An ACORD 25 certificate for a renters policy
+- A policy summary or evidence of insurance
+
+ALSO CHECK FOR:
+- CERTIFICATE HOLDER - Who the certificate was issued to
+- ADDITIONAL INSURED / ADDITIONAL INTEREST - Check if the landlord/property manager is listed
+- INSURED NAME - The tenant who holds the policy
+
+Return this JSON structure:
+{
+  "companyName": "insured tenant name",
+  "expirationDate": "YYYY-MM-DD (policy end date)",
+  "generalLiability": {
+    "amount": <personal liability / liability limit as integer, or null if NOT explicitly listed>,
+    "aggregate": null,
+    "expirationDate": "YYYY-MM-DD"
+  },
+  "autoLiability": null,
+  "workersComp": null,
+  "employersLiability": null,
+  "additionalCoverages": [
+    {
+      "type": "coverage type name (e.g. Personal Property, Medical Payments, Loss of Use)",
+      "amount": <limit as integer>,
+      "aggregate": null,
+      "expirationDate": "YYYY-MM-DD"
+    }
+  ],
+  "insuranceCompany": "carrier name",
+  "additionalInsured": "yes or no - is a landlord/property manager listed as additional insured or additional interest?",
+  "certificateHolder": "name from certificate holder section",
+  "waiverOfSubrogation": "no"
+}
+
+CRITICAL RULES:
+- ONLY extract amounts that are EXPLICITLY printed on the document
+- If a liability amount is NOT clearly stated with a dollar figure, set it to null - do NOT default to $1,000,000 or any other amount
+- Personal Liability on a renters policy maps to "generalLiability" in the response
+- Tenants typically do NOT have Auto, Workers Comp, or Employers Liability - set those to null
+- Put Personal Property, Medical Payments, Loss of Use, etc. in "additionalCoverages"
+- For Additional Insured, check if a landlord/property management company is listed anywhere
+
+NUMBER FORMAT: Convert dollar amounts to plain integers.
+- $100,000 → 100000
+- $300,000 → 300000
+- $25,000 → 25000
+
+DATE FORMAT: Convert to YYYY-MM-DD (e.g., 01/15/2025 → 2025-01-15)
+
+Return ONLY the JSON object, no other text.`
+      : `Extract ALL insurance coverage data from this Certificate of Insurance (likely an ACORD 25 or similar form).
 
 Read the entire document carefully and extract EVERY policy and coverage type listed, not just the common ones.
 
@@ -125,6 +177,7 @@ IMPORTANT RULES:
 - If a standard coverage (GL, Auto, WC, EL) is NOT on the certificate, set it to null instead of guessing
 - Put any non-standard coverages in the "additionalCoverages" array
 - If no additional coverages exist, return an empty array []
+- ONLY extract amounts that are EXPLICITLY printed on the document - do NOT guess or fabricate amounts
 
 NUMBER FORMAT: Convert dollar amounts to plain integers.
 - $1,000,000 → 1000000
@@ -133,7 +186,23 @@ NUMBER FORMAT: Convert dollar amounts to plain integers.
 
 DATE FORMAT: Convert to YYYY-MM-DD (e.g., 01/15/2025 → 2025-01-15)
 
-Return ONLY the JSON object, no other text.`
+Return ONLY the JSON object, no other text.`;
+
+    const anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
+
+    const message = await anthropic.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 4000,
+      messages: [{
+        role: 'user',
+        content: [
+          {
+            type: 'document',
+            source: { type: 'base64', media_type: 'application/pdf', data: pdfBase64 }
+          },
+          {
+            type: 'text',
+            text: extractionPrompt
           }
         ]
       }]
