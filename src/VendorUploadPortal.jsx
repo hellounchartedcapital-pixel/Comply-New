@@ -30,10 +30,10 @@ export function VendorUploadPortal({ token, onBack }) {
       setLoading(true);
       setError(null);
 
-      // Fetch vendor by upload token (include property_id for property-level requirements)
+      // Fetch vendor by upload token (requirements are stored directly on the vendor record)
       const { data, error: fetchError } = await supabase
         .from('vendors')
-        .select('id, name, dba, status, expiration_date, upload_token, upload_token_expires_at, user_id, property_id')
+        .select('id, name, dba, status, expiration_date, upload_token, upload_token_expires_at, user_id, property_id, requirements')
         .eq('upload_token', token)
         .single();
 
@@ -50,28 +50,6 @@ export function VendorUploadPortal({ token, onBack }) {
           return;
         }
       }
-
-      // Fetch user's requirements settings (fallback)
-      const { data: userSettings } = await supabase
-        .from('settings')
-        .select('general_liability, auto_liability, workers_comp, employers_liability, additional_requirements, require_additional_insured, require_waiver_of_subrogation')
-        .eq('user_id', data.user_id)
-        .single();
-
-      // Fetch property-level requirements if vendor is assigned to a property
-      let propertySettings = null;
-      if (data.property_id) {
-        const { data: propData } = await supabase
-          .from('properties')
-          .select('general_liability, gl_aggregate, auto_liability, auto_liability_required, workers_comp_required, employers_liability, require_additional_insured, require_waiver_of_subrogation, custom_coverages, company_name')
-          .eq('id', data.property_id)
-          .single();
-        propertySettings = propData;
-      }
-
-      // Attach settings to vendor object -- property-level takes precedence
-      data.userSettings = userSettings;
-      data.propertySettings = propertySettings;
 
       setVendor(data);
     } catch (err) {
@@ -156,40 +134,8 @@ export function VendorUploadPortal({ token, onBack }) {
         reader.readAsDataURL(file);
       });
 
-      // Build requirements -- property-level settings take precedence over user-level
-      const userSettings = vendor.userSettings || {};
-      const propSettings = vendor.propertySettings || null;
-
-      // Decode custom coverages from user-level additional_requirements if present
-      const userCustomCoverages = [];
-      if (userSettings.additional_requirements && Array.isArray(userSettings.additional_requirements)) {
-        userSettings.additional_requirements.forEach(item => {
-          if (typeof item === 'string' && item.startsWith('__COVERAGE__')) {
-            try {
-              const coverageData = JSON.parse(item.replace('__COVERAGE__', ''));
-              userCustomCoverages.push(coverageData);
-            } catch (e) {
-              // Skip invalid entries
-            }
-          }
-        });
-      }
-
-      // Property-level custom coverages (already stored as proper JSON array)
-      const propertyCustomCoverages = propSettings?.custom_coverages || [];
-
-      const requirements = {
-        general_liability: propSettings?.general_liability || userSettings.general_liability || 1000000,
-        auto_liability: propSettings?.auto_liability || userSettings.auto_liability || 1000000,
-        auto_liability_required: propSettings?.auto_liability_required || false,
-        workers_comp: propSettings?.workers_comp_required ? 'Statutory' : (userSettings.workers_comp || 'Statutory'),
-        workers_comp_required: propSettings?.workers_comp_required || false,
-        employers_liability: propSettings?.employers_liability || userSettings.employers_liability || 500000,
-        custom_coverages: propertyCustomCoverages.length > 0 ? propertyCustomCoverages : userCustomCoverages,
-        require_additional_insured: propSettings?.require_additional_insured ?? userSettings.require_additional_insured ?? false,
-        require_waiver_of_subrogation: propSettings?.require_waiver_of_subrogation ?? userSettings.require_waiver_of_subrogation ?? false,
-        company_name: propSettings?.company_name || ''
-      };
+      // Use requirements stored directly on the vendor record
+      const requirements = vendor.requirements || {};
 
       // Call the extraction Edge Function with token for server-side validation
       const { data: extractionResult, error: extractionError } = await supabase.functions.invoke('extract-coi', {
@@ -545,29 +491,21 @@ export function VendorUploadPortal({ token, onBack }) {
             </div>
           </div>
 
-          {/* Insurance Requirements */}
+          {/* Insurance Requirements (from vendor record, set when COI request was sent) */}
           {(() => {
-            const propSettings = vendor.propertySettings;
-            const userSettings = vendor.userSettings || {};
-            const glReq = propSettings?.general_liability || userSettings.general_liability;
-            const autoReq = propSettings?.auto_liability || userSettings.auto_liability;
-            const autoRequired = propSettings?.auto_liability_required;
-            const wcRequired = propSettings?.workers_comp_required;
-            const elReq = propSettings?.employers_liability || userSettings.employers_liability;
-            const reqAdditionalInsured = propSettings?.require_additional_insured ?? userSettings.require_additional_insured;
-            const reqWaiverOfSubrogation = propSettings?.require_waiver_of_subrogation ?? userSettings.require_waiver_of_subrogation;
+            const req = vendor.requirements;
+            if (!req) return null;
 
-            // Decode user-level custom coverages from additional_requirements if no property-level ones
-            let customCoverages = propSettings?.custom_coverages || [];
-            if (customCoverages.length === 0 && userSettings.additional_requirements && Array.isArray(userSettings.additional_requirements)) {
-              userSettings.additional_requirements.forEach(item => {
-                if (typeof item === 'string' && item.startsWith('__COVERAGE__')) {
-                  try {
-                    customCoverages.push(JSON.parse(item.replace('__COVERAGE__', '')));
-                  } catch (e) { /* skip invalid */ }
-                }
-              });
-            }
+            const glReq = req.general_liability;
+            const autoReq = req.auto_liability;
+            const autoRequired = req.auto_liability_required;
+            const wcRequired = req.workers_comp_required;
+            const elReq = req.employers_liability;
+            const customCoverages = req.custom_coverages || [];
+            const reqAdditionalInsured = req.require_additional_insured;
+            const reqWaiverOfSubrogation = req.require_waiver_of_subrogation;
+            const companyName = req.company_name;
+            const propertyName = req.property_name;
 
             const hasAnyRequirement = glReq || autoReq || wcRequired || elReq || reqAdditionalInsured || reqWaiverOfSubrogation || customCoverages.length > 0;
 
@@ -575,7 +513,9 @@ export function VendorUploadPortal({ token, onBack }) {
 
             return (
               <div className="mb-8 bg-gray-50 border border-gray-200 rounded-lg p-4">
-                <p className="text-sm font-medium text-gray-900 mb-2">Insurance Requirements:</p>
+                <p className="text-sm font-medium text-gray-900 mb-2">
+                  Insurance Requirements{companyName ? ` from ${companyName}` : ''}{propertyName ? ` — ${propertyName}` : ''}:
+                </p>
                 <ul className="text-sm text-gray-700 space-y-1">
                   {glReq > 0 && (
                     <li className="flex justify-between">

@@ -298,7 +298,8 @@ export function SmartUploadModal({
           uploadTokenExpiresAt: tokenExpiry.toISOString()
         },
         upload_token: uploadToken,
-        upload_token_expires_at: tokenExpiry.toISOString()
+        upload_token_expires_at: tokenExpiry.toISOString(),
+        requirements: requirements
       };
 
       const { data: newVendor, error: insertError } = await supabase

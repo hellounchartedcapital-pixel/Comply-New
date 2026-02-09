@@ -610,12 +610,30 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
       if (!uploadToken) {
         uploadToken = crypto.randomUUID();
       }
-      // Always update the token expiration when sending a COI request
+      // Get property requirements for this vendor
+      const vendorProperty = properties.find(p => p.id === requestCOIVendor.propertyId);
+
+      // Build full requirements to store on the vendor record (for the upload portal)
+      const storedRequirements = {
+        general_liability: vendorProperty?.general_liability || userRequirements?.general_liability || 1000000,
+        auto_liability: vendorProperty?.auto_liability || userRequirements?.auto_liability || 1000000,
+        auto_liability_required: vendorProperty?.auto_liability_required || false,
+        workers_comp_required: vendorProperty?.workers_comp_required || false,
+        employers_liability: vendorProperty?.employers_liability || userRequirements?.employers_liability || 500000,
+        custom_coverages: vendorProperty?.custom_coverages || [],
+        require_additional_insured: vendorProperty?.require_additional_insured !== false,
+        require_waiver_of_subrogation: vendorProperty?.require_waiver_of_subrogation || userRequirements?.require_waiver_of_subrogation || false,
+        company_name: userRequirements?.company_name || '',
+        property_name: vendorProperty?.name || null,
+      };
+
+      // Always update the token expiration and requirements when sending a COI request
       const { error: tokenError } = await supabase
         .from('vendors')
         .update({
           upload_token: uploadToken,
-          upload_token_expires_at: tokenExpiresAt.toISOString()
+          upload_token_expires_at: tokenExpiresAt.toISOString(),
+          requirements: storedRequirements
         })
         .eq('id', requestCOIVendor.id);
 
@@ -627,15 +645,14 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
       // Get the app URL (current origin)
       const appUrl = window.location.origin;
 
-      // Get property requirements for this vendor
-      const vendorProperty = properties.find(p => p.id === requestCOIVendor.propertyId);
+      // Build requirements for the email (camelCase format)
       const requirements = {
-        generalLiability: vendorProperty?.general_liability || userRequirements?.general_liability || 1000000,
-        autoLiability: vendorProperty?.auto_liability_required ? (vendorProperty?.auto_liability || userRequirements?.auto_liability || 1000000) : null,
-        workersComp: vendorProperty?.workers_comp_required || false,
-        employersLiability: vendorProperty?.workers_comp_required ? (vendorProperty?.employers_liability || userRequirements?.employers_liability || 500000) : null,
-        additionalInsured: vendorProperty?.require_additional_insured !== false,
-        waiverOfSubrogation: vendorProperty?.require_waiver_of_subrogation || userRequirements?.require_waiver_of_subrogation || false,
+        generalLiability: storedRequirements.general_liability,
+        autoLiability: storedRequirements.auto_liability_required ? storedRequirements.auto_liability : null,
+        workersComp: storedRequirements.workers_comp_required,
+        employersLiability: storedRequirements.workers_comp_required ? storedRequirements.employers_liability : null,
+        additionalInsured: storedRequirements.require_additional_insured,
+        waiverOfSubrogation: storedRequirements.require_waiver_of_subrogation,
       };
 
       const { data: result, error: fnError } = await supabase.functions.invoke('send-coi-request', {
@@ -754,24 +771,39 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
           const tokenExpiryDays = userRequirements?.upload_token_expiry_days || 30;
           tokenExpiresAt.setDate(tokenExpiresAt.getDate() + tokenExpiryDays);
 
+          // Build full requirements to store on the vendor record
+          const vendorProperty = properties.find(p => p.id === vendor.propertyId);
+          const storedRequirements = {
+            general_liability: vendorProperty?.general_liability || userRequirements?.general_liability || 1000000,
+            auto_liability: vendorProperty?.auto_liability || userRequirements?.auto_liability || 1000000,
+            auto_liability_required: vendorProperty?.auto_liability_required || false,
+            workers_comp_required: vendorProperty?.workers_comp_required || false,
+            employers_liability: vendorProperty?.employers_liability || userRequirements?.employers_liability || 500000,
+            custom_coverages: vendorProperty?.custom_coverages || [],
+            require_additional_insured: vendorProperty?.require_additional_insured !== false,
+            require_waiver_of_subrogation: vendorProperty?.require_waiver_of_subrogation || userRequirements?.require_waiver_of_subrogation || false,
+            company_name: companyName,
+            property_name: vendorProperty?.name || null,
+          };
+
           await supabase
             .from('vendors')
             .update({
               upload_token: uploadToken,
-              upload_token_expires_at: tokenExpiresAt.toISOString()
+              upload_token_expires_at: tokenExpiresAt.toISOString(),
+              requirements: storedRequirements
             })
             .eq('id', vendor.id);
 
           // Send email with requirements
           const issues = (vendor.issues || []).map(i => typeof i === 'string' ? i : i.message);
-          const vendorProperty = properties.find(p => p.id === vendor.propertyId);
           const requirements = {
-            generalLiability: vendorProperty?.general_liability || userRequirements?.general_liability || 1000000,
-            autoLiability: vendorProperty?.auto_liability_required ? (vendorProperty?.auto_liability || userRequirements?.auto_liability || 1000000) : null,
-            workersComp: vendorProperty?.workers_comp_required || false,
-            employersLiability: vendorProperty?.workers_comp_required ? (vendorProperty?.employers_liability || userRequirements?.employers_liability || 500000) : null,
-            additionalInsured: vendorProperty?.require_additional_insured !== false,
-            waiverOfSubrogation: vendorProperty?.require_waiver_of_subrogation || userRequirements?.require_waiver_of_subrogation || false,
+            generalLiability: storedRequirements.general_liability,
+            autoLiability: storedRequirements.auto_liability_required ? storedRequirements.auto_liability : null,
+            workersComp: storedRequirements.workers_comp_required,
+            employersLiability: storedRequirements.workers_comp_required ? storedRequirements.employers_liability : null,
+            additionalInsured: storedRequirements.require_additional_insured,
+            waiverOfSubrogation: storedRequirements.require_waiver_of_subrogation,
           };
 
           const { data: result, error: fnError } = await supabase.functions.invoke('send-coi-request', {
