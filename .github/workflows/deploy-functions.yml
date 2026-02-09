@@ -4,8 +4,10 @@ on:
   push:
     branches:
       - main
+      - claude/smartcoi-saas-build-uIybw
     paths:
       - 'supabase/functions/**'
+      - '.github/workflows/deploy-functions.yml'
   workflow_dispatch:
 
 jobs:
