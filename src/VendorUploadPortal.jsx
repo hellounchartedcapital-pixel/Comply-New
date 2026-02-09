@@ -543,6 +543,79 @@ export function VendorUploadPortal({ token, onBack }) {
             </div>
           </div>
 
+          {/* Insurance Requirements */}
+          {(() => {
+            const propSettings = vendor.propertySettings;
+            const userSettings = vendor.userSettings || {};
+            const glReq = propSettings?.general_liability || userSettings.general_liability;
+            const autoReq = propSettings?.auto_liability || userSettings.auto_liability;
+            const autoRequired = propSettings?.auto_liability_required;
+            const wcRequired = propSettings?.workers_comp_required;
+            const elReq = propSettings?.employers_liability || userSettings.employers_liability;
+            const reqAdditionalInsured = propSettings?.require_additional_insured ?? userSettings.require_additional_insured;
+            const reqWaiverOfSubrogation = propSettings?.require_waiver_of_subrogation ?? userSettings.require_waiver_of_subrogation;
+
+            // Decode user-level custom coverages from additional_requirements if no property-level ones
+            let customCoverages = propSettings?.custom_coverages || [];
+            if (customCoverages.length === 0 && userSettings.additional_requirements && Array.isArray(userSettings.additional_requirements)) {
+              userSettings.additional_requirements.forEach(item => {
+                if (typeof item === 'string' && item.startsWith('__COVERAGE__')) {
+                  try {
+                    customCoverages.push(JSON.parse(item.replace('__COVERAGE__', '')));
+                  } catch (e) { /* skip invalid */ }
+                }
+              });
+            }
+
+            const hasAnyRequirement = glReq || autoReq || wcRequired || elReq || reqAdditionalInsured || reqWaiverOfSubrogation || customCoverages.length > 0;
+
+            if (!hasAnyRequirement) return null;
+
+            return (
+              <div className="mb-8 bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <p className="text-sm font-medium text-gray-900 mb-2">Insurance Requirements:</p>
+                <ul className="text-sm text-gray-700 space-y-1">
+                  {glReq > 0 && (
+                    <li className="flex justify-between">
+                      <span>General Liability:</span>
+                      <span className="font-medium">min {formatCurrency(glReq)}</span>
+                    </li>
+                  )}
+                  {(autoRequired || autoReq > 0) && (
+                    <li className="flex justify-between">
+                      <span>Auto Liability:</span>
+                      <span className="font-medium">min {formatCurrency(autoReq || 1000000)}</span>
+                    </li>
+                  )}
+                  {wcRequired && (
+                    <li className="flex justify-between">
+                      <span>Workers Compensation:</span>
+                      <span className="font-medium">Statutory</span>
+                    </li>
+                  )}
+                  {elReq > 0 && (
+                    <li className="flex justify-between">
+                      <span>Employers Liability:</span>
+                      <span className="font-medium">min {formatCurrency(elReq)}</span>
+                    </li>
+                  )}
+                  {customCoverages.filter(c => c.required).map((cov, idx) => (
+                    <li key={idx} className="flex justify-between">
+                      <span>{cov.type}:</span>
+                      <span className="font-medium">min {formatCurrency(cov.amount)}</span>
+                    </li>
+                  ))}
+                  {reqAdditionalInsured && (
+                    <li>Must be listed as Additional Insured</li>
+                  )}
+                  {reqWaiverOfSubrogation && (
+                    <li>Waiver of Subrogation required</li>
+                  )}
+                </ul>
+              </div>
+            );
+          })()}
+
           {/* Upload Area */}
           <div
             onDragEnter={handleDrag}

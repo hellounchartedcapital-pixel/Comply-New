@@ -67,7 +67,8 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
     lastContactedAt: v.last_contacted_at,
     uploadToken: v.upload_token,
     uploadTokenExpiresAt: v.upload_token_expires_at,
-    rawData: v.raw_data
+    rawData: v.raw_data,
+    requirements: v.requirements || null
   }));
 
   const [selectedVendor, setSelectedVendor] = useState(null);
@@ -1966,20 +1967,38 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
                         </div>
                       )}
 
-                      {/* Coverage Details */}
+                      {/* Coverage Details - Required vs Found */}
                       <div>
                         <h4 className="font-bold text-gray-900 text-sm mb-2">Coverage Details</h4>
+                        {/* Column headers */}
+                        <div className="flex items-center justify-between px-2.5 pb-1 text-xs text-gray-500 font-medium">
+                          <span>Coverage</span>
+                          <div className="flex items-center space-x-4">
+                            <span className="w-20 text-right">Found</span>
+                            {selectedVendor.requirements && <span className="w-20 text-right">Required</span>}
+                          </div>
+                        </div>
                         <div className="space-y-1.5">
-                          {[
-                            { key: 'generalLiability', label: 'General Liability', coverage: selectedVendor.coverage.generalLiability },
-                            { key: 'autoLiability', label: 'Auto Liability', coverage: selectedVendor.coverage.autoLiability },
-                            { key: 'workersComp', label: 'Workers Compensation', coverage: selectedVendor.coverage.workersComp },
-                            { key: 'employersLiability', label: 'Employers Liability', coverage: selectedVendor.coverage.employersLiability },
-                          ].map(({ key, label, coverage }) => {
+                          {(() => {
+                            const reqs = selectedVendor.requirements || {};
+                            const reqMap = {
+                              generalLiability: reqs.general_liability,
+                              autoLiability: reqs.auto_liability,
+                              workersComp: reqs.workers_comp_required ? 'Statutory' : null,
+                              employersLiability: reqs.employers_liability,
+                            };
+                            return [
+                              { key: 'generalLiability', label: 'General Liability', coverage: selectedVendor.coverage.generalLiability },
+                              { key: 'autoLiability', label: 'Auto Liability', coverage: selectedVendor.coverage.autoLiability },
+                              { key: 'workersComp', label: 'Workers Compensation', coverage: selectedVendor.coverage.workersComp },
+                              { key: 'employersLiability', label: 'Employers Liability', coverage: selectedVendor.coverage.employersLiability },
+                            ].map(({ key, label, coverage }) => {
                             const amount = coverage?.amount;
                             const isExpired = coverage?.expired;
                             const isExpiringSoon = coverage?.expiringSoon;
                             const hasAmount = amount && amount !== 'N/A' && amount !== 0;
+                            const requiredAmount = reqMap[key];
+                            const hasRequirement = requiredAmount && requiredAmount !== 0;
 
                             let statusIcon, statusColor, statusBg, statusText;
                             if (!hasAmount) {
@@ -1997,6 +2016,11 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
                               statusColor = 'text-amber-600';
                               statusBg = 'bg-amber-50';
                               statusText = 'Expiring Soon';
+                            } else if (coverage?.compliant === false) {
+                              statusIcon = <AlertCircle size={14} className="text-orange-600" />;
+                              statusColor = 'text-orange-600';
+                              statusBg = 'bg-orange-50';
+                              statusText = 'Below Requirement';
                             } else {
                               statusIcon = <CheckCircle size={14} className="text-emerald-600" />;
                               statusColor = 'text-emerald-600';
@@ -2013,12 +2037,23 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
                                     <p className={`text-xs ${statusColor}`}>{statusText}</p>
                                   </div>
                                 </div>
-                                <p className="font-semibold text-gray-900 text-sm">
-                                  {key === 'workersComp' ? (amount || 'N/A') : formatCurrency(amount)}
-                                </p>
+                                <div className="flex items-center space-x-4">
+                                  <p className="font-semibold text-gray-900 text-sm w-20 text-right">
+                                    {key === 'workersComp' ? (amount || 'N/A') : formatCurrency(amount)}
+                                  </p>
+                                  {selectedVendor.requirements && (
+                                    <p className="text-xs text-gray-500 w-20 text-right">
+                                      {key === 'workersComp'
+                                        ? (hasRequirement ? 'Required' : '—')
+                                        : (hasRequirement ? formatCurrency(requiredAmount) : '—')
+                                      }
+                                    </p>
+                                  )}
+                                </div>
                               </div>
                             );
-                          })}
+                          });
+                          })()}
 
                           {/* Additional Coverages */}
                           {selectedVendor.additionalCoverages && selectedVendor.additionalCoverages.length > 0 && (
@@ -2095,6 +2130,31 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
                                 selectedVendor.missingAdditionalInsured ? 'text-red-700' : 'text-gray-600'
                               }`}>
                                 {selectedVendor.additionalInsured}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Waiver of Subrogation Status */}
+                      {(selectedVendor.hasWaiverOfSubrogation || selectedVendor.missingWaiverOfSubrogation) && (
+                        <div className={`p-3 rounded-xl border ${
+                          selectedVendor.hasWaiverOfSubrogation
+                            ? 'bg-emerald-50 border-emerald-200'
+                            : 'bg-red-50 border-red-200'
+                        }`}>
+                          <div className="flex items-start space-x-2">
+                            {selectedVendor.hasWaiverOfSubrogation ? (
+                              <CheckCircle size={16} className="text-emerald-600 flex-shrink-0 mt-0.5" />
+                            ) : (
+                              <AlertCircle size={16} className="text-red-600 flex-shrink-0 mt-0.5" />
+                            )}
+                            <div className="flex-1">
+                              <p className="text-sm font-semibold text-gray-900">Waiver of Subrogation</p>
+                              <p className={`text-sm mt-1 ${
+                                selectedVendor.hasWaiverOfSubrogation ? 'text-emerald-700' : 'text-red-700'
+                              }`}>
+                                {selectedVendor.hasWaiverOfSubrogation ? 'Included' : 'Missing — Required'}
                               </p>
                             </div>
                           </div>
