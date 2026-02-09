@@ -337,34 +337,13 @@ export function SmartUploadModal({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      // Check compliance against lease requirements
-      const issues = [];
-      let insuranceStatus = 'compliant';
+      // Use compliance status and issues from the edge function
+      let insuranceStatus = data.status || 'compliant';
+      const issues = (data.issues || []).map(issue =>
+        typeof issue === 'string' ? issue : (issue?.message || issue?.description || '')
+      ).filter(Boolean);
 
       const liabilityAmount = data.coverage?.generalLiability?.amount || 0;
-      if (liabilityAmount < tenantDefaults.liabilityMin) {
-        issues.push(`Personal Liability ${formatCurrency(liabilityAmount)} is below required ${formatCurrency(tenantDefaults.liabilityMin)}`);
-      }
-
-      if (tenantDefaults.requiresAdditionalInsured && !data.additionalInsured) {
-        issues.push('Additional Insured endorsement not found');
-      }
-
-      // Check expiration
-      if (data.expirationDate) {
-        const expDate = new Date(data.expirationDate);
-        const today = new Date();
-        const daysUntil = Math.floor((expDate - today) / (1000 * 60 * 60 * 24));
-        if (daysUntil < 0) {
-          insuranceStatus = 'expired';
-        } else if (daysUntil <= 30) {
-          insuranceStatus = 'expiring';
-        } else if (issues.length > 0) {
-          insuranceStatus = 'non-compliant';
-        }
-      } else if (issues.length > 0) {
-        insuranceStatus = 'non-compliant';
-      }
 
       // Generate upload token
       const uploadToken = crypto.randomUUID();
