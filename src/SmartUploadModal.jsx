@@ -231,7 +231,7 @@ export function SmartUploadModal({
 
       // Process based on document type
       if (documentType === 'vendor') {
-        await processVendorUpload(extractedData, fileName, selectedProp);
+        await processVendorUpload(extractedData, fileName, selectedProp, requirements);
       } else {
         await processTenantUpload(extractedData, fileName);
       }
@@ -255,7 +255,7 @@ export function SmartUploadModal({
     }
   };
 
-  const processVendorUpload = async (data, filePath, property) => {
+  const processVendorUpload = async (data, filePath, property, requirements) => {
     setUploadStatus('Creating vendor record...');
 
     try {
