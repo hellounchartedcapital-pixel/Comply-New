@@ -1,0 +1,35 @@
+[project]
+id = ""
+
+[functions.extract-coi]
+verify_jwt = false
+
+[functions.send-coi-request]
+verify_jwt = false
+
+[functions.send-notifications]
+verify_jwt = false
+
+[functions.send-contact]
+verify_jwt = false
+
+[functions.recheck-compliance]
+verify_jwt = false
+
+[functions.auto-follow-up]
+verify_jwt = false
+
+[functions.extract-lease]
+verify_jwt = false
+
+[functions.extract-requirements]
+verify_jwt = false
+
+[functions.create-checkout-session]
+verify_jwt = false
+
+[functions.create-portal-session]
+verify_jwt = false
+
+[functions.stripe-webhook]
+verify_jwt = false
