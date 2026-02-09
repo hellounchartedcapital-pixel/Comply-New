@@ -46,65 +46,77 @@ serve(async (req) => {
     const isTenantPolicy = requirements?.is_tenant_policy === true;
 
     const extractionPrompt = isTenantPolicy
-      ? `Extract insurance coverage data from this document. This is a TENANT/RENTERS insurance policy or certificate.
+      ? `Extract ALL insurance coverage data from this Certificate of Insurance (ACORD 25 or similar form) for a COMMERCIAL TENANT.
 
-Read the ENTIRE document carefully. Only extract amounts that are EXPLICITLY written on the document. Do NOT guess or assume any amounts.
+This certificate is for a tenant of a commercial property. Read the entire document carefully and extract EVERY policy and coverage type listed.
 
-TENANT POLICIES typically include:
-- Personal Liability / Liability (this is the tenant's "General Liability")
-- Personal Property / Contents Coverage
-- Medical Payments to Others
-- Loss of Use / Additional Living Expense
-- Deductible amounts
+ALWAYS EXTRACT:
+1. INSURED/COMPANY NAME - The business or person who holds the insurance
+2. INSURANCE COMPANY - The carrier/insurer name
+3. CERTIFICATE HOLDER - Who the certificate was issued to (typically the landlord/property manager)
+4. ADDITIONAL INSURED - Check Description of Operations section for landlord/property manager
+5. WAIVER OF SUBROGATION - Check Description of Operations section
 
-The document may be:
-- A renters insurance declarations page
-- An ACORD 25 certificate for a renters policy
-- A policy summary or evidence of insurance
+STANDARD COVERAGES (extract if present on the certificate):
+- GENERAL LIABILITY - "Each Occurrence" limit and "General Aggregate"
+- AUTOMOBILE LIABILITY - "Combined Single Limit"
+- WORKERS COMPENSATION - Usually "Statutory"
+- EMPLOYERS LIABILITY - "Each Accident" amount
 
-ALSO CHECK FOR:
-- CERTIFICATE HOLDER - Who the certificate was issued to
-- ADDITIONAL INSURED / ADDITIONAL INTEREST - Check if the landlord/property manager is listed
-- INSURED NAME - The tenant who holds the policy
+ADDITIONAL COVERAGES (extract ANY other coverage types found, such as):
+- Umbrella/Excess Liability
+- Professional Liability / Errors & Omissions
+- Business Personal Property / Contents
+- Cyber Liability
+- Medical Payments
+- Any other coverage type listed on the certificate
 
 Return this JSON structure:
 {
-  "companyName": "insured tenant name",
-  "expirationDate": "YYYY-MM-DD (policy end date)",
+  "companyName": "insured tenant/company name",
+  "expirationDate": "YYYY-MM-DD (earliest expiration across all policies)",
   "generalLiability": {
-    "amount": <personal liability / liability limit as integer, or null if NOT explicitly listed>,
-    "aggregate": null,
+    "amount": <each occurrence limit as integer, or null if NOT explicitly listed with a dollar amount>,
+    "aggregate": <general aggregate as integer, or null if not listed>,
     "expirationDate": "YYYY-MM-DD"
   },
-  "autoLiability": null,
-  "workersComp": null,
-  "employersLiability": null,
+  "autoLiability": {
+    "amount": <combined single limit as integer>,
+    "expirationDate": "YYYY-MM-DD"
+  },
+  "workersComp": {
+    "amount": "Statutory",
+    "expirationDate": "YYYY-MM-DD"
+  },
+  "employersLiability": {
+    "amount": <each accident amount as integer>,
+    "expirationDate": "YYYY-MM-DD"
+  },
   "additionalCoverages": [
     {
-      "type": "coverage type name (e.g. Personal Property, Medical Payments, Loss of Use)",
+      "type": "coverage type name",
       "amount": <limit as integer>,
-      "aggregate": null,
+      "aggregate": <aggregate limit as integer if listed, otherwise null>,
       "expirationDate": "YYYY-MM-DD"
     }
   ],
   "insuranceCompany": "carrier name",
-  "additionalInsured": "yes or no - is a landlord/property manager listed as additional insured or additional interest?",
+  "additionalInsured": "yes or no",
   "certificateHolder": "name from certificate holder section",
-  "waiverOfSubrogation": "no"
+  "waiverOfSubrogation": "yes or no"
 }
 
 CRITICAL RULES:
-- ONLY extract amounts that are EXPLICITLY printed on the document
-- If a liability amount is NOT clearly stated with a dollar figure, set it to null - do NOT default to $1,000,000 or any other amount
-- Personal Liability on a renters policy maps to "generalLiability" in the response
-- Tenants typically do NOT have Auto, Workers Comp, or Employers Liability - set those to null
-- Put Personal Property, Medical Payments, Loss of Use, etc. in "additionalCoverages"
-- For Additional Insured, check if a landlord/property management company is listed anywhere
+- ONLY extract amounts that are EXPLICITLY printed on the document with a dollar figure
+- If a coverage section exists on the form but has NO dollar amount filled in, set it to null - do NOT guess or default to any amount
+- If a standard coverage (GL, Auto, WC, EL) is NOT on the certificate at all, set it to null
+- Put any non-standard coverages in the "additionalCoverages" array
+- If no additional coverages exist, return an empty array []
 
 NUMBER FORMAT: Convert dollar amounts to plain integers.
-- $100,000 → 100000
+- $1,000,000 → 1000000
 - $300,000 → 300000
-- $25,000 → 25000
+- $100,000 → 100000
 
 DATE FORMAT: Convert to YYYY-MM-DD (e.g., 01/15/2025 → 2025-01-15)
 
