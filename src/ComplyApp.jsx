@@ -566,6 +566,12 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
     setSendingEmail(true);
 
     try {
+      // Refresh session to ensure JWT is valid before calling edge function
+      const { error: refreshError } = await supabase.auth.refreshSession();
+      if (refreshError) {
+        logger.error('Session refresh failed', refreshError);
+      }
+
       // Save the email to the vendor if it's new or updated
       if (requestCOIEmail !== requestCOIVendor.contactEmail) {
         const result = await updateVendor(requestCOIVendor.id, {
@@ -718,6 +724,10 @@ function ComplyApp({ user, onSignOut, onShowPricing }) {
 
     setBulkRequestConfirm(null);
     setBulkRequesting(true);
+
+    // Refresh session to ensure JWT is valid before calling edge functions
+    await supabase.auth.refreshSession();
+
     let successCount = 0;
     let failCount = 0;
     const failedVendors = []; // Track which vendors failed and why
