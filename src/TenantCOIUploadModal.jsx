@@ -45,7 +45,8 @@ export function TenantCOIUploadModal({ isOpen, onClose, onTenantCreated, onManua
     insuranceCompany: '',
     additionalInsured: 'no',
     waiverOfSubrogation: 'no',
-    certificateHolder: ''
+    certificateHolder: '',
+    additionalCoverages: []
   });
 
   // Manual entry fields
@@ -84,7 +85,8 @@ export function TenantCOIUploadModal({ isOpen, onClose, onTenantCreated, onManua
       insuranceCompany: '',
       additionalInsured: 'no',
       waiverOfSubrogation: 'no',
-      certificateHolder: ''
+      certificateHolder: '',
+      additionalCoverages: []
     });
     setFormData({
       property_id: '',
@@ -183,9 +185,11 @@ export function TenantCOIUploadModal({ isOpen, onClose, onTenantCreated, onManua
       reader.readAsDataURL(selectedFile);
       const base64Data = await base64Promise;
 
-      // Call extract-coi edge function
+      // Call extract-coi edge function with rawOnly flag
+      // This returns the direct AI extraction without buildVendorData processing
+      // so we get exactly what the AI read from the document
       const { data: result, error: fnError } = await supabase.functions.invoke('extract-coi', {
-        body: { pdfBase64: base64Data }
+        body: { pdfBase64: base64Data, rawOnly: true }
       });
 
       if (fnError) {
@@ -196,22 +200,24 @@ export function TenantCOIUploadModal({ isOpen, onClose, onTenantCreated, onManua
         throw new Error(result?.error || 'Failed to extract COI data');
       }
 
-      const coiData = result.data;
-      const rawData = coiData.rawData || {};
+      // Raw AI extraction data - use directly without buildVendorData processing
+      const raw = result.data;
 
-      // Populate extracted data for editing
+      // Populate extracted data for editing - use raw AI output
+      // null means the AI found the section but the field was blank
       setExtractedData({
-        companyName: coiData.name || rawData.companyName || '',
-        expirationDate: coiData.expirationDate || '',
-        generalLiability: coiData.coverage?.generalLiability?.amount || 0,
-        generalLiabilityAggregate: coiData.coverage?.generalLiability?.aggregate || 0,
-        autoLiability: coiData.coverage?.autoLiability?.amount || 0,
-        workersComp: coiData.coverage?.workersComp?.amount || 'Statutory',
-        employersLiability: coiData.coverage?.employersLiability?.amount || 0,
-        insuranceCompany: coiData.insuranceCompany || rawData.insuranceCompany || '',
-        additionalInsured: coiData.additionalInsured || rawData.additionalInsured || 'no',
-        waiverOfSubrogation: coiData.waiverOfSubrogation || rawData.waiverOfSubrogation || 'no',
-        certificateHolder: coiData.certificateHolder || rawData.certificateHolder || ''
+        companyName: raw.companyName || '',
+        expirationDate: raw.expirationDate || '',
+        generalLiability: raw.generalLiability?.amount ?? 0,
+        generalLiabilityAggregate: raw.generalLiability?.aggregate ?? 0,
+        autoLiability: raw.autoLiability?.amount ?? 0,
+        workersComp: raw.workersComp?.amount || 'Statutory',
+        employersLiability: raw.employersLiability?.amount ?? 0,
+        insuranceCompany: raw.insuranceCompany || '',
+        additionalInsured: raw.additionalInsured || 'no',
+        waiverOfSubrogation: raw.waiverOfSubrogation || 'no',
+        certificateHolder: raw.certificateHolder || '',
+        additionalCoverages: raw.additionalCoverages || []
       });
 
       setStep(STEPS.REVIEW);
@@ -691,6 +697,21 @@ export function TenantCOIUploadModal({ isOpen, onClose, onTenantCreated, onManua
                     </select>
                   </div>
                 </div>
+
+                {/* Additional Coverages from extraction */}
+                {extractedData.additionalCoverages && extractedData.additionalCoverages.length > 0 && (
+                  <div className="mt-4 pt-4 border-t border-blue-200">
+                    <h4 className="text-sm font-medium text-gray-700 mb-2">Additional Coverages Found</h4>
+                    <div className="space-y-2">
+                      {extractedData.additionalCoverages.map((cov, idx) => (
+                        <div key={idx} className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-blue-100">
+                          <span className="text-sm text-gray-700">{cov.type}</span>
+                          <span className="text-sm font-medium text-gray-900">{formatCurrency(cov.amount)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Contact Info & Property */}
@@ -949,23 +970,41 @@ export function TenantCOIUploadModal({ isOpen, onClose, onTenantCreated, onManua
               <div className="bg-gray-50 rounded-xl p-4">
                 <h4 className="font-semibold text-gray-900 mb-3">Coverage Summary</h4>
                 <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">General Liability:</span>
-                    <span className="font-medium">{formatCurrency(extractedData.generalLiability)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Auto Liability:</span>
-                    <span className="font-medium">{formatCurrency(extractedData.autoLiability)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Employers Liability:</span>
-                    <span className="font-medium">{formatCurrency(extractedData.employersLiability)}</span>
-                  </div>
+                  {extractedData.generalLiability > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">General Liability:</span>
+                      <span className="font-medium">{formatCurrency(extractedData.generalLiability)}</span>
+                    </div>
+                  )}
+                  {extractedData.autoLiability > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Auto Liability:</span>
+                      <span className="font-medium">{formatCurrency(extractedData.autoLiability)}</span>
+                    </div>
+                  )}
+                  {extractedData.employersLiability > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Employers Liability:</span>
+                      <span className="font-medium">{formatCurrency(extractedData.employersLiability)}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between">
                     <span className="text-gray-600">Expires:</span>
                     <span className="font-medium">{extractedData.expirationDate || 'N/A'}</span>
                   </div>
                 </div>
+                {/* Additional coverages in summary */}
+                {extractedData.additionalCoverages && extractedData.additionalCoverages.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-gray-200">
+                    <h5 className="text-xs font-medium text-gray-500 mb-2">Additional Coverages</h5>
+                    {extractedData.additionalCoverages.map((cov, idx) => (
+                      <div key={idx} className="flex justify-between text-sm">
+                        <span className="text-gray-600">{cov.type}:</span>
+                        <span className="font-medium">{formatCurrency(cov.amount)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}

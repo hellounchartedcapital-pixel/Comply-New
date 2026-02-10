@@ -30,7 +30,7 @@ serve(async (req) => {
       throw new Error('ANTHROPIC_API_KEY not configured');
     }
 
-    const { pdfBase64, requirements } = await req.json();
+    const { pdfBase64, requirements, rawOnly } = await req.json();
 
     if (!pdfBase64) {
       throw new Error('No PDF data provided');
@@ -69,10 +69,27 @@ ALWAYS EXTRACT:
 5. WAIVER OF SUBROGATION - Check Description of Operations section
 
 STANDARD COVERAGES (extract if present on the certificate):
-- GENERAL LIABILITY - "Each Occurrence" limit and "General Aggregate"
-- AUTOMOBILE LIABILITY - "Combined Single Limit"
-- WORKERS COMPENSATION - Usually "Statutory"
-- EMPLOYERS LIABILITY - "Each Accident" amount
+
+GENERAL LIABILITY (ACORD 25 Section):
+  The GL section on an ACORD 25 form has MULTIPLE sub-fields. You MUST distinguish between them:
+  - "EACH OCCURRENCE" → This is the PRIMARY per-occurrence limit. Use this for the "amount" field.
+  - "GENERAL AGGREGATE" → Use this for the "aggregate" field.
+  - "DAMAGE TO RENTED PREMISES (Ea occurrence)" → This is NOT the main GL limit. Do NOT use this as "amount".
+  - "MED EXP (Any one person)" → This is NOT the main GL limit. Ignore for amount/aggregate.
+  - "PERSONAL & ADV INJURY" → This is NOT the main GL limit. Ignore for amount/aggregate.
+  - "PRODUCTS - COMP/OP AGG" → This is NOT the general aggregate. Ignore for amount/aggregate.
+  CRITICAL: ONLY use the value from the "EACH OCCURRENCE" row for generalLiability.amount.
+  If the "EACH OCCURRENCE" field is blank/empty but other sub-fields have values, set amount to null.
+
+AUTOMOBILE LIABILITY:
+  - "COMBINED SINGLE LIMIT (Ea accident)" → Use this for the "amount" field.
+
+WORKERS COMPENSATION:
+  - Usually shows "X" in the Statutory Limits box → Use "Statutory".
+
+EMPLOYERS LIABILITY:
+  - "E.L. EACH ACCIDENT" → Use this for the "amount" field.
+  - Do NOT confuse with "E.L. DISEASE - EA EMPLOYEE" or "E.L. DISEASE - POLICY LIMIT".
 
 ADDITIONAL COVERAGES (extract ANY other coverage types found, such as):
 - Umbrella/Excess Liability
@@ -90,12 +107,12 @@ Return this JSON structure:
   "companyName": "insured company name",
   "expirationDate": "YYYY-MM-DD (earliest expiration across all policies)",
   "generalLiability": {
-    "amount": <each occurrence as integer, or null if the field is blank/empty on the form>,
-    "aggregate": <general aggregate as integer, or null if blank>,
+    "amount": <EACH OCCURRENCE limit as integer, or null if that specific field is blank/empty>,
+    "aggregate": <GENERAL AGGREGATE as integer, or null if blank>,
     "expirationDate": "YYYY-MM-DD"
   },
   "autoLiability": {
-    "amount": <combined single limit as integer, or null if blank>,
+    "amount": <COMBINED SINGLE LIMIT as integer, or null if blank>,
     "expirationDate": "YYYY-MM-DD"
   },
   "workersComp": {
@@ -103,7 +120,7 @@ Return this JSON structure:
     "expirationDate": "YYYY-MM-DD"
   },
   "employersLiability": {
-    "amount": <each accident amount as integer, or null if blank>,
+    "amount": <E.L. EACH ACCIDENT amount as integer, or null if blank>,
     "expirationDate": "YYYY-MM-DD"
   },
   "additionalCoverages": [
@@ -122,11 +139,13 @@ Return this JSON structure:
 
 IMPORTANT RULES:
 - Include ALL coverage types found on the certificate
-- If a standard coverage (GL, Auto, WC, EL) section exists on the form but the dollar amount fields are BLANK or EMPTY, set the entire coverage to null — do NOT infer or guess a value
+- If a standard coverage section exists on the form but its PRIMARY dollar amount field is BLANK or EMPTY, set the ENTIRE coverage object to null — do NOT use values from other sub-fields
 - If a standard coverage is NOT on the certificate at all, set it to null
 - Put any non-standard coverages in the "additionalCoverages" array
 - If no additional coverages exist, return an empty array []
 - ONLY report dollar amounts that are EXPLICITLY printed with a number on the document
+- Do NOT confuse sub-fields within a section (e.g., "Damage to Rented Premises" is NOT "Each Occurrence")
+- If you are unsure whether a value belongs to a specific field, set it to null rather than guessing
 
 NUMBER FORMAT: Convert dollar amounts to plain integers.
 - $1,000,000 → 1000000
@@ -152,6 +171,14 @@ Return ONLY the JSON object, no other text.`
 
     const extractedData = JSON.parse(jsonMatch[0]);
     console.log('Extracted data:', JSON.stringify(extractedData));
+
+    // If rawOnly flag is set, return just the AI extraction without compliance processing
+    if (rawOnly) {
+      return new Response(
+        JSON.stringify({ success: true, data: extractedData, raw: true }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+      );
+    }
 
     const vendorData = buildVendorData(extractedData, reqs);
 
