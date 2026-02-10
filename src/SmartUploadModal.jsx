@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   X, Upload, Loader2, CheckCircle, AlertCircle,
-  Building2, Home, FileCheck, Users, Mail
+  Building2, Home, FileCheck, Mail
 } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import logger from './logger';
@@ -389,8 +389,7 @@ export function SmartUploadModal({
         }
       }
 
-      // Create tenant record
-      // Maps the same buildVendorData output fields to tenant columns
+      // Create tenant record — only columns that exist on tenants table
       const tenantData = {
         user_id: user.id,
         name: tenantName,
@@ -408,31 +407,19 @@ export function SmartUploadModal({
         requires_additional_insured: requirements.require_additional_insured || false,
         // Coverage — individual columns (read by tenant detail view)
         policy_expiration_date: data.expirationDate || null,
-        policy_liability_amount: data.coverage?.generalLiability?.amount || 0,
         policy_general_liability: data.coverage?.generalLiability?.amount || 0,
-        policy_general_liability_aggregate: data.coverage?.generalLiability?.aggregate || 0,
         policy_auto_liability: data.coverage?.autoLiability?.amount || 0,
         policy_workers_comp: data.coverage?.workersComp?.amount ? String(data.coverage.workersComp.amount) : null,
         policy_employers_liability: data.coverage?.employersLiability?.amount || 0,
         insurance_company: data.insuranceCompany || null,
-        // Coverage — full JSON (same as vendor's coverage field)
+        // Coverage — full JSON
         policy_coverage: data.coverage ? { ...data.coverage, additionalCoverages: data.additionalCoverages || [] } : null,
-        // Compliance — same fields as vendor
+        // Compliance
         compliance_issues: issues,
-        additional_insured: data.additionalInsured || null,
-        policy_additional_insured: data.additionalInsured || null,
         has_additional_insured: !!data.hasAdditionalInsured,
-        waiver_of_subrogation: data.waiverOfSubrogation || null,
         has_waiver_of_subrogation: !!data.hasWaiverOfSubrogation,
-        // Raw data and document
+        // Document
         policy_document_path: filePath,
-        raw_policy_data: {
-          ...data.rawData,
-          documentPath: filePath,
-          uploadToken: uploadToken,
-          uploadTokenExpiresAt: tokenExpiry.toISOString()
-        },
-        policy_uploaded_at: new Date().toISOString(),
         upload_token: uploadToken,
         upload_token_expires_at: tokenExpiry.toISOString()
       };
@@ -560,20 +547,20 @@ export function SmartUploadModal({
                       onClick={() => setDocumentType('tenant')}
                       className={`p-4 rounded-xl border-2 transition-all text-left ${
                         documentType === 'tenant'
-                          ? 'border-purple-500 bg-purple-50'
+                          ? 'border-blue-500 bg-blue-50'
                           : 'border-gray-200 hover:border-gray-300'
                       }`}
                     >
                       <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-2 ${
-                        documentType === 'tenant' ? 'bg-purple-100' : 'bg-gray-100'
+                        documentType === 'tenant' ? 'bg-blue-100' : 'bg-gray-100'
                       }`}>
-                        <Users size={20} className={documentType === 'tenant' ? 'text-purple-600' : 'text-gray-500'} />
+                        <FileCheck size={20} className={documentType === 'tenant' ? 'text-blue-600' : 'text-gray-500'} />
                       </div>
-                      <p className={`font-semibold ${documentType === 'tenant' ? 'text-purple-900' : 'text-gray-900'}`}>
-                        Tenant Insurance
+                      <p className={`font-semibold ${documentType === 'tenant' ? 'text-blue-900' : 'text-gray-900'}`}>
+                        Tenant COI
                       </p>
                       <p className="text-xs text-gray-500 mt-1">
-                        Renter's policy
+                        Commercial certificate
                       </p>
                     </button>
                   </div>
@@ -675,15 +662,15 @@ export function SmartUploadModal({
 
               {/* Lease Requirements (for tenants) */}
               {documentType === 'tenant' && (
-                <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
-                  <h4 className="text-sm font-semibold text-purple-900 mb-3">Lease Requirements</h4>
+                <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                  <h4 className="text-sm font-semibold text-blue-900 mb-3">Coverage Requirements</h4>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-xs font-medium text-purple-800 mb-1">General Liability</label>
+                      <label className="block text-xs font-medium text-blue-800 mb-1">General Liability</label>
                       <select
                         value={leaseRequirements.general_liability}
                         onChange={(e) => setLeaseRequirements(r => ({ ...r, general_liability: parseInt(e.target.value) }))}
-                        className="w-full px-2 py-1.5 text-sm border border-purple-300 rounded-lg bg-white"
+                        className="w-full px-2 py-1.5 text-sm border border-blue-300 rounded-lg bg-white"
                       >
                         <option value={0}>Not Required</option>
                         <option value={100000}>$100,000</option>
@@ -694,11 +681,11 @@ export function SmartUploadModal({
                       </select>
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-purple-800 mb-1">Auto Liability</label>
+                      <label className="block text-xs font-medium text-blue-800 mb-1">Auto Liability</label>
                       <select
                         value={leaseRequirements.auto_liability}
                         onChange={(e) => setLeaseRequirements(r => ({ ...r, auto_liability: parseInt(e.target.value) }))}
-                        className="w-full px-2 py-1.5 text-sm border border-purple-300 rounded-lg bg-white"
+                        className="w-full px-2 py-1.5 text-sm border border-blue-300 rounded-lg bg-white"
                       >
                         <option value={0}>Not Required</option>
                         <option value={100000}>$100,000</option>
@@ -708,22 +695,22 @@ export function SmartUploadModal({
                       </select>
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-purple-800 mb-1">Workers Comp</label>
+                      <label className="block text-xs font-medium text-blue-800 mb-1">Workers Comp</label>
                       <select
                         value={leaseRequirements.workers_comp_required ? '1' : '0'}
                         onChange={(e) => setLeaseRequirements(r => ({ ...r, workers_comp_required: e.target.value === '1' }))}
-                        className="w-full px-2 py-1.5 text-sm border border-purple-300 rounded-lg bg-white"
+                        className="w-full px-2 py-1.5 text-sm border border-blue-300 rounded-lg bg-white"
                       >
                         <option value="0">Not Required</option>
                         <option value="1">Required</option>
                       </select>
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-purple-800 mb-1">Employers Liability</label>
+                      <label className="block text-xs font-medium text-blue-800 mb-1">Employers Liability</label>
                       <select
                         value={leaseRequirements.employers_liability}
                         onChange={(e) => setLeaseRequirements(r => ({ ...r, employers_liability: parseInt(e.target.value) }))}
-                        className="w-full px-2 py-1.5 text-sm border border-purple-300 rounded-lg bg-white"
+                        className="w-full px-2 py-1.5 text-sm border border-blue-300 rounded-lg bg-white"
                       >
                         <option value={0}>Not Required</option>
                         <option value={100000}>$100,000</option>
@@ -732,22 +719,22 @@ export function SmartUploadModal({
                       </select>
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-purple-800 mb-1">Additional Insured</label>
+                      <label className="block text-xs font-medium text-blue-800 mb-1">Additional Insured</label>
                       <select
                         value={leaseRequirements.require_additional_insured ? '1' : '0'}
                         onChange={(e) => setLeaseRequirements(r => ({ ...r, require_additional_insured: e.target.value === '1' }))}
-                        className="w-full px-2 py-1.5 text-sm border border-purple-300 rounded-lg bg-white"
+                        className="w-full px-2 py-1.5 text-sm border border-blue-300 rounded-lg bg-white"
                       >
                         <option value="1">Required</option>
                         <option value="0">Not Required</option>
                       </select>
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-purple-800 mb-1">Waiver of Subrogation</label>
+                      <label className="block text-xs font-medium text-blue-800 mb-1">Waiver of Subrogation</label>
                       <select
                         value={leaseRequirements.require_waiver_of_subrogation ? '1' : '0'}
                         onChange={(e) => setLeaseRequirements(r => ({ ...r, require_waiver_of_subrogation: e.target.value === '1' }))}
-                        className="w-full px-2 py-1.5 text-sm border border-purple-300 rounded-lg bg-white"
+                        className="w-full px-2 py-1.5 text-sm border border-blue-300 rounded-lg bg-white"
                       >
                         <option value="0">Not Required</option>
                         <option value="1">Required</option>
@@ -778,25 +765,20 @@ export function SmartUploadModal({
               )}
 
               {/* Summary */}
-              <div className={`rounded-lg p-4 mb-4 ${
-                documentType === 'vendor' ? 'bg-blue-50 border border-blue-200' : 'bg-purple-50 border border-purple-200'
-              }`}>
+              <div className="rounded-lg p-4 mb-4 bg-blue-50 border border-blue-200">
                 <div className="flex items-center gap-2 mb-2">
-                  {documentType === 'vendor'
-                    ? <FileCheck size={18} className="text-blue-600" />
-                    : <Users size={18} className="text-purple-600" />
-                  }
-                  <span className={`font-semibold ${documentType === 'vendor' ? 'text-blue-900' : 'text-purple-900'}`}>
-                    {documentType === 'vendor' ? 'Vendor COI' : 'Tenant Insurance'}
+                  <FileCheck size={18} className="text-blue-600" />
+                  <span className="font-semibold text-blue-900">
+                    {documentType === 'vendor' ? 'Vendor' : 'Tenant'} COI
                   </span>
                 </div>
-                <p className={`text-sm ${documentType === 'vendor' ? 'text-blue-700' : 'text-purple-700'}`}>
+                <p className="text-sm text-blue-700">
                   {selectedProp?.name}
                   {contactName && ` • ${contactName}`}
                   {unitNumber && unitNumber.trim() && ` • Unit ${unitNumber.trim()}`}
                 </p>
                 {contactEmail && (
-                  <p className={`text-xs mt-1 ${documentType === 'vendor' ? 'text-blue-600' : 'text-purple-600'}`}>
+                  <p className="text-xs mt-1 text-blue-600">
                     <Mail size={12} className="inline mr-1" />{contactEmail}
                   </p>
                 )}
