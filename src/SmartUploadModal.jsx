@@ -407,9 +407,16 @@ export function SmartUploadModal({
         required_workers_comp: leaseRequirements.workers_comp_required || false,
         required_employers_liability: leaseRequirements.employers_liability || 0,
         requires_additional_insured: leaseRequirements.require_additional_insured || false,
-        // Policy data
+        // Policy data - individual columns (read by tenant detail view)
         policy_expiration_date: data.expirationDate || null,
         policy_liability_amount: liabilityAmount,
+        policy_general_liability: data.coverage?.generalLiability?.amount || 0,
+        policy_general_liability_aggregate: data.coverage?.generalLiability?.aggregate || 0,
+        policy_auto_liability: data.coverage?.autoLiability?.amount || 0,
+        policy_workers_comp: data.coverage?.workersComp?.amount ? String(data.coverage.workersComp.amount) : null,
+        policy_employers_liability: data.coverage?.employersLiability?.amount || 0,
+        insurance_company: data.insuranceCompany || null,
+        // Policy data - full JSON
         policy_coverage: data.coverage ? { ...data.coverage, additionalCoverages: data.additionalCoverages || [] } : null,
         policy_additional_insured: data.additionalInsured || null,
         has_additional_insured: !!data.hasAdditionalInsured,
