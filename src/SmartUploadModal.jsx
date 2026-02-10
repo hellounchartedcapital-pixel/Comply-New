@@ -389,8 +389,7 @@ export function SmartUploadModal({
         }
       }
 
-      // Create tenant record
-      // Maps the same buildVendorData output fields to tenant columns
+      // Create tenant record — only columns that exist on tenants table
       const tenantData = {
         user_id: user.id,
         name: tenantName,
@@ -408,31 +407,19 @@ export function SmartUploadModal({
         requires_additional_insured: requirements.require_additional_insured || false,
         // Coverage — individual columns (read by tenant detail view)
         policy_expiration_date: data.expirationDate || null,
-        policy_liability_amount: data.coverage?.generalLiability?.amount || 0,
         policy_general_liability: data.coverage?.generalLiability?.amount || 0,
-        policy_general_liability_aggregate: data.coverage?.generalLiability?.aggregate || 0,
         policy_auto_liability: data.coverage?.autoLiability?.amount || 0,
         policy_workers_comp: data.coverage?.workersComp?.amount ? String(data.coverage.workersComp.amount) : null,
         policy_employers_liability: data.coverage?.employersLiability?.amount || 0,
         insurance_company: data.insuranceCompany || null,
-        // Coverage — full JSON (same as vendor's coverage field)
+        // Coverage — full JSON
         policy_coverage: data.coverage ? { ...data.coverage, additionalCoverages: data.additionalCoverages || [] } : null,
-        // Compliance — same fields as vendor
+        // Compliance
         compliance_issues: issues,
-        additional_insured: data.additionalInsured || null,
-        policy_additional_insured: data.additionalInsured || null,
         has_additional_insured: !!data.hasAdditionalInsured,
-        waiver_of_subrogation: data.waiverOfSubrogation || null,
         has_waiver_of_subrogation: !!data.hasWaiverOfSubrogation,
-        // Raw data and document
+        // Document
         policy_document_path: filePath,
-        raw_policy_data: {
-          ...data.rawData,
-          documentPath: filePath,
-          uploadToken: uploadToken,
-          uploadTokenExpiresAt: tokenExpiry.toISOString()
-        },
-        policy_uploaded_at: new Date().toISOString(),
         upload_token: uploadToken,
         upload_token_expires_at: tokenExpiry.toISOString()
       };
