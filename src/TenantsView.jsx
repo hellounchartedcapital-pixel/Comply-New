@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   Users, Plus, Search, CheckCircle, XCircle, AlertCircle, Clock,
   Mail, Phone, Calendar, Building2, X, Send,
-  ExternalLink, Loader2, FileText, History, Upload
+  Loader2, FileText, History, Upload
 } from 'lucide-react';
 import { useTenants } from './useTenants';
 import { supabase } from './supabaseClient';
@@ -11,7 +11,7 @@ import { AlertModal, useAlertModal } from './AlertModal';
 import { PropertySelector } from './PropertySelector';
 import { SmartUploadModal } from './SmartUploadModal';
 import logger from './logger';
-import { showSuccess, showError } from './toast';
+import { showSuccess } from './toast';
 
 
 // Status icon component (matches vendor style)
@@ -566,7 +566,6 @@ export function TenantsView({ properties, userRequirements, selectedProperty, on
   const [editingTenant, setEditingTenant] = useState(null);
   const [selectedTenant, setSelectedTenant] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
-  const [copySuccess, setCopySuccess] = useState(null);
   const [sendingRequest, setSendingRequest] = useState(null);
   const [requestSuccess, setRequestSuccess] = useState(null);
   const [bulkRequesting, setBulkRequesting] = useState(false);
@@ -835,18 +834,6 @@ export function TenantsView({ properties, userRequirements, selectedProperty, on
     await deleteTenant(id);
     setDeleteConfirm(null);
     setSelectedTenant(null);
-  };
-
-  const copyUploadLink = async (tenant) => {
-    try {
-      const link = `${window.location.origin}?tenant_upload=${tenant.upload_token}`;
-      await navigator.clipboard.writeText(link);
-      setCopySuccess(tenant.id);
-      showSuccess('Upload link copied to clipboard');
-      setTimeout(() => setCopySuccess(null), 2000);
-    } catch (err) {
-      showError('Failed to copy link. Please try again.');
-    }
   };
 
   const handleSendRequest = async (tenant) => {
@@ -1666,9 +1653,9 @@ export function TenantsView({ properties, userRequirements, selectedProperty, on
                         </div>
                       )}
 
-                      {/* Coverage Details - Required vs Found */}
+                      {/* Coverage Details - mirrors vendor detail view exactly */}
                       <div>
-                        <h4 className="font-bold text-gray-900 text-sm mb-2">Coverage — Required vs Found</h4>
+                        <h4 className="font-bold text-gray-900 text-sm mb-2">Coverage Details</h4>
                         {/* Column headers */}
                         <div className="flex items-center justify-between px-2.5 pb-1 text-xs text-gray-500 font-medium">
                           <span>Coverage</span>
@@ -1678,189 +1665,183 @@ export function TenantsView({ properties, userRequirements, selectedProperty, on
                           </div>
                         </div>
                         <div className="space-y-1.5">
-                          {/* General Liability Coverage */}
                           {(() => {
-                            const hasPolicy = selectedTenant.policy_expiration_date;
-                            const amount = selectedTenant.policy_general_liability || 0;
-                            const required = selectedTenant.required_general_liability || 0;
-                            const meetsRequirement = amount >= required;
-                            const isExpired = selectedTenant.insurance_status === 'expired';
-                            const isExpiring = selectedTenant.insurance_status === 'expiring';
+                            const coverage = selectedTenant.policy_coverage || {};
+                            const reqs = {
+                              general_liability: selectedTenant.required_general_liability || 0,
+                              auto_liability: selectedTenant.required_auto_liability || 0,
+                              workers_comp_required: selectedTenant.required_workers_comp || false,
+                              employers_liability: selectedTenant.required_employers_liability || 0,
+                            };
+                            const reqMap = {
+                              generalLiability: reqs.general_liability,
+                              autoLiability: reqs.auto_liability,
+                              workersComp: reqs.workers_comp_required ? 'Statutory' : null,
+                              employersLiability: reqs.employers_liability,
+                            };
+                            return [
+                              { key: 'generalLiability', label: 'General Liability', coverage: coverage.generalLiability },
+                              { key: 'autoLiability', label: 'Auto Liability', coverage: coverage.autoLiability },
+                              { key: 'workersComp', label: 'Workers Compensation', coverage: coverage.workersComp },
+                              { key: 'employersLiability', label: 'Employers Liability', coverage: coverage.employersLiability },
+                            ].map(({ key, label, coverage: cov }) => {
+                              const amount = cov?.amount;
+                              const hasAmount = amount && amount !== 'N/A' && amount !== 0;
+                              const requiredAmount = reqMap[key];
+                              const hasRequirement = requiredAmount && requiredAmount !== 0;
 
-                            let statusIcon, statusColor, statusBg, statusText;
-                            if (!hasPolicy) {
-                              statusIcon = <XCircle size={14} className="text-gray-400" />;
-                              statusColor = 'text-gray-400';
-                              statusBg = 'bg-gray-50';
-                              statusText = 'No policy';
-                            } else if (isExpired) {
-                              statusIcon = <XCircle size={14} className="text-red-600" />;
-                              statusColor = 'text-red-600';
-                              statusBg = 'bg-red-50';
-                              statusText = 'Expired';
-                            } else if (isExpiring) {
-                              statusIcon = <AlertCircle size={14} className="text-amber-600" />;
-                              statusColor = 'text-amber-600';
-                              statusBg = 'bg-amber-50';
-                              statusText = 'Expiring Soon';
-                            } else if (!meetsRequirement && required > 0) {
-                              statusIcon = <AlertCircle size={14} className="text-orange-600" />;
-                              statusColor = 'text-orange-600';
-                              statusBg = 'bg-orange-50';
-                              statusText = 'Below Requirement';
-                            } else {
-                              statusIcon = <CheckCircle size={14} className="text-emerald-600" />;
-                              statusColor = 'text-emerald-600';
-                              statusBg = 'bg-emerald-50';
-                              statusText = 'Compliant';
-                            }
+                              let statusIcon, statusColor, statusBg, statusText;
+                              if (!hasAmount) {
+                                statusIcon = <XCircle size={14} className="text-gray-400" />;
+                                statusColor = 'text-gray-400';
+                                statusBg = 'bg-gray-50';
+                                statusText = 'Not provided';
+                              } else if (cov?.expired) {
+                                statusIcon = <XCircle size={14} className="text-red-600" />;
+                                statusColor = 'text-red-600';
+                                statusBg = 'bg-red-50';
+                                statusText = 'Expired';
+                              } else if (cov?.expiringSoon) {
+                                statusIcon = <AlertCircle size={14} className="text-amber-600" />;
+                                statusColor = 'text-amber-600';
+                                statusBg = 'bg-amber-50';
+                                statusText = 'Expiring Soon';
+                              } else if (cov?.compliant === false) {
+                                statusIcon = <AlertCircle size={14} className="text-orange-600" />;
+                                statusColor = 'text-orange-600';
+                                statusBg = 'bg-orange-50';
+                                statusText = 'Below Requirement';
+                              } else {
+                                statusIcon = <CheckCircle size={14} className="text-emerald-600" />;
+                                statusColor = 'text-emerald-600';
+                                statusBg = 'bg-emerald-50';
+                                statusText = 'Compliant';
+                              }
 
-                            return (
-                              <div className={`flex items-center justify-between p-2.5 rounded-lg ${statusBg}`}>
-                                <div className="flex items-center space-x-2">
-                                  {statusIcon}
-                                  <div>
-                                    <p className="font-medium text-gray-900 text-sm">General Liability</p>
-                                    <p className={`text-xs ${statusColor}`}>{statusText}</p>
-                                  </div>
-                                </div>
-                                <div className="flex items-center space-x-4">
-                                  <p className="font-semibold text-gray-900 text-sm w-20 text-right">
-                                    {hasPolicy && amount > 0 ? formatCurrency(amount) : 'N/A'}
-                                  </p>
-                                  <p className="text-xs text-gray-500 w-20 text-right">
-                                    {required > 0 ? formatCurrency(required) : '—'}
-                                  </p>
-                                </div>
-                              </div>
-                            );
-                          })()}
-
-                          {/* Auto Liability */}
-                          {(selectedTenant.policy_auto_liability > 0 || selectedTenant.required_auto_liability > 0) && (
-                            <div className={`flex items-center justify-between p-2.5 rounded-lg ${
-                              selectedTenant.policy_auto_liability >= (selectedTenant.required_auto_liability || 0)
-                                ? 'bg-emerald-50' : 'bg-orange-50'
-                            }`}>
-                              <div className="flex items-center space-x-2">
-                                {selectedTenant.policy_auto_liability >= (selectedTenant.required_auto_liability || 0) ? (
-                                  <CheckCircle size={14} className="text-emerald-600" />
-                                ) : (
-                                  <AlertCircle size={14} className="text-orange-600" />
-                                )}
-                                <p className="font-medium text-gray-900 text-sm">Auto Liability</p>
-                              </div>
-                              <div className="flex items-center space-x-4">
-                                <p className="font-semibold text-gray-900 text-sm w-20 text-right">
-                                  {selectedTenant.policy_auto_liability > 0 ? formatCurrency(selectedTenant.policy_auto_liability) : 'N/A'}
-                                </p>
-                                <p className="text-xs text-gray-500 w-20 text-right">
-                                  {selectedTenant.required_auto_liability > 0 ? formatCurrency(selectedTenant.required_auto_liability) : '—'}
-                                </p>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Workers Comp */}
-                          {(selectedTenant.policy_workers_comp || selectedTenant.required_workers_comp) && (
-                            <div className={`flex items-center justify-between p-2.5 rounded-lg ${
-                              selectedTenant.policy_workers_comp ? 'bg-emerald-50' : 'bg-orange-50'
-                            }`}>
-                              <div className="flex items-center space-x-2">
-                                {selectedTenant.policy_workers_comp ? (
-                                  <CheckCircle size={14} className="text-emerald-600" />
-                                ) : (
-                                  <AlertCircle size={14} className="text-orange-600" />
-                                )}
-                                <p className="font-medium text-gray-900 text-sm">Workers Comp</p>
-                              </div>
-                              <div className="flex items-center space-x-4">
-                                <p className="font-semibold text-gray-900 text-sm w-20 text-right">
-                                  {selectedTenant.policy_workers_comp || 'N/A'}
-                                </p>
-                                <p className="text-xs text-gray-500 w-20 text-right">
-                                  {selectedTenant.required_workers_comp ? 'Required' : '—'}
-                                </p>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Employers Liability */}
-                          {(selectedTenant.policy_employers_liability > 0 || selectedTenant.required_employers_liability > 0) && (
-                            <div className={`flex items-center justify-between p-2.5 rounded-lg ${
-                              selectedTenant.policy_employers_liability >= (selectedTenant.required_employers_liability || 0)
-                                ? 'bg-emerald-50' : 'bg-orange-50'
-                            }`}>
-                              <div className="flex items-center space-x-2">
-                                {selectedTenant.policy_employers_liability >= (selectedTenant.required_employers_liability || 0) ? (
-                                  <CheckCircle size={14} className="text-emerald-600" />
-                                ) : (
-                                  <AlertCircle size={14} className="text-orange-600" />
-                                )}
-                                <p className="font-medium text-gray-900 text-sm">Employers Liability</p>
-                              </div>
-                              <div className="flex items-center space-x-4">
-                                <p className="font-semibold text-gray-900 text-sm w-20 text-right">
-                                  {selectedTenant.policy_employers_liability > 0 ? formatCurrency(selectedTenant.policy_employers_liability) : 'N/A'}
-                                </p>
-                                <p className="text-xs text-gray-500 w-20 text-right">
-                                  {selectedTenant.required_employers_liability > 0 ? formatCurrency(selectedTenant.required_employers_liability) : '—'}
-                                </p>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Additional Coverages from policy_coverage */}
-                          {selectedTenant.policy_coverage?.additionalCoverages && selectedTenant.policy_coverage.additionalCoverages.length > 0 && (
-                            <>
-                              {selectedTenant.policy_coverage.additionalCoverages.map((cov, idx) => (
-                                <div key={`additional-${idx}`} className="flex items-center justify-between p-2.5 rounded-lg bg-emerald-50">
+                              return (
+                                <div key={key} className={`flex items-center justify-between p-2.5 rounded-lg ${statusBg}`}>
                                   <div className="flex items-center space-x-2">
-                                    <CheckCircle size={14} className="text-emerald-600" />
-                                    <p className="font-medium text-gray-900 text-sm">{cov.type}</p>
+                                    {statusIcon}
+                                    <div>
+                                      <p className="font-medium text-gray-900 text-sm">{label}</p>
+                                      <p className={`text-xs ${statusColor}`}>{statusText}</p>
+                                    </div>
                                   </div>
                                   <div className="flex items-center space-x-4">
                                     <p className="font-semibold text-gray-900 text-sm w-20 text-right">
-                                      {formatCurrency(cov.amount)}
+                                      {key === 'workersComp' ? (amount || 'N/A') : formatCurrency(amount)}
                                     </p>
-                                    <p className="text-xs text-gray-500 w-20 text-right">—</p>
+                                    <p className="text-xs text-gray-500 w-20 text-right">
+                                      {key === 'workersComp'
+                                        ? (hasRequirement ? 'Required' : '—')
+                                        : (hasRequirement ? formatCurrency(requiredAmount) : '—')
+                                      }
+                                    </p>
                                   </div>
                                 </div>
-                              ))}
-                            </>
-                          )}
+                              );
+                            });
+                          })()}
 
-                          {/* Additional Insured */}
-                          {selectedTenant.require_additional_insured && (
-                            <div className={`flex items-center justify-between p-2.5 rounded-lg ${
-                              selectedTenant.has_additional_insured ? 'bg-emerald-50' : 'bg-orange-50'
-                            }`}>
-                              <div className="flex items-center space-x-2">
-                                {selectedTenant.has_additional_insured ? (
-                                  <CheckCircle size={14} className="text-emerald-600" />
-                                ) : (
-                                  <AlertCircle size={14} className="text-orange-600" />
-                                )}
-                                <div>
-                                  <p className="font-medium text-gray-900 text-sm">Additional Insured</p>
-                                  <p className={`text-xs ${selectedTenant.has_additional_insured ? 'text-emerald-600' : 'text-orange-600'}`}>
-                                    {selectedTenant.has_additional_insured ? 'Included' : 'Missing'}
-                                  </p>
-                                </div>
-                              </div>
-                              <p className="font-semibold text-gray-900 text-sm">Required</p>
-                            </div>
+                          {/* Additional Coverages */}
+                          {selectedTenant.policy_coverage?.additionalCoverages && selectedTenant.policy_coverage.additionalCoverages.length > 0 && (
+                            <>
+                              {selectedTenant.policy_coverage.additionalCoverages.map((cov, idx) => {
+                                const amount = cov.amount;
+                                const hasAmount = amount && amount !== 0;
+
+                                let statusIcon, statusColor, statusBg, statusText;
+                                if (!hasAmount) {
+                                  statusIcon = <XCircle size={14} className="text-gray-400" />;
+                                  statusColor = 'text-gray-400';
+                                  statusBg = 'bg-gray-50';
+                                  statusText = 'Not provided';
+                                } else {
+                                  statusIcon = <CheckCircle size={14} className="text-emerald-600" />;
+                                  statusColor = 'text-emerald-600';
+                                  statusBg = 'bg-emerald-50';
+                                  statusText = 'Active';
+                                }
+
+                                return (
+                                  <div key={`additional-${idx}`} className={`flex items-center justify-between p-2.5 rounded-lg ${statusBg}`}>
+                                    <div className="flex items-center space-x-2">
+                                      {statusIcon}
+                                      <div>
+                                        <p className="font-medium text-gray-900 text-sm">{cov.type}</p>
+                                        <p className={`text-xs ${statusColor}`}>{statusText}</p>
+                                      </div>
+                                    </div>
+                                    <p className="font-semibold text-gray-900 text-sm">
+                                      {formatCurrency(amount)}
+                                    </p>
+                                  </div>
+                                );
+                              })}
+                            </>
                           )}
                         </div>
                       </div>
 
-                      {/* Issues */}
-                      {selectedTenant.insurance_issues && selectedTenant.insurance_issues.length > 0 && (
+                      {/* Additional Insured Status - matches vendor style */}
+                      {(selectedTenant.has_additional_insured || (selectedTenant.requires_additional_insured && !selectedTenant.has_additional_insured)) && (
+                        <div className={`p-3 rounded-xl border ${
+                          selectedTenant.has_additional_insured
+                            ? 'bg-emerald-50 border-emerald-200'
+                            : 'bg-red-50 border-red-200'
+                        }`}>
+                          <div className="flex items-start space-x-2">
+                            {selectedTenant.has_additional_insured ? (
+                              <CheckCircle size={16} className="text-emerald-600 flex-shrink-0 mt-0.5" />
+                            ) : (
+                              <AlertCircle size={16} className="text-red-600 flex-shrink-0 mt-0.5" />
+                            )}
+                            <div className="flex-1">
+                              <p className="text-sm font-semibold text-gray-900">Additional Insured</p>
+                              <p className={`text-sm mt-1 ${
+                                selectedTenant.has_additional_insured ? 'text-emerald-700' : 'text-red-700'
+                              }`}>
+                                {selectedTenant.has_additional_insured ? 'Included' : 'Missing — Required'}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Waiver of Subrogation Status - matches vendor style */}
+                      {(selectedTenant.has_waiver_of_subrogation || (selectedTenant.policy_coverage && !selectedTenant.has_waiver_of_subrogation && selectedTenant.required_workers_comp)) && (
+                        <div className={`p-3 rounded-xl border ${
+                          selectedTenant.has_waiver_of_subrogation
+                            ? 'bg-emerald-50 border-emerald-200'
+                            : 'bg-red-50 border-red-200'
+                        }`}>
+                          <div className="flex items-start space-x-2">
+                            {selectedTenant.has_waiver_of_subrogation ? (
+                              <CheckCircle size={16} className="text-emerald-600 flex-shrink-0 mt-0.5" />
+                            ) : (
+                              <AlertCircle size={16} className="text-red-600 flex-shrink-0 mt-0.5" />
+                            )}
+                            <div className="flex-1">
+                              <p className="text-sm font-semibold text-gray-900">Waiver of Subrogation</p>
+                              <p className={`text-sm mt-1 ${
+                                selectedTenant.has_waiver_of_subrogation ? 'text-emerald-700' : 'text-red-700'
+                              }`}>
+                                {selectedTenant.has_waiver_of_subrogation ? 'Included' : 'Missing — Required'}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Issues - matches vendor style */}
+                      {((selectedTenant.compliance_issues && selectedTenant.compliance_issues.length > 0) || (selectedTenant.insurance_issues && selectedTenant.insurance_issues.length > 0)) && (
                         <div className="p-3 bg-red-50 border border-red-200 rounded-xl">
                           <h4 className="font-bold text-red-900 text-sm mb-2">Issues</h4>
                           <div className="space-y-1.5">
-                            {selectedTenant.insurance_issues.map((issue, idx) => (
-                              <div key={idx} className="flex items-start space-x-2 text-sm text-red-700">
+                            {(selectedTenant.compliance_issues || selectedTenant.insurance_issues || []).map((issue, idx) => (
+                              <div key={idx} className={`flex items-start space-x-2 text-sm ${
+                                issue.type === 'critical' ? 'text-red-700' : 'text-orange-700'
+                              }`}>
                                 <AlertCircle size={14} className="mt-0.5 flex-shrink-0" />
                                 <span>{typeof issue === 'string' ? issue : issue.message}</span>
                               </div>
@@ -1870,7 +1851,7 @@ export function TenantsView({ properties, userRequirements, selectedProperty, on
                       )}
 
                       {/* Contact Information */}
-                      {(selectedTenant.email || selectedTenant.phone) && (
+                      {(selectedTenant.name || selectedTenant.email || selectedTenant.phone) && (
                         <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl">
                           <h4 className="font-bold text-gray-900 text-sm mb-2">Contact Information</h4>
                           <div className="space-y-1.5">
@@ -1889,38 +1870,6 @@ export function TenantsView({ properties, userRequirements, selectedProperty, on
                           </div>
                         </div>
                       )}
-
-                      {/* Actions */}
-                      <div className="space-y-2 pt-2">
-                        <button
-                          onClick={() => copyUploadLink(selectedTenant)}
-                          className="w-full px-4 py-2.5 bg-emerald-50 text-emerald-700 rounded-xl hover:bg-emerald-100 font-medium flex items-center justify-center gap-2 transition-all"
-                        >
-                          <ExternalLink size={16} />
-                          {copySuccess === selectedTenant.id ? 'Link Copied!' : 'Copy Upload Link'}
-                        </button>
-                        {selectedTenant.email && (
-                          requestSuccess === selectedTenant.id ? (
-                            <div className="w-full px-4 py-2.5 bg-emerald-100 text-emerald-700 rounded-xl font-medium flex items-center justify-center gap-2">
-                              <CheckCircle size={16} />
-                              Request Sent!
-                            </div>
-                          ) : (
-                            <button
-                              onClick={() => handleSendRequest(selectedTenant)}
-                              disabled={sendingRequest === selectedTenant.id}
-                              className="w-full px-4 py-2.5 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-xl hover:shadow-md font-medium flex items-center justify-center gap-2 disabled:opacity-50 transition-all"
-                            >
-                              {sendingRequest === selectedTenant.id ? (
-                                <Loader2 size={16} className="animate-spin" />
-                              ) : (
-                                <Send size={16} />
-                              )}
-                              Request Certificate
-                            </button>
-                          )
-                        )}
-                      </div>
                     </div>
                   )}
 
@@ -2000,6 +1949,39 @@ export function TenantsView({ properties, userRequirements, selectedProperty, on
                       )}
                     </div>
                   )}
+
+                  {/* Action Buttons - matches vendor style */}
+                  <div className="flex flex-col sm:flex-row gap-2 pt-4 mt-4 border-t border-gray-200">
+                    {selectedTenant.email && (
+                      (selectedTenant.insurance_status === 'expired' || selectedTenant.insurance_status === 'non-compliant' || selectedTenant.insurance_status === 'expiring') ? (
+                        requestSuccess === selectedTenant.id ? (
+                          <div className="flex-1 px-4 py-2.5 bg-emerald-100 text-emerald-700 rounded-xl font-semibold flex items-center justify-center space-x-2 text-sm">
+                            <CheckCircle size={14} />
+                            <span>Request Sent!</span>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => handleSendRequest(selectedTenant)}
+                            disabled={sendingRequest === selectedTenant.id}
+                            className="flex-1 px-4 py-2.5 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-xl hover:shadow-lg font-semibold flex items-center justify-center space-x-2 disabled:opacity-50 transition-all text-sm"
+                          >
+                            {sendingRequest === selectedTenant.id ? (
+                              <Loader2 size={14} className="animate-spin" />
+                            ) : (
+                              <Send size={14} />
+                            )}
+                            <span>Request New COI</span>
+                          </button>
+                        )
+                      ) : null
+                    )}
+                    <button
+                      onClick={() => setSelectedTenant(null)}
+                      className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 font-semibold transition-all text-sm"
+                    >
+                      Close
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
