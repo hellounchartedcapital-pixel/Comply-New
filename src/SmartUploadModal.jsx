@@ -35,11 +35,14 @@ export function SmartUploadModal({
   const [contactName, setContactName] = useState('');
   const [contactEmail, setContactEmail] = useState('');
 
-  // Tenant defaults (loaded from settings)
-  const [tenantDefaults, setTenantDefaults] = useState({
-    liabilityMin: 100000,
-    requiresAdditionalInsured: true,
-    additionalInsuredText: ''
+  // Lease requirements (user-entered per tenant)
+  const [leaseRequirements, setLeaseRequirements] = useState({
+    general_liability: 1000000,
+    auto_liability: 0,
+    workers_comp_required: false,
+    employers_liability: 0,
+    require_additional_insured: true,
+    require_waiver_of_subrogation: false
   });
 
   // Upload state
@@ -48,30 +51,6 @@ export function SmartUploadModal({
   const [dragActive, setDragActive] = useState(false);
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
-
-  // Load tenant defaults from settings
-  const loadTenantDefaults = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data } = await supabase
-        .from('settings')
-        .select('tenant_default_liability_min, tenant_default_requires_additional_insured, tenant_default_additional_insured_text')
-        .eq('user_id', user.id)
-        .single();
-
-      if (data) {
-        setTenantDefaults({
-          liabilityMin: data.tenant_default_liability_min || 100000,
-          requiresAdditionalInsured: data.tenant_default_requires_additional_insured !== false,
-          additionalInsuredText: data.tenant_default_additional_insured_text || ''
-        });
-      }
-    } catch (err) {
-      logger.error('Error loading tenant defaults', err);
-    }
-  };
 
   // Reset when modal opens
   useEffect(() => {
@@ -82,6 +61,14 @@ export function SmartUploadModal({
       setContactEmail('');
       setResult(null);
       setError(null);
+      setLeaseRequirements({
+        general_liability: 1000000,
+        auto_liability: 0,
+        workers_comp_required: false,
+        employers_liability: 0,
+        require_additional_insured: true,
+        require_waiver_of_subrogation: false
+      });
 
       // Try to restore last selected property from localStorage
       let lastPropertyId = null;
@@ -103,7 +90,6 @@ export function SmartUploadModal({
       }
 
       setUnitNumber('');
-      loadTenantDefaults();
     }
   }, [isOpen, initialProperty, properties, defaultDocumentType]);
 
@@ -208,9 +194,13 @@ export function SmartUploadModal({
         };
       } else {
         requirements = {
-          general_liability: tenantDefaults.liabilityMin,
-          require_additional_insured: tenantDefaults.requiresAdditionalInsured,
-          is_tenant_policy: true
+          general_liability: leaseRequirements.general_liability || 0,
+          auto_liability: leaseRequirements.auto_liability || 0,
+          auto_liability_required: leaseRequirements.auto_liability > 0,
+          workers_comp_required: leaseRequirements.workers_comp_required || false,
+          employers_liability: leaseRequirements.employers_liability || 0,
+          require_additional_insured: leaseRequirements.require_additional_insured || false,
+          require_waiver_of_subrogation: leaseRequirements.require_waiver_of_subrogation || false,
         };
       }
 
@@ -411,16 +401,19 @@ export function SmartUploadModal({
         unit_id: unitId,
         status: 'active',
         insurance_status: insuranceStatus,
-        // Lease requirements (from defaults)
-        required_liability_min: tenantDefaults.liabilityMin,
-        requires_additional_insured: tenantDefaults.requiresAdditionalInsured,
-        additional_insured_text: tenantDefaults.additionalInsuredText,
+        // Lease requirements (user-entered)
+        required_general_liability: leaseRequirements.general_liability || 0,
+        required_auto_liability: leaseRequirements.auto_liability || 0,
+        required_workers_comp: leaseRequirements.workers_comp_required || false,
+        required_employers_liability: leaseRequirements.employers_liability || 0,
+        requires_additional_insured: leaseRequirements.require_additional_insured || false,
         // Policy data
         policy_expiration_date: data.expirationDate || null,
         policy_liability_amount: liabilityAmount,
         policy_coverage: data.coverage ? { ...data.coverage, additionalCoverages: data.additionalCoverages || [] } : null,
         policy_additional_insured: data.additionalInsured || null,
-        has_additional_insured: !!data.additionalInsured,
+        has_additional_insured: !!data.hasAdditionalInsured,
+        has_waiver_of_subrogation: !!data.hasWaiverOfSubrogation,
         policy_document_path: filePath,
         compliance_issues: issues.length > 0 ? issues : null,
         raw_policy_data: data.rawData || null,
@@ -668,16 +661,87 @@ export function SmartUploadModal({
                 </div>
               )}
 
-              {/* Tenant Requirements Preview */}
-              {documentType === 'tenant' && selectedProp && (
+              {/* Lease Requirements (for tenants) */}
+              {documentType === 'tenant' && (
                 <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
-                  <h4 className="text-sm font-semibold text-purple-900 mb-2">Tenant Requirements (from Settings)</h4>
-                  <ul className="text-sm text-purple-800 space-y-1">
-                    <li>• Personal Liability: {formatCurrency(tenantDefaults.liabilityMin)} min</li>
-                    {tenantDefaults.requiresAdditionalInsured && (
-                      <li>• Additional Insured: Required</li>
-                    )}
-                  </ul>
+                  <h4 className="text-sm font-semibold text-purple-900 mb-3">Lease Requirements</h4>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-purple-800 mb-1">General Liability</label>
+                      <select
+                        value={leaseRequirements.general_liability}
+                        onChange={(e) => setLeaseRequirements(r => ({ ...r, general_liability: parseInt(e.target.value) }))}
+                        className="w-full px-2 py-1.5 text-sm border border-purple-300 rounded-lg bg-white"
+                      >
+                        <option value={0}>Not Required</option>
+                        <option value={100000}>$100,000</option>
+                        <option value={300000}>$300,000</option>
+                        <option value={500000}>$500,000</option>
+                        <option value={1000000}>$1,000,000</option>
+                        <option value={2000000}>$2,000,000</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-purple-800 mb-1">Auto Liability</label>
+                      <select
+                        value={leaseRequirements.auto_liability}
+                        onChange={(e) => setLeaseRequirements(r => ({ ...r, auto_liability: parseInt(e.target.value) }))}
+                        className="w-full px-2 py-1.5 text-sm border border-purple-300 rounded-lg bg-white"
+                      >
+                        <option value={0}>Not Required</option>
+                        <option value={100000}>$100,000</option>
+                        <option value={300000}>$300,000</option>
+                        <option value={500000}>$500,000</option>
+                        <option value={1000000}>$1,000,000</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-purple-800 mb-1">Workers Comp</label>
+                      <select
+                        value={leaseRequirements.workers_comp_required ? '1' : '0'}
+                        onChange={(e) => setLeaseRequirements(r => ({ ...r, workers_comp_required: e.target.value === '1' }))}
+                        className="w-full px-2 py-1.5 text-sm border border-purple-300 rounded-lg bg-white"
+                      >
+                        <option value="0">Not Required</option>
+                        <option value="1">Required</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-purple-800 mb-1">Employers Liability</label>
+                      <select
+                        value={leaseRequirements.employers_liability}
+                        onChange={(e) => setLeaseRequirements(r => ({ ...r, employers_liability: parseInt(e.target.value) }))}
+                        className="w-full px-2 py-1.5 text-sm border border-purple-300 rounded-lg bg-white"
+                      >
+                        <option value={0}>Not Required</option>
+                        <option value={100000}>$100,000</option>
+                        <option value={500000}>$500,000</option>
+                        <option value={1000000}>$1,000,000</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-purple-800 mb-1">Additional Insured</label>
+                      <select
+                        value={leaseRequirements.require_additional_insured ? '1' : '0'}
+                        onChange={(e) => setLeaseRequirements(r => ({ ...r, require_additional_insured: e.target.value === '1' }))}
+                        className="w-full px-2 py-1.5 text-sm border border-purple-300 rounded-lg bg-white"
+                      >
+                        <option value="1">Required</option>
+                        <option value="0">Not Required</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-purple-800 mb-1">Waiver of Subrogation</label>
+                      <select
+                        value={leaseRequirements.require_waiver_of_subrogation ? '1' : '0'}
+                        onChange={(e) => setLeaseRequirements(r => ({ ...r, require_waiver_of_subrogation: e.target.value === '1' }))}
+                        className="w-full px-2 py-1.5 text-sm border border-purple-300 rounded-lg bg-white"
+                      >
+                        <option value="0">Not Required</option>
+                        <option value="1">Required</option>
+                      </select>
+                    </div>
+                  </div>
                 </div>
               )}
 
