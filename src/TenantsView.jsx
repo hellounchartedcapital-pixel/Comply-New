@@ -9,7 +9,7 @@ import { supabase } from './supabaseClient';
 import { formatCurrency, formatDate, formatRelativeDate, getStatusConfig, getDaysUntil } from './utils/complianceUtils';
 import { AlertModal, useAlertModal } from './AlertModal';
 import { PropertySelector } from './PropertySelector';
-import { TenantCOIUploadModal } from './TenantCOIUploadModal';
+import { SmartUploadModal } from './SmartUploadModal';
 import logger from './logger';
 import { showSuccess, showError } from './toast';
 
@@ -1398,18 +1398,16 @@ export function TenantsView({ properties, userRequirements, selectedProperty, on
         properties={properties}
       />
 
-      {/* COI Upload Modal - Simplified tenant creation with COI */}
-      <TenantCOIUploadModal
+      {/* COI Upload Modal - Same component as vendor upload, locked to tenant type */}
+      <SmartUploadModal
         isOpen={showCOIUpload}
         onClose={() => setShowCOIUpload(false)}
         properties={properties}
-        onTenantCreated={(newTenant) => {
+        userRequirements={userRequirements}
+        defaultDocumentType="tenant"
+        onUploadComplete={({ type, data: newTenant }) => {
           showSuccess(`Tenant "${newTenant.name}" added successfully`);
           refreshTenants();
-        }}
-        onManualAdd={() => {
-          setEditingTenant(null);
-          setShowModal(true);
         }}
       />
 
