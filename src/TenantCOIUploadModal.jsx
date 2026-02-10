@@ -1,8 +1,8 @@
 // TenantCOIUploadModal.jsx - Tenant COI upload: Set requirements first, then upload COI
 import React, { useState, useCallback, useEffect } from 'react';
 import {
-  X, Upload, FileText, Loader2, CheckCircle, AlertCircle,
-  Building2, User, Shield, ArrowRight, Mail, Phone, Home
+  X, Upload, Loader2, CheckCircle, AlertCircle,
+  Building2, User, Shield, Mail, Phone, Home
 } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import logger from './logger';
