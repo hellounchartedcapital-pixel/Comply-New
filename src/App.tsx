@@ -7,6 +7,7 @@ import { AuthProvider, useAuth } from '@/hooks/useAuth';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner';
 
+const LandingPage = lazy(() => import('@/pages/LandingPage'));
 const Dashboard = lazy(() => import('@/pages/Dashboard'));
 const Properties = lazy(() => import('@/pages/Properties'));
 const PropertyDetail = lazy(() => import('@/pages/PropertyDetail'));
@@ -36,37 +37,6 @@ function PageLoader() {
   );
 }
 
-function ProtectedRoutes() {
-  const { user, loading } = useAuth();
-
-  if (loading) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <LoadingSpinner size="lg" text="Loading SmartCOI..." />
-      </div>
-    );
-  }
-
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
-  return (
-    <Routes>
-      <Route element={<AppLayout />}>
-        <Route index element={<Suspense fallback={<PageLoader />}><Dashboard /></Suspense>} />
-        <Route path="properties" element={<Suspense fallback={<PageLoader />}><Properties /></Suspense>} />
-        <Route path="properties/:id" element={<Suspense fallback={<PageLoader />}><PropertyDetail /></Suspense>} />
-        <Route path="vendors" element={<Suspense fallback={<PageLoader />}><Vendors /></Suspense>} />
-        <Route path="tenants" element={<Suspense fallback={<PageLoader />}><Tenants /></Suspense>} />
-        <Route path="upload" element={<Suspense fallback={<PageLoader />}><COIUpload /></Suspense>} />
-        <Route path="requirements" element={<Suspense fallback={<PageLoader />}><Requirements /></Suspense>} />
-        <Route path="reports" element={<Suspense fallback={<PageLoader />}><Reports /></Suspense>} />
-        <Route path="settings" element={<Suspense fallback={<PageLoader />}><SettingsPage /></Suspense>} />
-      </Route>
-    </Routes>
-  );
-}
-
 function AppRoutes() {
   const { user, loading } = useAuth();
 
@@ -80,11 +50,24 @@ function AppRoutes() {
 
   return (
     <Routes>
+      {/* Public routes */}
+      <Route
+        path="/"
+        element={
+          user ? (
+            <Navigate to="/dashboard" replace />
+          ) : (
+            <Suspense fallback={<PageLoader />}>
+              <LandingPage />
+            </Suspense>
+          )
+        }
+      />
       <Route
         path="/login"
         element={
           user ? (
-            <Navigate to="/" replace />
+            <Navigate to="/dashboard" replace />
           ) : (
             <Suspense fallback={<PageLoader />}>
               <Login />
@@ -100,7 +83,85 @@ function AppRoutes() {
           </Suspense>
         }
       />
-      <Route path="/*" element={<ProtectedRoutes />} />
+
+      {/* Protected routes (require auth) */}
+      <Route element={user ? <AppLayout /> : <Navigate to="/login" replace />}>
+        <Route
+          path="/dashboard"
+          element={
+            <Suspense fallback={<PageLoader />}>
+              <Dashboard />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/properties"
+          element={
+            <Suspense fallback={<PageLoader />}>
+              <Properties />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/properties/:id"
+          element={
+            <Suspense fallback={<PageLoader />}>
+              <PropertyDetail />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/vendors"
+          element={
+            <Suspense fallback={<PageLoader />}>
+              <Vendors />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/tenants"
+          element={
+            <Suspense fallback={<PageLoader />}>
+              <Tenants />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/upload"
+          element={
+            <Suspense fallback={<PageLoader />}>
+              <COIUpload />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/requirements"
+          element={
+            <Suspense fallback={<PageLoader />}>
+              <Requirements />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/reports"
+          element={
+            <Suspense fallback={<PageLoader />}>
+              <Reports />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/settings"
+          element={
+            <Suspense fallback={<PageLoader />}>
+              <SettingsPage />
+            </Suspense>
+          }
+        />
+      </Route>
+
+      {/* Catch-all */}
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }

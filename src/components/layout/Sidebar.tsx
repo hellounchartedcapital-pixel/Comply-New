@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils';
 import { Logo } from './Logo';
 
 const navItems = [
-  { path: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { path: '/properties', label: 'Properties', icon: Building2 },
   { path: '/vendors', label: 'Vendors', icon: Truck },
   { path: '/tenants', label: 'Tenants', icon: Users },
@@ -48,10 +48,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       <nav className="flex-1 overflow-y-auto p-2" aria-label="Main navigation">
         <ul className="space-y-1">
           {navItems.map((item) => {
-            const isActive =
-              item.path === '/'
-                ? location.pathname === '/'
-                : location.pathname.startsWith(item.path);
+            const isActive = location.pathname.startsWith(item.path);
             const Icon = item.icon;
 
             return (
