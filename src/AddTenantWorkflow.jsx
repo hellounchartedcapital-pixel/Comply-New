@@ -922,7 +922,6 @@ export function AddTenantWorkflow({ isOpen, onClose, onSave, properties, selecte
         lease_end: tenantInfo.lease_end || null,
         has_requirement_profile: true,
         insurance_status: 'pending',
-        status: 'active',
       };
 
       // Create profile data
