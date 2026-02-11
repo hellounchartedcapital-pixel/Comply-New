@@ -50,3 +50,23 @@ export async function deleteRequirementTemplate(id: string): Promise<void> {
   const { error } = await supabase.from('requirement_templates').delete().eq('id', id);
   if (error) throw error;
 }
+
+export async function fetchTemplateByProperty(
+  propertyId: string,
+  entityType: 'vendor' | 'tenant'
+): Promise<RequirementTemplate | null> {
+  const { data, error } = await supabase
+    .from('requirement_templates')
+    .select('*')
+    .eq('property_id', propertyId)
+    .eq('entity_type', entityType)
+    .maybeSingle();
+
+  if (error) {
+    if (error.code === '42P01' || error.message?.includes('does not exist')) {
+      return null;
+    }
+    throw error;
+  }
+  return data as RequirementTemplate | null;
+}
