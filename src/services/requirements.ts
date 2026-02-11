@@ -21,39 +21,28 @@ export async function fetchRequirementTemplates(): Promise<RequirementTemplate[]
 export async function createRequirementTemplate(
   template: Omit<RequirementTemplate, 'id' | 'user_id' | 'created_at' | 'updated_at'>
 ): Promise<RequirementTemplate> {
-  // Strip property_id from the top-level insert payload — the column may not
-  // exist yet if the migration hasn't been applied. Instead we persist it
-  // inside the endorsements JSONB so fetchTemplateByProperty can find it.
-  const { property_id, ...rest } = template as any;
+  // Only send columns that exist on the DB table. property_id may not exist
+  // yet, so we always store it inside the endorsements JSONB as _property_id.
+  const propertyId = (template as any).property_id;
   const payload = {
-    ...rest,
+    name: template.name,
+    entity_type: template.entity_type,
+    description: template.description,
+    coverages: template.coverages ?? {},
     endorsements: {
-      ...rest.endorsements,
-      ...(property_id ? { _property_id: property_id } : {}),
+      ...(template.endorsements ?? {}),
+      ...(propertyId ? { _property_id: propertyId } : {}),
     },
   };
 
-  // Try inserting with the property_id column first
   const { data, error } = await supabase
     .from('requirement_templates')
-    .insert(property_id ? { ...payload, property_id } : payload)
+    .insert(payload)
     .select()
     .single();
 
-  if (error) {
-    // If the column doesn't exist yet, retry without it
-    if (error.message?.includes('property_id') || error.code === '42703') {
-      const { data: d2, error: e2 } = await supabase
-        .from('requirement_templates')
-        .insert(payload)
-        .select()
-        .single();
-      if (e2) throw e2;
-      return { ...d2, property_id } as RequirementTemplate;
-    }
-    throw error;
-  }
-  return data as RequirementTemplate;
+  if (error) throw error;
+  return { ...data, property_id: propertyId } as RequirementTemplate;
 }
 
 export async function updateRequirementTemplate(
