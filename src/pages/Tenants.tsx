@@ -1,6 +1,7 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Users, Plus, X, Mail, Phone, Building2, Calendar, Trash2 } from 'lucide-react';
+import { Users, Plus, X, Mail, Phone, Building2, Calendar, Trash2, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -27,6 +28,7 @@ import { formatDate } from '@/lib/utils';
 import type { Tenant } from '@/types';
 
 export default function Tenants() {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -199,6 +201,15 @@ export default function Tenants() {
                   </div>
                 )}
                 <Separator />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => navigate(`/upload?type=tenant&id=${selectedTenant.id}`)}
+                >
+                  <Upload className="mr-2 h-3.5 w-3.5" />
+                  Upload COI
+                </Button>
                 <Button
                   variant="destructive"
                   size="sm"

@@ -22,7 +22,6 @@ export function AppLayout() {
           userName={userName}
           userEmail={userEmail}
           onSignOut={signOut}
-          notificationCount={3}
         />
         <main className="flex-1 overflow-y-auto p-6">
           <Outlet />

@@ -228,8 +228,8 @@ export default function Dashboard() {
   });
 
   const isLoading = vendorsLoading || tenantsLoading;
-  const vendors = vendorData?.data ?? [];
-  const tenants = tenantData?.data ?? [];
+  const vendors = useMemo(() => vendorData?.data ?? [], [vendorData?.data]);
+  const tenants = useMemo(() => tenantData?.data ?? [], [tenantData?.data]);
   const allStats = useMemo(() => calculateStats(vendors, tenants), [vendors, tenants]);
 
   if (isLoading) return <DashboardSkeleton />;

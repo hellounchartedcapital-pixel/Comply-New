@@ -1,5 +1,5 @@
-import { Search, Bell, ChevronDown, LogOut, User } from 'lucide-react';
-import { Input } from '@/components/ui/input';
+import { useNavigate } from 'react-router-dom';
+import { Bell, ChevronDown, LogOut, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
@@ -16,30 +16,28 @@ interface TopBarProps {
   userName: string;
   userEmail: string;
   onSignOut: () => void;
-  notificationCount?: number;
 }
 
-export function TopBar({ userName, userEmail, onSignOut, notificationCount = 0 }: TopBarProps) {
-  return (
-    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b bg-white px-6">
-      <div className="relative w-full max-w-md">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-        <Input
-          placeholder="Search vendors, tenants, properties..."
-          className="border-0 bg-secondary pl-10"
-          aria-label="Global search"
-        />
-      </div>
+export function TopBar({ userName, userEmail, onSignOut }: TopBarProps) {
+  const navigate = useNavigate();
 
+  return (
+    <header className="sticky top-0 z-30 flex h-16 items-center justify-end border-b bg-white px-6">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" className="relative" aria-label={`Notifications${notificationCount > 0 ? `, ${notificationCount} unread` : ''}`}>
-          <Bell className="h-5 w-5" aria-hidden="true" />
-          {notificationCount > 0 && (
-            <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full gradient-primary text-[10px] font-bold text-white">
-              {notificationCount > 9 ? '9+' : notificationCount}
-            </span>
-          )}
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="relative" aria-label="Notifications">
+              <Bell className="h-5 w-5" aria-hidden="true" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-72">
+            <DropdownMenuLabel>Notifications</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <div className="p-4 text-center text-sm text-muted-foreground">
+              No new notifications
+            </div>
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -59,9 +57,9 @@ export function TopBar({ userName, userEmail, onSignOut, notificationCount = 0 }
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
-              <User className="mr-2 h-4 w-4" aria-hidden="true" />
-              Profile
+            <DropdownMenuItem onClick={() => navigate('/settings')}>
+              <Settings className="mr-2 h-4 w-4" aria-hidden="true" />
+              Settings
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={onSignOut}>

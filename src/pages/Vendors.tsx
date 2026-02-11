@@ -1,6 +1,7 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Truck, Plus, X, Mail, Phone, Building2 } from 'lucide-react';
+import { Truck, Plus, X, Mail, Phone, Building2, Upload, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -34,12 +35,13 @@ import { SearchFilter } from '@/components/shared/SearchFilter';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { Skeleton } from '@/components/ui/skeleton';
-import { fetchVendors, createVendor } from '@/services/vendors';
+import { fetchVendors, createVendor, deleteVendor } from '@/services/vendors';
 import { fetchProperties } from '@/services/properties';
 import { formatDate } from '@/lib/utils';
 import type { Vendor } from '@/types';
 
 export default function Vendors() {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -73,6 +75,16 @@ export default function Vendors() {
       toast.success('Vendor created successfully');
     },
     onError: (err) => toast.error(err instanceof Error ? err.message : 'Failed to create vendor'),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: deleteVendor,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['vendors'] });
+      setSelectedVendor(null);
+      toast.success('Vendor deleted successfully');
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Failed to delete vendor'),
   });
 
   const vendors = vendorData?.data ?? [];
@@ -206,6 +218,30 @@ export default function Vendors() {
                       : 'No COI on file'}
                   </p>
                 </div>
+                <Separator />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => navigate(`/upload?type=vendor&id=${selectedVendor.id}`)}
+                >
+                  <Upload className="mr-2 h-3.5 w-3.5" />
+                  Upload COI
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => {
+                    if (window.confirm(`Delete vendor "${selectedVendor.name}"?`)) {
+                      deleteMutation.mutate(selectedVendor.id);
+                    }
+                  }}
+                  disabled={deleteMutation.isPending}
+                >
+                  <Trash2 className="mr-2 h-3.5 w-3.5" />
+                  Delete Vendor
+                </Button>
               </CardContent>
             </Card>
           )}

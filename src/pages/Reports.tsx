@@ -111,8 +111,8 @@ export default function Reports() {
   });
 
   const isLoading = vendorsLoading || tenantsLoading;
-  const vendors = vendorData?.data ?? [];
-  const tenants = tenantData?.data ?? [];
+  const vendors = useMemo(() => vendorData?.data ?? [], [vendorData?.data]);
+  const tenants = useMemo(() => tenantData?.data ?? [], [tenantData?.data]);
 
   const stats = useMemo(() => computeStats(vendors, tenants, entityFilter), [vendors, tenants, entityFilter]);
 
