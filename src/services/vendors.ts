@@ -98,28 +98,23 @@ export async function updateVendor(id: string, updates: Partial<Vendor>): Promis
 }
 
 export async function deleteVendor(id: string): Promise<void> {
-  // Try hard delete first
-  const { error } = await supabase.from('vendors').delete().eq('id', id);
-  if (error) {
-    // Fall back to soft delete if hard delete fails (e.g. FK constraint)
-    const { error: softError } = await supabase
-      .from('vendors')
-      .update({ deleted_at: new Date().toISOString() })
-      .eq('id', id);
-    if (softError) throw softError;
-    return;
-  }
+  // Soft-delete first to ensure record is hidden from queries immediately
+  const { error: softError } = await supabase
+    .from('vendors')
+    .update({ deleted_at: new Date().toISOString() })
+    .eq('id', id);
+  if (softError) throw softError;
+
+  // Then attempt hard delete as cleanup
+  await supabase.from('vendors').delete().eq('id', id);
 }
 
 export async function deleteVendors(ids: string[]): Promise<void> {
-  const { error } = await supabase.from('vendors').delete().in('id', ids);
-  if (error) {
-    // Fall back to soft delete if hard delete fails
-    const { error: softError } = await supabase
-      .from('vendors')
-      .update({ deleted_at: new Date().toISOString() })
-      .in('id', ids);
-    if (softError) throw softError;
-    return;
-  }
+  const { error: softError } = await supabase
+    .from('vendors')
+    .update({ deleted_at: new Date().toISOString() })
+    .in('id', ids);
+  if (softError) throw softError;
+
+  await supabase.from('vendors').delete().in('id', ids);
 }
