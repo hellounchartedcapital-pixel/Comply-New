@@ -1,244 +1,70 @@
-/* index.css - Tailwind CSS imports */
-
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Base styles */
 @layer base {
+  :root {
+    --background: 210 20% 98%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 160 82% 39%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 210 20% 96%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 210 20% 96%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 160 82% 95%;
+    --accent-foreground: 160 82% 25%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    --success: 160 82% 39%;
+    --success-foreground: 0 0% 100%;
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 160 82% 39%;
+    --radius: 0.5rem;
+
+    --sidebar-background: 222 47% 11%;
+    --sidebar-foreground: 215 20% 65%;
+    --sidebar-primary: 160 82% 39%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 215 28% 17%;
+    --sidebar-accent-foreground: 210 20% 98%;
+    --sidebar-border: 215 28% 20%;
+    --sidebar-ring: 160 82% 39%;
+
+    --topbar-background: 0 0% 100%;
+    --topbar-foreground: 222 47% 11%;
+    --topbar-border: 214 32% 91%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
   body {
-    font-family: 'Inter', sans-serif;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-  }
-
-  html {
-    scroll-behavior: smooth;
+    @apply bg-background text-foreground font-sans antialiased;
   }
 }
 
-/* Animations */
-@keyframes fade-in-up {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes fade-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes scale-in {
-  from {
-    opacity: 0;
-    transform: scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-@keyframes float {
-  0%, 100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-10px);
-  }
-}
-
-/* Animation utility classes */
 @layer utilities {
-  .animate-fade-in-up {
-    animation: fade-in-up 0.6s ease-out forwards;
+  .gradient-primary {
+    background: linear-gradient(135deg, hsl(160, 82%, 39%), hsl(175, 84%, 32%));
   }
 
-  .animate-fade-in {
-    animation: fade-in 0.5s ease-out forwards;
+  .gradient-primary-hover {
+    background: linear-gradient(135deg, hsl(160, 82%, 35%), hsl(175, 84%, 28%));
   }
 
-  .animate-scale-in {
-    animation: scale-in 0.5s ease-out forwards;
+  .text-gradient-primary {
+    background: linear-gradient(135deg, hsl(160, 82%, 39%), hsl(175, 84%, 32%));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
   }
-
-  .animate-float {
-    animation: float 6s ease-in-out infinite;
-  }
-
-  .animation-delay-100 {
-    animation-delay: 100ms;
-  }
-
-  .animation-delay-200 {
-    animation-delay: 200ms;
-  }
-
-  .animation-delay-300 {
-    animation-delay: 300ms;
-  }
-
-  .animation-delay-400 {
-    animation-delay: 400ms;
-  }
-
-  .animation-delay-500 {
-    animation-delay: 500ms;
-  }
-}
-
-/* ============================================
-   ACCESSIBILITY STYLES
-   ============================================ */
-
-/* Screen reader only content */
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
-
-/* Make screen reader content visible when focused */
-.sr-only-focusable:focus,
-.sr-only-focusable:active {
-  position: static;
-  width: auto;
-  height: auto;
-  padding: inherit;
-  margin: inherit;
-  overflow: visible;
-  clip: auto;
-  white-space: normal;
-}
-
-/* Skip to main content link */
-.skip-link {
-  position: absolute;
-  top: -40px;
-  left: 0;
-  background: #10b981;
-  color: white;
-  padding: 8px 16px;
-  z-index: 100;
-  transition: top 0.3s;
-}
-
-.skip-link:focus {
-  top: 0;
-}
-
-/* Focus visible styles */
-@layer utilities {
-  /* Enhanced focus ring for keyboard navigation */
-  .focus-visible-ring:focus-visible {
-    outline: 2px solid #10b981;
-    outline-offset: 2px;
-  }
-
-  /* Remove default focus outline for mouse users but keep for keyboard */
-  .focus-visible-only:focus:not(:focus-visible) {
-    outline: none;
-  }
-
-  .focus-visible-only:focus-visible {
-    outline: 2px solid #10b981;
-    outline-offset: 2px;
-  }
-}
-
-/* Ensure all interactive elements have visible focus */
-button:focus-visible,
-a:focus-visible,
-input:focus-visible,
-select:focus-visible,
-textarea:focus-visible,
-[tabindex]:focus-visible {
-  outline: 2px solid #10b981;
-  outline-offset: 2px;
-}
-
-/* High contrast mode support */
-@media (prefers-contrast: high) {
-  .status-compliant { border: 2px solid #059669 !important; }
-  .status-non-compliant { border: 2px solid #ea580c !important; }
-  .status-expiring { border: 2px solid #d97706 !important; }
-  .status-expired { border: 2px solid #dc2626 !important; }
-  .status-pending { border: 2px solid #6b7280 !important; }
-}
-
-/* Reduced motion support */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
-}
-
-/* Status indicators with patterns for colorblind users */
-.status-indicator {
-  position: relative;
-}
-
-.status-indicator::before {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: -12px;
-  transform: translateY(-50%);
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-}
-
-.status-indicator.compliant::before {
-  background: #10b981;
-  /* Solid circle for compliant */
-}
-
-.status-indicator.non-compliant::before {
-  background: #f97316;
-  /* Add warning pattern */
-  clip-path: polygon(50% 0%, 100% 100%, 0% 100%);
-  border-radius: 0;
-}
-
-.status-indicator.expired::before {
-  background: #ef4444;
-  /* X pattern for expired */
-  clip-path: polygon(20% 0%, 0% 20%, 30% 50%, 0% 80%, 20% 100%, 50% 70%, 80% 100%, 100% 80%, 70% 50%, 100% 20%, 80% 0%, 50% 30%);
-  border-radius: 0;
-}
-
-.status-indicator.expiring::before {
-  background: #f59e0b;
-  /* Diamond for expiring */
-  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
-  border-radius: 0;
-}
-
-.status-indicator.pending::before {
-  background: #6b7280;
-  border: 2px dashed currentColor;
-  /* Dashed circle for pending */
 }
