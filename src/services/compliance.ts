@@ -32,8 +32,18 @@ export function compareCoverageToRequirements(
       (c) => c.type.toLowerCase().includes(type.toLowerCase())
     );
 
-  // General Liability
-  if (template.coverages.general_liability_occurrence) {
+  const trackExpiration = (cov: ExtractedCoverage | undefined) => {
+    if (cov?.expiration_date) {
+      const expDate = new Date(cov.expiration_date);
+      if (expDate < now) expiredCount++;
+      else if (expDate < thirtyDaysFromNow) expiringCount++;
+    }
+  };
+
+  // General Liability — check if required via toggle or legacy presence of limit
+  const glRequired = template.coverages.general_liability_required
+    ?? (!!template.coverages.general_liability_occurrence);
+  if (glRequired && template.coverages.general_liability_occurrence) {
     const cov = findCoverage('general liability');
     const actual = cov?.occurrence_limit ?? null;
     const required = template.coverages.general_liability_occurrence;
@@ -45,15 +55,10 @@ export function compareCoverageToRequirements(
       status: met ? 'compliant' : 'non-compliant',
       expiration_date: cov?.expiration_date,
     });
-
-    if (cov?.expiration_date) {
-      const expDate = new Date(cov.expiration_date);
-      if (expDate < now) expiredCount++;
-      else if (expDate < thirtyDaysFromNow) expiringCount++;
-    }
+    trackExpiration(cov);
   }
 
-  if (template.coverages.general_liability_aggregate) {
+  if (glRequired && template.coverages.general_liability_aggregate) {
     const cov = findCoverage('general liability');
     const actual = cov?.aggregate_limit ?? null;
     const required = template.coverages.general_liability_aggregate;
@@ -67,7 +72,9 @@ export function compareCoverageToRequirements(
   }
 
   // Automobile Liability
-  if (template.coverages.automobile_liability_csl) {
+  const autoRequired = template.coverages.automobile_liability_required
+    ?? (!!template.coverages.automobile_liability_csl);
+  if (autoRequired && template.coverages.automobile_liability_csl) {
     const cov = findCoverage('auto');
     const actual = cov?.combined_single_limit ?? cov?.occurrence_limit ?? null;
     const required = template.coverages.automobile_liability_csl;
@@ -79,12 +86,7 @@ export function compareCoverageToRequirements(
       status: met ? 'compliant' : 'non-compliant',
       expiration_date: cov?.expiration_date,
     });
-
-    if (cov?.expiration_date) {
-      const expDate = new Date(cov.expiration_date);
-      if (expDate < now) expiredCount++;
-      else if (expDate < thirtyDaysFromNow) expiringCount++;
-    }
+    trackExpiration(cov);
   }
 
   // Workers' Compensation
@@ -98,16 +100,31 @@ export function compareCoverageToRequirements(
       status: actual ? 'compliant' : 'non-compliant',
       expiration_date: cov?.expiration_date,
     });
-
-    if (cov?.expiration_date) {
-      const expDate = new Date(cov.expiration_date);
-      if (expDate < now) expiredCount++;
-      else if (expDate < thirtyDaysFromNow) expiringCount++;
-    }
+    trackExpiration(cov);
   }
 
-  // Umbrella
-  if (template.coverages.umbrella_limit) {
+  // Employers' Liability
+  const elRequired = template.coverages.employers_liability_required
+    ?? (!!template.coverages.workers_comp_employers_liability);
+  if (elRequired && template.coverages.workers_comp_employers_liability) {
+    const cov = findCoverage('employer');
+    const actual = cov?.occurrence_limit ?? cov?.combined_single_limit ?? null;
+    const required = template.coverages.workers_comp_employers_liability;
+    const met = actual !== null && actual >= required;
+    fields.push({
+      field_name: "Employers' Liability",
+      required_value: required,
+      actual_value: actual,
+      status: met ? 'compliant' : 'non-compliant',
+      expiration_date: cov?.expiration_date,
+    });
+    trackExpiration(cov);
+  }
+
+  // Umbrella / Excess
+  const umbrellaRequired = template.coverages.umbrella_required
+    ?? (!!template.coverages.umbrella_limit);
+  if (umbrellaRequired && template.coverages.umbrella_limit) {
     const cov = findCoverage('umbrella') ?? findCoverage('excess');
     const actual = cov?.occurrence_limit ?? cov?.aggregate_limit ?? null;
     const required = template.coverages.umbrella_limit;
@@ -119,16 +136,13 @@ export function compareCoverageToRequirements(
       status: met ? 'compliant' : 'non-compliant',
       expiration_date: cov?.expiration_date,
     });
-
-    if (cov?.expiration_date) {
-      const expDate = new Date(cov.expiration_date);
-      if (expDate < now) expiredCount++;
-      else if (expDate < thirtyDaysFromNow) expiringCount++;
-    }
+    trackExpiration(cov);
   }
 
-  // Professional Liability
-  if (template.coverages.professional_liability_limit) {
+  // Professional Liability / E&O
+  const profRequired = template.coverages.professional_liability_required
+    ?? (!!template.coverages.professional_liability_limit);
+  if (profRequired && template.coverages.professional_liability_limit) {
     const cov = findCoverage('professional') ?? findCoverage('e&o');
     const actual = cov?.occurrence_limit ?? cov?.aggregate_limit ?? null;
     const required = template.coverages.professional_liability_limit;

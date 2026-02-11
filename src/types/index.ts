@@ -325,24 +325,45 @@ export interface RequirementTemplate {
   name: string;
   entity_type: EntityType;
   description?: string;
+  property_id?: string;
   property_count?: number;
   coverages: {
+    // General Liability
+    general_liability_required?: boolean;
     general_liability_occurrence?: number;
     general_liability_aggregate?: number;
+    general_liability_contractual?: boolean;
+    general_liability_umbrella_note?: boolean;
+    // Business Auto Liability
+    automobile_liability_required?: boolean;
     automobile_liability_csl?: number;
+    automobile_liability_owned_hired_non_owned?: boolean;
+    // Workers' Compensation
     workers_comp_statutory?: boolean;
+    workers_comp_accept_exemption?: boolean;
+    // Employers' Liability
+    employers_liability_required?: boolean;
     workers_comp_employers_liability?: number;
+    // Umbrella / Excess
+    umbrella_required?: boolean;
     umbrella_limit?: number;
+    // Professional Liability / E&O
+    professional_liability_required?: boolean;
     professional_liability_limit?: number;
+    // Tenant-specific
     property_insurance_limit?: number;
     business_interruption_required?: boolean;
   };
   endorsements: {
     require_additional_insured?: boolean;
+    additional_insured_entities?: string;
+    blanket_additional_insured_accepted?: boolean;
     require_waiver_of_subrogation?: boolean;
     certificate_holder_name?: string;
     certificate_holder_address?: string;
     cancellation_notice_days?: number;
+    property_address_on_coi_required?: boolean;
+    dec_pages_required?: boolean;
   };
   custom_coverages?: CustomCoverageRequirement[];
   created_at: string;
