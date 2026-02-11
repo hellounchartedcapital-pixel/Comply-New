@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -10,11 +10,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { PageHeader } from '@/components/shared/PageHeader';
 import { DocumentUploadZone } from '@/components/shared/DocumentUploadZone';
 import { ExtractedCoverageDisplay } from '@/components/shared/ExtractedCoverageDisplay';
+import { RequirementTemplateSelector } from '@/components/shared/RequirementTemplateSelector';
 import { PropertySelector } from '@/components/shared/PropertySelector';
 import { ComplianceResults } from '@/components/shared/ComplianceResults';
 import { extractCOI, uploadCOIFile } from '@/services/ai-extraction';
 import { createVendor, updateVendor } from '@/services/vendors';
-import { fetchBuildingDefaults } from '@/services/properties';
+import { fetchRequirementTemplates } from '@/services/requirements';
 import { compareCoverageToRequirements } from '@/services/compliance';
 import type { COIExtractionResult, ComplianceResult } from '@/types';
 
@@ -32,6 +33,7 @@ export default function AddVendor() {
   const [vendorName, setVendorName] = useState('');
   const [vendorEmail, setVendorEmail] = useState('');
   const [propertyId, setPropertyId] = useState('');
+  const [templateId, setTemplateId] = useState('');
 
   // Validation state
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -40,6 +42,12 @@ export default function AddVendor() {
   const [isCreating, setIsCreating] = useState(false);
   const [complianceResult, setComplianceResult] = useState<ComplianceResult | null>(null);
   const [createdSuccessfully, setCreatedSuccessfully] = useState(false);
+
+  // Fetch requirement templates so we can look up the selected one during create
+  const { data: templates } = useQuery({
+    queryKey: ['requirement-templates'],
+    queryFn: fetchRequirementTemplates,
+  });
 
   const handleFileUpload = useCallback(async (file: File) => {
     setUploadedFile(file);
@@ -61,7 +69,7 @@ export default function AddVendor() {
           result.error ?? "We couldn't automatically extract data from this certificate. Please check that the file is a valid COI and try again, or contact support."
         );
       }
-    } catch (err) {
+    } catch {
       setExtractionError(
         "We couldn't automatically extract data from this certificate. Please check that the file is a valid COI and try again, or contact support."
       );
@@ -88,8 +96,8 @@ export default function AddVendor() {
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(vendorEmail)) {
       newErrors.email = 'Please enter a valid email address';
     }
-    if (!propertyId) {
-      newErrors.property = 'Please assign this vendor to a property';
+    if (!templateId) {
+      newErrors.template = 'Please select a requirement template to compare against';
     }
 
     setErrors(newErrors);
@@ -106,7 +114,7 @@ export default function AddVendor() {
       const vendor = await createVendor({
         name: vendorName.trim(),
         contact_email: vendorEmail.trim(),
-        property_id: propertyId,
+        property_id: propertyId || undefined,
       });
 
       // 2. Upload COI file to storage
@@ -130,41 +138,22 @@ export default function AddVendor() {
         status,
       } as any);
 
-      // 4. Run compliance comparison against building requirements
-      try {
-        const buildingDefaults = await fetchBuildingDefaults(propertyId, 'vendor');
-        if (buildingDefaults) {
-          const template = {
-            id: buildingDefaults.id,
-            name: 'Building Requirements',
-            entity_type: 'vendor' as const,
-            user_id: '',
-            coverages: {
-              general_liability_occurrence: buildingDefaults.general_liability_occurrence,
-              general_liability_aggregate: buildingDefaults.general_liability_aggregate,
-              automobile_liability_csl: buildingDefaults.automobile_liability_csl,
-              workers_comp_statutory: buildingDefaults.workers_comp_statutory,
-              umbrella_limit: buildingDefaults.umbrella_limit,
-              professional_liability_limit: buildingDefaults.professional_liability_limit,
-              property_insurance_limit: buildingDefaults.property_insurance_limit,
-            },
-            endorsements: {},
-            created_at: '',
-            updated_at: '',
-          };
-          const compliance = compareCoverageToRequirements(extractionResult.coverages, template);
-          setComplianceResult(compliance);
-        } else {
-          // No building defaults configured
-          setComplianceResult(null);
+      // 4. Run compliance comparison against the selected requirement template
+      const selectedTemplate = (templates ?? []).find((t) => t.id === templateId);
+      if (selectedTemplate) {
+        const compliance = compareCoverageToRequirements(extractionResult.coverages, selectedTemplate);
+        setComplianceResult(compliance);
+
+        // Update vendor status based on compliance result
+        if (compliance.overall_status !== status) {
+          await updateVendor(vendor.id, {
+            status: compliance.overall_status,
+          } as any);
         }
-      } catch {
-        // Compliance check failed — not critical
       }
 
       // 5. Invalidate queries and show success
       queryClient.invalidateQueries({ queryKey: ['vendors'] });
-      queryClient.invalidateQueries({ queryKey: ['properties'] });
       setCreatedSuccessfully(true);
       toast.success('Vendor created — compliance check complete');
     } catch (err) {
@@ -172,7 +161,7 @@ export default function AddVendor() {
     } finally {
       setIsCreating(false);
     }
-  }, [vendorName, vendorEmail, propertyId, extractionResult, uploadedFile, queryClient]);
+  }, [vendorName, vendorEmail, propertyId, templateId, extractionResult, uploadedFile, templates, queryClient]);
 
   // After successful creation, show compliance results with a link to go back
   if (createdSuccessfully) {
@@ -194,7 +183,7 @@ export default function AddVendor() {
         ) : (
           <ComplianceResults
             result={{ overall_status: 'non-compliant', compliance_percentage: 0, fields: [], expiring_within_30_days: 0, expired_count: 0 }}
-            noRequirementsMessage={`No building requirements configured for the assigned property. Set up requirements to enable compliance tracking.`}
+            noRequirementsMessage="No requirement template was selected. Set up requirements to enable compliance tracking."
           />
         )}
 
@@ -213,6 +202,7 @@ export default function AddVendor() {
               setVendorName('');
               setVendorEmail('');
               setPropertyId('');
+              setTemplateId('');
               setComplianceResult(null);
               setErrors({});
             }}
@@ -338,20 +328,31 @@ export default function AddVendor() {
 
               <PropertySelector
                 value={propertyId}
-                onChange={(v) => {
-                  setPropertyId(v);
-                  if (errors.property) setErrors((prev) => ({ ...prev, property: '' }));
-                }}
-                required
-                error={errors.property}
+                onChange={(v) => setPropertyId(v)}
               />
+
+              <RequirementTemplateSelector
+                value={templateId}
+                onChange={(v) => {
+                  setTemplateId(v);
+                  if (errors.template) setErrors((prev) => ({ ...prev, template: '' }));
+                }}
+                entityType="vendor"
+                label="Requirement Template"
+                required
+                error={errors.template}
+              />
+              <p className="text-xs text-muted-foreground -mt-2">
+                The vendor's COI will be compared against this template to check compliance.
+                Manage templates on the Requirements page.
+              </p>
             </CardContent>
           </Card>
 
           {/* Create button */}
           <Button
             onClick={handleCreate}
-            disabled={isCreating || !vendorName.trim() || !vendorEmail.trim() || !propertyId}
+            disabled={isCreating || !vendorName.trim() || !vendorEmail.trim() || !templateId}
             className="w-full h-12 text-base"
           >
             {isCreating ? (
