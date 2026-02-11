@@ -199,31 +199,31 @@ const features = [
     icon: Sparkles,
     title: 'AI-Powered COI Extraction',
     description: 'Upload a certificate PDF and let AI extract carrier info, coverage types, limits, and expiration dates in seconds — not hours.',
-    size: 'large' as const,
+    span: 'lg:col-span-2',
   },
   {
     icon: Truck,
     title: 'Vendor Compliance',
     description: 'Set requirements per building, upload vendor COIs, get instant compliance status. Three ways to set up requirements — building defaults, AI-assisted, or manual.',
-    size: 'small' as const,
+    span: '',
   },
   {
     icon: Users,
     title: 'Tenant COI Tracking',
     description: 'Upload a lease and let AI extract insurance requirements automatically. The only platform that handles lease-driven tenant compliance — not just vendors.',
-    size: 'small' as const,
+    span: '',
   },
   {
     icon: Bell,
     title: 'Expiration Alerts',
     description: 'Get notified before certificates expire. Automatically email vendors and tenants when coverage lapses so you never get caught with a gap.',
-    size: 'small' as const,
+    span: '',
   },
   {
     icon: LayoutDashboard,
     title: 'Real-Time Compliance Dashboard',
     description: 'See your entire portfolio\'s compliance status at a glance. Filter by property, vendor, tenant, or status. Export reports in one click.',
-    size: 'large' as const,
+    span: '',
   },
 ];
 
@@ -532,12 +532,11 @@ export default function LandingPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 max-w-6xl mx-auto">
             {features.map((feature, i) => {
               const Icon = feature.icon;
-              const isLarge = feature.size === 'large';
               return (
                 <FadeIn
                   key={i}
                   delay={i * 0.08}
-                  className={isLarge ? 'lg:col-span-2' : ''}
+                  className={feature.span}
                 >
                   <div className="group relative bg-gray-50 hover:bg-white rounded-2xl p-8 border border-gray-200/60 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-gray-200/50 hover:border-gray-300/80 h-full">
                     <div className="w-12 h-12 bg-gradient-to-br from-emerald-600 to-teal-500 rounded-xl flex items-center justify-center mb-5 shadow-lg shadow-emerald-500/20 transition-transform duration-300 group-hover:scale-110">
