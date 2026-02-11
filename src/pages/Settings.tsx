@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Building2, Users, Bell, Plug, CreditCard } from 'lucide-react';
+import { Building2, Users, Bell, Plug, CreditCard, UserCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -13,8 +13,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { cn } from '@/lib/utils';
 import { fetchOrganizationSettings, upsertOrganizationSettings } from '@/services/settings';
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/lib/supabase';
 
 const TABS = [
+  { id: 'profile', label: 'Profile', icon: UserCircle },
   { id: 'organization', label: 'Organization', icon: Building2 },
   { id: 'team', label: 'Team Members', icon: Users },
   { id: 'notifications', label: 'Notifications', icon: Bell },
@@ -23,6 +26,66 @@ const TABS = [
 ] as const;
 
 type TabId = (typeof TABS)[number]['id'];
+
+function ProfileTab() {
+  const { user } = useAuth();
+  const [fullName, setFullName] = useState(
+    (user?.user_metadata?.full_name as string) ?? ''
+  );
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const { error } = await supabase.auth.updateUser({
+        data: { full_name: fullName },
+      });
+      if (error) throw error;
+      toast.success('Profile updated');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to update profile');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="max-w-2xl space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Profile</CardTitle>
+          <CardDescription>Your personal account details</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="profile-name">Full Name</Label>
+            <Input
+              id="profile-name"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              placeholder="Jane Smith"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="profile-email">Email</Label>
+            <Input
+              id="profile-email"
+              value={user?.email ?? ''}
+              disabled
+              className="bg-muted"
+            />
+            <p className="text-xs text-muted-foreground">
+              Contact support to change your email address.
+            </p>
+          </div>
+          <Button onClick={handleSave} disabled={saving}>
+            {saving ? 'Saving...' : 'Save Profile'}
+          </Button>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
 
 function OrganizationTab() {
   const queryClient = useQueryClient();
@@ -346,9 +409,10 @@ function BillingTab() {
 }
 
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState<TabId>('organization');
+  const [activeTab, setActiveTab] = useState<TabId>('profile');
 
   const tabContent: Record<TabId, React.ReactNode> = {
+    profile: <ProfileTab />,
     organization: <OrganizationTab />,
     team: <TeamTab />,
     notifications: <NotificationsTab />,
