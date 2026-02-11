@@ -6,7 +6,7 @@ export async function fetchOrganizationSettings(): Promise<OrganizationSettings 
   if (!user) return null;
 
   const { data, error } = await supabase
-    .from('organization_settings')
+    .from('settings')
     .select('*')
     .eq('user_id', user.id)
     .maybeSingle();
@@ -29,7 +29,7 @@ export async function upsertOrganizationSettings(
   if (!user) throw new Error('Authentication required');
 
   const { data, error } = await supabase
-    .from('organization_settings')
+    .from('settings')
     .upsert(
       { ...settings, user_id: user.id },
       { onConflict: 'user_id' }
