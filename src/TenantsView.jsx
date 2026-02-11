@@ -1,18 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Users, Plus, Search, CheckCircle, XCircle, AlertCircle, Clock,
   Mail, Phone, Calendar, Building2, X, Send,
-  Loader2, FileText, History, Upload
+  Loader2, FileText, History, Upload, Shield, ChevronDown, ChevronUp,
+  Eye
 } from 'lucide-react';
 import { useTenants } from './useTenants';
 import { supabase } from './supabaseClient';
 import { formatCurrency, formatDate, formatRelativeDate, getStatusConfig, getDaysUntil } from './utils/complianceUtils';
+import { getSourceInfo, getComplianceFieldStatusInfo } from './utils/tenantComplianceUtils';
 import { AlertModal, useAlertModal } from './AlertModal';
 import { PropertySelector } from './PropertySelector';
-import { SmartUploadModal } from './SmartUploadModal';
+import { AddTenantWorkflow } from './AddTenantWorkflow';
+import { TenantCOIUpload } from './TenantCOIUpload';
+import { BuildingTenantDefaults } from './BuildingTenantDefaults';
 import logger from './logger';
 import { showSuccess } from './toast';
-
 
 // Status icon component (matches vendor style)
 function getStatusIcon(status) {
@@ -27,11 +30,9 @@ function getStatusIcon(status) {
   );
 }
 
-// Status badge component with dynamic days calculation (matches vendor style)
+// Status badge component with dynamic days calculation
 function getStatusBadge(status, expirationDate) {
   const config = getStatusConfig(status);
-
-  // Calculate days dynamically for accurate display
   const days = getDaysUntil(expirationDate);
 
   let label;
@@ -50,508 +51,42 @@ function getStatusBadge(status, expirationDate) {
   );
 }
 
-// Add/Edit Tenant Modal
-function TenantModal({ isOpen, onClose, onSave, tenant, properties }) {
-  const [formData, setFormData] = useState({
-    // Basic info
-    name: '',
-    email: '',
-    phone: '',
-    property_id: '',
-    unit_number: '',
+// Lease renewal warning badge
+function LeaseRenewalBadge({ leaseEnd, leaseRenewalDate }) {
+  const date = leaseRenewalDate || leaseEnd;
+  if (!date) return null;
+  const days = getDaysUntil(date);
+  if (days === null || days > 90) return null;
 
-    // COI Coverage (what tenant has)
-    policy_expiration_date: '',
-    insurance_company: '',
-    policy_general_liability: 0,
-    policy_auto_liability: 0,
-    policy_workers_comp: '',
-    policy_employers_liability: 0,
-    has_additional_insured: false,
-    has_waiver_of_subrogation: false,
-
-    // Requirements (what you require)
-    required_general_liability: 1000000,
-    required_auto_liability: 0,
-    required_workers_comp: false,
-    required_employers_liability: 0,
-    require_additional_insured: true,
-    require_waiver_of_subrogation: false,
-    certificate_holder_name: '',
-    additional_insured_names: '',
-  });
-  const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState('info');
-
-  const COVERAGE_OPTIONS = [
-    { value: 0, label: 'Not Required' },
-    { value: 100000, label: '$100,000' },
-    { value: 300000, label: '$300,000' },
-    { value: 500000, label: '$500,000' },
-    { value: 1000000, label: '$1,000,000' },
-    { value: 2000000, label: '$2,000,000' },
-    { value: 5000000, label: '$5,000,000' },
-  ];
-
-  useEffect(() => {
-    if (tenant) {
-      setFormData({
-        name: tenant.name || '',
-        email: tenant.email || '',
-        phone: tenant.phone || '',
-        property_id: tenant.property_id || '',
-        unit_number: tenant.unit?.unit_number || tenant.suite_number || '',
-
-        // COI Coverage
-        policy_expiration_date: tenant.policy_expiration_date || '',
-        insurance_company: tenant.insurance_company || '',
-        policy_general_liability: tenant.policy_general_liability || 0,
-        policy_auto_liability: tenant.policy_auto_liability || 0,
-        policy_workers_comp: tenant.policy_workers_comp || '',
-        policy_employers_liability: tenant.policy_employers_liability || 0,
-        has_additional_insured: tenant.has_additional_insured || false,
-        has_waiver_of_subrogation: tenant.has_waiver_of_subrogation || false,
-
-        // Requirements
-        required_general_liability: tenant.required_general_liability || 1000000,
-        required_auto_liability: tenant.required_auto_liability || 0,
-        required_workers_comp: tenant.required_workers_comp || false,
-        required_employers_liability: tenant.required_employers_liability || 0,
-        require_additional_insured: tenant.require_additional_insured !== false,
-        require_waiver_of_subrogation: tenant.require_waiver_of_subrogation || false,
-        certificate_holder_name: tenant.certificate_holder_name || '',
-        additional_insured_names: tenant.additional_insured_names || '',
-      });
-    } else {
-      setFormData({
-        name: '',
-        email: '',
-        phone: '',
-        property_id: '',
-        unit_number: '',
-        policy_expiration_date: '',
-        insurance_company: '',
-        policy_general_liability: 0,
-        policy_auto_liability: 0,
-        policy_workers_comp: '',
-        policy_employers_liability: 0,
-        has_additional_insured: false,
-        has_waiver_of_subrogation: false,
-        required_general_liability: 1000000,
-        required_auto_liability: 0,
-        required_workers_comp: false,
-        required_employers_liability: 0,
-        require_additional_insured: true,
-        require_waiver_of_subrogation: false,
-        certificate_holder_name: '',
-        additional_insured_names: '',
-      });
-    }
-    setActiveTab('info');
-  }, [tenant, isOpen]);
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!formData.name.trim()) return;
-
-    setSaving(true);
-    try {
-      await onSave(formData);
-      onClose();
-    } catch (err) {
-      logger.error('Error saving tenant', err);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  if (!isOpen) return null;
-
+  if (days < 0) {
+    return (
+      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-red-100 text-red-700">
+        Lease expired
+      </span>
+    );
+  }
+  if (days <= 30) {
+    return (
+      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-amber-100 text-amber-700">
+        Lease renewal in {days}d
+      </span>
+    );
+  }
   return (
-    <div
-      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-    >
-      <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-        <div className="p-6 border-b border-gray-200 flex items-center justify-between">
-          <h2 className="text-xl font-bold text-gray-900">
-            {tenant ? 'Edit Tenant' : 'Add New Tenant'}
-          </h2>
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg">
-            <X size={20} className="text-gray-500" />
-          </button>
-        </div>
+    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-blue-100 text-blue-700">
+      Lease renewal in {days}d
+    </span>
+  );
+}
 
-        {/* Tabs */}
-        <div className="flex border-b border-gray-200">
-          <button
-            type="button"
-            onClick={() => setActiveTab('info')}
-            className={`flex-1 px-4 py-3 text-sm font-medium ${
-              activeTab === 'info'
-                ? 'text-emerald-600 border-b-2 border-emerald-600 bg-emerald-50'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            Tenant Info
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('coverage')}
-            className={`flex-1 px-4 py-3 text-sm font-medium ${
-              activeTab === 'coverage'
-                ? 'text-emerald-600 border-b-2 border-emerald-600 bg-emerald-50'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            COI Coverage
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('requirements')}
-            className={`flex-1 px-4 py-3 text-sm font-medium ${
-              activeTab === 'requirements'
-                ? 'text-emerald-600 border-b-2 border-emerald-600 bg-emerald-50'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            Requirements
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6">
-          {/* Tenant Info Tab */}
-          {activeTab === 'info' && (
-            <div className="space-y-6">
-              <div>
-                <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <Users size={16} className="text-emerald-600" />
-                  Tenant Information
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Tenant/Company Name *
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                      placeholder="Company Name or Tenant Name"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                    <input
-                      type="email"
-                      value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                      placeholder="tenant@company.com"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-                    <input
-                      type="tel"
-                      value={formData.phone}
-                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                      placeholder="(555) 123-4567"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <Building2 size={16} className="text-emerald-600" />
-                  Property & Unit
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Property</label>
-                    <select
-                      value={formData.property_id}
-                      onChange={(e) => setFormData({ ...formData, property_id: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                    >
-                      <option value="">Select property...</option>
-                      {properties.map(p => (
-                        <option key={p.id} value={p.id}>{p.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Unit/Suite</label>
-                    <input
-                      type="text"
-                      value={formData.unit_number}
-                      onChange={(e) => setFormData({ ...formData, unit_number: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                      placeholder="e.g., Suite 100"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* COI Coverage Tab */}
-          {activeTab === 'coverage' && (
-            <div className="space-y-6">
-              <div className="bg-blue-50 rounded-xl p-4 border border-blue-200">
-                <h3 className="text-sm font-semibold text-gray-900 mb-1">Current COI Coverage</h3>
-                <p className="text-xs text-gray-500 mb-4">
-                  These values are from the tenant's Certificate of Insurance
-                </p>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Policy Expiration
-                    </label>
-                    <input
-                      type="date"
-                      value={formData.policy_expiration_date}
-                      onChange={(e) => setFormData({ ...formData, policy_expiration_date: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Insurance Company
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.insurance_company}
-                      onChange={(e) => setFormData({ ...formData, insurance_company: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                      placeholder="Insurance Co."
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      General Liability
-                    </label>
-                    <input
-                      type="number"
-                      value={formData.policy_general_liability}
-                      onChange={(e) => setFormData({ ...formData, policy_general_liability: parseInt(e.target.value) || 0 })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                      placeholder="1000000"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Auto Liability
-                    </label>
-                    <input
-                      type="number"
-                      value={formData.policy_auto_liability}
-                      onChange={(e) => setFormData({ ...formData, policy_auto_liability: parseInt(e.target.value) || 0 })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                      placeholder="1000000"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Workers Comp
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.policy_workers_comp}
-                      onChange={(e) => setFormData({ ...formData, policy_workers_comp: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                      placeholder="Statutory"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Employers Liability
-                    </label>
-                    <input
-                      type="number"
-                      value={formData.policy_employers_liability}
-                      onChange={(e) => setFormData({ ...formData, policy_employers_liability: parseInt(e.target.value) || 0 })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                      placeholder="500000"
-                    />
-                  </div>
-                </div>
-
-                <div className="mt-4 pt-4 border-t border-blue-200 space-y-3">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={formData.has_additional_insured}
-                      onChange={(e) => setFormData({ ...formData, has_additional_insured: e.target.checked })}
-                      className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
-                    />
-                    <span className="text-sm text-gray-700">COI includes Additional Insured</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={formData.has_waiver_of_subrogation}
-                      onChange={(e) => setFormData({ ...formData, has_waiver_of_subrogation: e.target.checked })}
-                      className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
-                    />
-                    <span className="text-sm text-gray-700">COI includes Waiver of Subrogation</span>
-                  </label>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Requirements Tab */}
-          {activeTab === 'requirements' && (
-            <div className="space-y-6">
-              <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-200">
-                <h3 className="text-sm font-semibold text-gray-900 mb-1">Your Requirements</h3>
-                <p className="text-xs text-gray-500 mb-4">
-                  Set the minimum coverage you require from this tenant
-                </p>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      General Liability Required
-                    </label>
-                    <select
-                      value={formData.required_general_liability}
-                      onChange={(e) => setFormData({ ...formData, required_general_liability: parseInt(e.target.value) })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                    >
-                      {COVERAGE_OPTIONS.map(opt => (
-                        <option key={opt.value} value={opt.value}>{opt.label}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Auto Liability Required
-                    </label>
-                    <select
-                      value={formData.required_auto_liability}
-                      onChange={(e) => setFormData({ ...formData, required_auto_liability: parseInt(e.target.value) })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                    >
-                      {COVERAGE_OPTIONS.map(opt => (
-                        <option key={opt.value} value={opt.value}>{opt.label}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Employers Liability Required
-                    </label>
-                    <select
-                      value={formData.required_employers_liability}
-                      onChange={(e) => setFormData({ ...formData, required_employers_liability: parseInt(e.target.value) })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                    >
-                      {COVERAGE_OPTIONS.map(opt => (
-                        <option key={opt.value} value={opt.value}>{opt.label}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="flex items-center">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={formData.required_workers_comp}
-                        onChange={(e) => setFormData({ ...formData, required_workers_comp: e.target.checked })}
-                        className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
-                      />
-                      <span className="text-sm text-gray-700">Workers' Comp Required</span>
-                    </label>
-                  </div>
-                </div>
-
-                <div className="mt-4 pt-4 border-t border-emerald-200 space-y-3">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={formData.require_additional_insured}
-                      onChange={(e) => setFormData({ ...formData, require_additional_insured: e.target.checked })}
-                      className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
-                    />
-                    <span className="text-sm text-gray-700">Require Additional Insured Endorsement</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={formData.require_waiver_of_subrogation}
-                      onChange={(e) => setFormData({ ...formData, require_waiver_of_subrogation: e.target.checked })}
-                      className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
-                    />
-                    <span className="text-sm text-gray-700">Require Waiver of Subrogation</span>
-                  </label>
-                </div>
-              </div>
-
-              <div className="bg-amber-50 rounded-xl p-4 border border-amber-200">
-                <h3 className="text-sm font-semibold text-gray-900 mb-3">Certificate Details</h3>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Certificate Holder Name
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.certificate_holder_name}
-                      onChange={(e) => setFormData({ ...formData, certificate_holder_name: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                      placeholder="Your Company Name, LLC"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Additional Insured Name(s)
-                    </label>
-                    <textarea
-                      value={formData.additional_insured_names}
-                      onChange={(e) => setFormData({ ...formData, additional_insured_names: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                      placeholder="Property Owner LLC&#10;Management Company Inc"
-                      rows={2}
-                    />
-                    <p className="text-xs text-gray-500 mt-1">One name per line if multiple</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </form>
-
-        <div className="p-6 border-t border-gray-200 flex gap-3">
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSubmit}
-            disabled={saving || !formData.name.trim()}
-            className="flex-1 px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 font-medium disabled:opacity-50 flex items-center justify-center gap-2"
-          >
-            {saving ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                Saving...
-              </>
-            ) : (
-              <>{tenant ? 'Update Tenant' : 'Add Tenant'}</>
-            )}
-          </button>
-        </div>
-      </div>
-    </div>
+// Requirement source badge (subtle)
+function SourceBadge({ source }) {
+  if (!source) return null;
+  const info = getSourceInfo(source);
+  return (
+    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] ${info.bg} ${info.color}`}>
+      {info.label}
+    </span>
   );
 }
 
@@ -562,22 +97,52 @@ export function TenantsView({ properties, userRequirements, selectedProperty, on
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [sortBy, setSortBy] = useState('name');
-  const [showModal, setShowModal] = useState(false);
-  const [editingTenant, setEditingTenant] = useState(null);
   const [selectedTenant, setSelectedTenant] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [sendingRequest, setSendingRequest] = useState(null);
   const [requestSuccess, setRequestSuccess] = useState(null);
   const [bulkRequesting, setBulkRequesting] = useState(false);
-  const [bulkRequestConfirm, setBulkRequestConfirm] = useState(false); // show bulk request confirmation modal
+  const [bulkRequestConfirm, setBulkRequestConfirm] = useState(false);
   const [bulkResults, setBulkResults] = useState(null);
   const [tenantDetailsTab, setTenantDetailsTab] = useState('details');
   const [coiPreviewUrl, setCoiPreviewUrl] = useState(null);
   const [tenantActivity, setTenantActivity] = useState([]);
   const [loadingActivity, setLoadingActivity] = useState(false);
-  const [showCOIUpload, setShowCOIUpload] = useState(false);
 
-  // Calculate tenants that need attention (non-compliant with email)
+  // New workflow state
+  const [showAddWorkflow, setShowAddWorkflow] = useState(false);
+  const [showCOIUpload, setShowCOIUpload] = useState(false);
+  const [coiUploadTenant, setCOIUploadTenant] = useState(null);
+  const [showBuildingDefaults, setShowBuildingDefaults] = useState(false);
+  const [requirementProfiles, setRequirementProfiles] = useState({});
+  const [expandedTenantId, setExpandedTenantId] = useState(null);
+
+  // Load requirement profiles for all tenants
+  const loadRequirementProfiles = useCallback(async () => {
+    const tenantIds = tenants.filter(t => t.has_requirement_profile).map(t => t.id);
+    if (tenantIds.length === 0) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('tenant_requirement_profiles')
+        .select('*')
+        .in('tenant_id', tenantIds);
+
+      if (error) throw error;
+
+      const profileMap = {};
+      (data || []).forEach(p => { profileMap[p.tenant_id] = p; });
+      setRequirementProfiles(profileMap);
+    } catch (err) {
+      logger.error('Error loading requirement profiles', err);
+    }
+  }, [tenants]);
+
+  useEffect(() => {
+    loadRequirementProfiles();
+  }, [loadRequirementProfiles]);
+
+  // Tenants needing attention
   const tenantsNeedingAttention = tenants.filter(t =>
     ['expired', 'non-compliant', 'expiring', 'pending'].includes(t.insurance_status) && t.email
   );
@@ -609,22 +174,18 @@ export function TenantsView({ properties, userRequirements, selectedProperty, on
       return 0;
     });
 
-  // Get public URL for COI document
+  // COI document handling
   const getCOIDocumentUrl = async (documentPath) => {
     if (!documentPath) return null;
-
-    const { data } = supabase.storage
-      .from('coi-documents')
-      .getPublicUrl(documentPath);
-
+    const { data } = supabase.storage.from('coi-documents').getPublicUrl(documentPath);
     return data?.publicUrl;
   };
 
-  // Load COI preview when tenant is selected
   useEffect(() => {
     const loadCOIPreview = async () => {
-      if (selectedTenant?.policy_document_path) {
-        const url = await getCOIDocumentUrl(selectedTenant.policy_document_path);
+      const docPath = selectedTenant?.coi_document_path || selectedTenant?.policy_document_path;
+      if (docPath) {
+        const url = await getCOIDocumentUrl(docPath);
         setCoiPreviewUrl(url);
       } else {
         setCoiPreviewUrl(null);
@@ -633,7 +194,7 @@ export function TenantsView({ properties, userRequirements, selectedProperty, on
     loadCOIPreview();
   }, [selectedTenant]);
 
-  // Load tenant activity when history tab is selected
+  // Load tenant activity
   useEffect(() => {
     const loadTenantActivity = async () => {
       if (selectedTenant && tenantDetailsTab === 'history') {
@@ -645,7 +206,6 @@ export function TenantsView({ properties, userRequirements, selectedProperty, on
             .eq('tenant_id', selectedTenant.id)
             .order('created_at', { ascending: false })
             .limit(50);
-
           if (error) throw error;
           setTenantActivity(data || []);
         } catch (err) {
@@ -659,7 +219,6 @@ export function TenantsView({ properties, userRequirements, selectedProperty, on
     loadTenantActivity();
   }, [selectedTenant, tenantDetailsTab]);
 
-  // Reset tab and activity when tenant changes
   useEffect(() => {
     if (!selectedTenant) {
       setTenantDetailsTab('details');
@@ -668,174 +227,60 @@ export function TenantsView({ properties, userRequirements, selectedProperty, on
     }
   }, [selectedTenant]);
 
-  // Handle viewing COI
-  const handleViewCOI = (tenant) => {
-    if (!tenant.policy_document_path) {
-      showAlert({
-        type: 'warning',
-        title: 'No Document',
-        message: 'No COI document has been uploaded for this tenant.',
-        details: 'Request a certificate to view it here.'
-      });
-      return;
-    }
-    window.open(coiPreviewUrl, '_blank');
-  };
-
-  // Handle downloading COI
-  const handleDownloadCOI = async (tenant) => {
-    if (!tenant.policy_document_path) {
-      showAlert({
-        type: 'warning',
-        title: 'No Document',
-        message: 'No COI document has been uploaded for this tenant.'
-      });
-      return;
-    }
-
+  // Handle adding a new tenant with requirement profile (new workflow)
+  const handleSaveNewTenant = async (tenantData, profileData) => {
     try {
-      const { data, error } = await supabase.storage
-        .from('coi-documents')
-        .download(tenant.policy_document_path);
-
-      if (error) throw error;
-
-      const url = URL.createObjectURL(data);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${tenant.name}_COI.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (error) {
-      logger.error('Error downloading COI:', error);
-      showAlert({
-        type: 'error',
-        title: 'Download Failed',
-        message: 'Failed to download the certificate.',
-        details: error.message
-      });
-    }
-  };
-
-  const handleSave = async (formData) => {
-    // Handle unit creation/lookup
-    let unitId = null;
-    if (formData.unit_number && formData.unit_number.trim() && formData.property_id) {
       const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        // Check if unit already exists
-        const { data: existingUnit } = await supabase
-          .from('units')
-          .select('id')
-          .eq('property_id', formData.property_id)
-          .eq('user_id', user.id)
-          .eq('unit_number', formData.unit_number.trim())
-          .single();
+      if (!user) throw new Error('Not authenticated');
 
-        if (existingUnit) {
-          unitId = existingUnit.id;
+      // Create tenant
+      const tenant = await addTenant(tenantData);
+
+      // Create requirement profile
+      if (profileData) {
+        const { error: profileError } = await supabase
+          .from('tenant_requirement_profiles')
+          .insert({
+            ...profileData,
+            user_id: user.id,
+            tenant_id: tenant.id,
+          });
+
+        if (profileError) {
+          logger.error('Error creating requirement profile', profileError);
         } else {
-          // Create new unit
-          const { data: newUnit } = await supabase
-            .from('units')
-            .insert({
-              user_id: user.id,
-              property_id: formData.property_id,
-              unit_number: formData.unit_number.trim()
-            })
-            .select('id')
-            .single();
-
-          if (newUnit) {
-            unitId = newUnit.id;
-          }
-        }
-      }
-    }
-
-    // Calculate compliance status based on coverage vs requirements
-    const calculateComplianceStatus = (data) => {
-      const issues = [];
-
-      // Check expiration
-      if (data.policy_expiration_date) {
-        const today = new Date();
-        const expDate = new Date(data.policy_expiration_date);
-        const daysUntilExpiration = Math.floor((expDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-
-        if (daysUntilExpiration < 0) {
-          return { status: 'expired', issues: [{ type: 'critical', message: `Policy expired on ${data.policy_expiration_date}` }] };
-        } else if (daysUntilExpiration <= 30) {
-          issues.push({ type: 'warning', message: `Policy expiring in ${daysUntilExpiration} days` });
+          // Update tenant to link to profile
+          await updateTenant(tenant.id, {
+            has_requirement_profile: true,
+          });
         }
       }
 
-      // Check coverage amounts
-      const gl = data.policy_general_liability || 0;
-      const reqGl = data.required_general_liability || 0;
-      if (reqGl > 0 && gl < reqGl) {
-        issues.push({ type: 'error', message: `General Liability $${(gl/1000000).toFixed(1)}M below required $${(reqGl/1000000).toFixed(1)}M` });
-      }
+      // Log activity
+      await supabase.from('tenant_activity').insert({
+        tenant_id: tenant.id,
+        user_id: user.id,
+        activity_type: 'vendor_created',
+        description: `Tenant added via ${profileData?.creation_method || 'manual'} workflow`,
+        metadata: { creation_method: profileData?.creation_method },
+      });
 
-      const auto = data.policy_auto_liability || 0;
-      const reqAuto = data.required_auto_liability || 0;
-      if (reqAuto > 0 && auto < reqAuto) {
-        issues.push({ type: 'error', message: `Auto Liability below required amount` });
-      }
-
-      const el = data.policy_employers_liability || 0;
-      const reqEl = data.required_employers_liability || 0;
-      if (reqEl > 0 && el < reqEl) {
-        issues.push({ type: 'error', message: `Employers Liability below required amount` });
-      }
-
-      if (data.required_workers_comp && !data.policy_workers_comp) {
-        issues.push({ type: 'error', message: `Workers Compensation required but not found` });
-      }
-
-      if (data.require_additional_insured && !data.has_additional_insured) {
-        issues.push({ type: 'error', message: `Additional Insured endorsement required but not found` });
-      }
-
-      if (data.require_waiver_of_subrogation && !data.has_waiver_of_subrogation) {
-        issues.push({ type: 'error', message: `Waiver of Subrogation required but not found` });
-      }
-
-      const hasErrors = issues.some(i => i.type === 'error' || i.type === 'critical');
-      const hasWarnings = issues.some(i => i.type === 'warning');
-
-      let status = 'compliant';
-      if (hasErrors) status = 'non-compliant';
-      else if (hasWarnings) status = 'expiring';
-      else if (!data.policy_expiration_date) status = 'pending';
-
-      return { status, issues };
-    };
-
-    const saveData = { ...formData, unit_id: unitId };
-    delete saveData.unit_number;
-
-    // Recalculate compliance status
-    const { status, issues } = calculateComplianceStatus(saveData);
-    saveData.insurance_status = status;
-    saveData.insurance_issues = issues;
-
-    if (editingTenant) {
-      await updateTenant(editingTenant.id, saveData);
-    } else {
-      await addTenant(saveData);
+      showSuccess('Tenant added successfully');
+      refreshTenants();
+      loadRequirementProfiles();
+    } catch (err) {
+      logger.error('Error in handleSaveNewTenant', err);
+      throw err;
     }
-    setEditingTenant(null);
   };
 
-  const handleDelete = async (id) => {
-    await deleteTenant(id);
-    setDeleteConfirm(null);
-    setSelectedTenant(null);
+  // Handle COI upload complete
+  const handleCOIUploadComplete = () => {
+    refreshTenants();
+    loadRequirementProfiles();
   };
 
+  // Handle send COI request
   const handleSendRequest = async (tenant) => {
     if (!tenant.email) return;
     setSendingRequest(tenant.id);
@@ -845,112 +290,81 @@ export function TenantsView({ properties, userRequirements, selectedProperty, on
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      // Generate upload token if needed
       let uploadToken = tenant.upload_token;
       if (!uploadToken) {
         uploadToken = crypto.randomUUID();
         const tokenExpiresAt = new Date();
         tokenExpiresAt.setDate(tokenExpiresAt.getDate() + 30);
-
-        await supabase
-          .from('tenants')
-          .update({
-            upload_token: uploadToken,
-            upload_token_expires_at: tokenExpiresAt.toISOString()
-          })
-          .eq('id', tenant.id);
+        await supabase.from('tenants').update({
+          upload_token: uploadToken,
+          upload_token_expires_at: tokenExpiresAt.toISOString(),
+        }).eq('id', tenant.id);
       }
 
       const appUrl = window.location.origin;
       const companyName = userRequirements?.company_name || 'Our Company';
-
-      // Get tenant's property for requirements
       const tenantProperty = properties?.find(p => p.id === tenant.property_id);
+      const profile = requirementProfiles[tenant.id];
 
-      // Build requirements from tenant's lease terms (stored on tenant record)
       const requirements = {
-        generalLiability: tenant.required_general_liability || 100000,
-        autoLiability: tenant.required_auto_liability || null,
-        workersComp: tenant.required_workers_comp || false,
-        employersLiability: tenant.required_employers_liability || null,
-        additionalInsured: tenant.requires_additional_insured ?? false,
-        waiverOfSubrogation: false,
+        generalLiability: profile?.gl_occurrence_limit || tenant.required_general_liability || 1000000,
+        autoLiability: profile?.commercial_auto_csl || tenant.required_auto_liability || null,
+        workersComp: profile?.workers_comp_statutory || tenant.required_workers_comp || false,
+        employersLiability: profile?.workers_comp_employers_liability_limit || tenant.required_employers_liability || null,
+        additionalInsured: (profile?.additional_insured_entities?.length > 0) || tenant.requires_additional_insured || false,
+        waiverOfSubrogation: profile?.waiver_of_subrogation_required || false,
       };
 
-      // Determine issues based on status
       const issues = [];
-      if (tenant.insurance_status === 'expired') {
-        issues.push('Certificate has expired');
-      } else if (tenant.insurance_status === 'non-compliant') {
-        issues.push('Certificate does not meet requirements');
-      } else if (tenant.insurance_status === 'pending') {
-        issues.push('No certificate on file');
-      }
+      if (tenant.insurance_status === 'expired') issues.push('Certificate has expired');
+      else if (tenant.insurance_status === 'non-compliant') issues.push('Certificate does not meet requirements');
+      else if (tenant.insurance_status === 'pending') issues.push('No certificate on file');
 
-      // Call the edge function
       const { data: result, error: fnError } = await supabase.functions.invoke('send-coi-request', {
         body: {
           to: tenant.email,
-          vendorName: tenant.name, // Reuse vendor template for now
+          vendorName: tenant.name,
           vendorStatus: tenant.insurance_status,
-          issues: issues,
-          companyName: companyName,
+          issues,
+          companyName,
           replyTo: user.email,
-          uploadToken: uploadToken,
-          appUrl: appUrl,
-          requirements: requirements,
+          uploadToken,
+          appUrl,
+          requirements,
           propertyName: tenantProperty?.name || null,
-          isTenant: true, // Flag for tenant-specific handling
+          isTenant: true,
         },
       });
 
-      if (fnError) {
-        throw new Error(fnError.message || 'Failed to send email');
-      }
+      if (fnError) throw new Error(fnError.message || 'Failed to send email');
+      if (result && !result.success) throw new Error(result.error || 'Failed to send email');
 
-      if (result && !result.success) {
-        throw new Error(result.error || 'Failed to send email');
-      }
-
-      // Update last contacted timestamp
-      await supabase
-        .from('tenants')
-        .update({ last_contacted_at: new Date().toISOString() })
-        .eq('id', tenant.id);
-
-      // Log activity
+      await supabase.from('tenants').update({ last_contacted_at: new Date().toISOString() }).eq('id', tenant.id);
       await supabase.from('tenant_activity').insert({
         tenant_id: tenant.id,
         user_id: user.id,
         activity_type: 'email_sent',
         description: `COI request email sent to ${tenant.email}`,
-        metadata: { email: tenant.email, status: tenant.insurance_status }
+        metadata: { email: tenant.email, status: tenant.insurance_status },
       });
 
       setRequestSuccess(tenant.id);
       setTimeout(() => setRequestSuccess(null), 3000);
       refreshTenants();
-
     } catch (error) {
       logger.error('Failed to send tenant COI request', error);
-      showAlert({
-        type: 'error',
-        title: 'Request Failed',
-        message: 'Failed to send the COI request email.',
-        details: error.message
-      });
+      showAlert({ type: 'error', title: 'Request Failed', message: 'Failed to send the COI request email.', details: error.message });
     } finally {
       setSendingRequest(null);
     }
   };
 
-  // Show bulk request confirmation modal
+  // Bulk request
   const handleBulkRequest = () => {
     if (tenantsNeedingAttention.length === 0) return;
     setBulkRequestConfirm(true);
   };
 
-  // Execute bulk COI requests after confirmation
   const executeBulkRequest = async () => {
     setBulkRequestConfirm(false);
     setBulkRequesting(true);
@@ -967,77 +381,57 @@ export function TenantsView({ properties, userRequirements, selectedProperty, on
 
       for (const tenant of tenantsNeedingAttention) {
         try {
-          // Generate upload token
           const uploadToken = crypto.randomUUID();
           const tokenExpiresAt = new Date();
           tokenExpiresAt.setDate(tokenExpiresAt.getDate() + 30);
 
-          await supabase
-            .from('tenants')
-            .update({
-              upload_token: uploadToken,
-              upload_token_expires_at: tokenExpiresAt.toISOString()
-            })
-            .eq('id', tenant.id);
+          await supabase.from('tenants').update({
+            upload_token: uploadToken,
+            upload_token_expires_at: tokenExpiresAt.toISOString(),
+          }).eq('id', tenant.id);
 
-          // Get tenant's property
           const tenantProperty = properties?.find(p => p.id === tenant.property_id);
+          const profile = requirementProfiles[tenant.id];
 
-          // Build requirements from tenant's lease terms (stored on tenant record)
           const requirements = {
-            generalLiability: tenant.required_general_liability || 100000,
-            autoLiability: tenant.required_auto_liability || null,
-            workersComp: tenant.required_workers_comp || false,
-            employersLiability: tenant.required_employers_liability || null,
-            additionalInsured: tenant.requires_additional_insured ?? false,
-            waiverOfSubrogation: false,
+            generalLiability: profile?.gl_occurrence_limit || tenant.required_general_liability || 1000000,
+            autoLiability: profile?.commercial_auto_csl || null,
+            workersComp: profile?.workers_comp_statutory || false,
+            employersLiability: profile?.workers_comp_employers_liability_limit || null,
+            additionalInsured: (profile?.additional_insured_entities?.length > 0) || false,
+            waiverOfSubrogation: profile?.waiver_of_subrogation_required || false,
           };
 
-          // Determine issues
           const issues = [];
-          if (tenant.insurance_status === 'expired') {
-            issues.push('Certificate has expired');
-          } else if (tenant.insurance_status === 'non-compliant') {
-            issues.push('Certificate does not meet requirements');
-          } else if (tenant.insurance_status === 'pending') {
-            issues.push('No certificate on file');
-          }
+          if (tenant.insurance_status === 'expired') issues.push('Certificate has expired');
+          else if (tenant.insurance_status === 'non-compliant') issues.push('Certificate does not meet requirements');
+          else if (tenant.insurance_status === 'pending') issues.push('No certificate on file');
 
-          // Send email
           const { data: result, error: fnError } = await supabase.functions.invoke('send-coi-request', {
             body: {
               to: tenant.email,
               vendorName: tenant.name,
               vendorStatus: tenant.insurance_status,
-              issues: issues,
-              companyName: companyName,
+              issues,
+              companyName,
               replyTo: user.email,
-              uploadToken: uploadToken,
-              appUrl: appUrl,
-              requirements: requirements,
+              uploadToken,
+              appUrl,
+              requirements,
               propertyName: tenantProperty?.name || null,
               isTenant: true,
             },
           });
 
-          if (fnError || (result && !result.success)) {
-            failCount++;
-            continue;
-          }
+          if (fnError || (result && !result.success)) { failCount++; continue; }
 
-          // Update last contacted timestamp
-          await supabase
-            .from('tenants')
-            .update({ last_contacted_at: new Date().toISOString() })
-            .eq('id', tenant.id);
-
-          // Log activity
+          await supabase.from('tenants').update({ last_contacted_at: new Date().toISOString() }).eq('id', tenant.id);
           await supabase.from('tenant_activity').insert({
             tenant_id: tenant.id,
             user_id: user.id,
             activity_type: 'email_sent',
             description: `COI request email sent to ${tenant.email} (bulk)`,
-            metadata: { email: tenant.email, status: tenant.insurance_status, bulk: true }
+            metadata: { email: tenant.email, status: tenant.insurance_status, bulk: true },
           });
 
           successCount++;
@@ -1047,35 +441,32 @@ export function TenantsView({ properties, userRequirements, selectedProperty, on
         }
       }
 
-      // Log bulk request completion
-      await supabase.from('tenant_activity').insert({
-        tenant_id: null,
-        user_id: user.id,
-        activity_type: 'bulk_request',
-        description: `Bulk COI request completed: ${successCount} sent, ${failCount} failed`,
-        metadata: { success: successCount, failed: failCount, total: tenantsNeedingAttention.length }
-      });
-
       setBulkResults({ success: successCount, failed: failCount });
       setTimeout(() => setBulkResults(null), 5000);
       refreshTenants();
-
     } catch (error) {
       logger.error('Bulk request failed', error);
-      showAlert({
-        type: 'error',
-        title: 'Bulk Request Failed',
-        message: 'Failed to send bulk COI requests.',
-        details: error.message
-      });
+      showAlert({ type: 'error', title: 'Bulk Request Failed', message: 'Failed to send bulk COI requests.', details: error.message });
     } finally {
       setBulkRequesting(false);
     }
   };
 
+  const handleDelete = async (id) => {
+    await deleteTenant(id);
+    setDeleteConfirm(null);
+    setSelectedTenant(null);
+  };
+
+  // COI upload for a specific tenant
+  const openCOIUpload = (tenant) => {
+    setCOIUploadTenant(tenant);
+    setShowCOIUpload(true);
+  };
+
   return (
     <div className="space-y-6">
-      {/* Property Selector for Tenants */}
+      {/* Property Selector */}
       {properties.length > 0 && (
         <div className="flex items-center justify-between">
           <PropertySelector
@@ -1084,81 +475,52 @@ export function TenantsView({ properties, userRequirements, selectedProperty, on
             onSelectProperty={onSelectProperty}
             loading={loadingProperties}
           />
-          {selectedProperty && (
-            <p className="text-sm text-gray-500">
-              Showing tenants for <span className="font-medium text-gray-700">{selectedProperty.name}</span>
-            </p>
-          )}
+          <div className="flex items-center gap-2">
+            {selectedProperty && (
+              <button
+                onClick={() => setShowBuildingDefaults(true)}
+                className="px-3 py-2 text-sm bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 flex items-center gap-1.5 font-medium"
+              >
+                <Shield size={14} />
+                Tenant Defaults
+              </button>
+            )}
+          </div>
         </div>
       )}
 
-      {/* Stats Cards - Same style as vendors */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <button
-          onClick={() => setStatusFilter('all')}
-          className={`bg-white rounded-2xl shadow-sm border p-5 hover:shadow-md transition-all text-left ${statusFilter === 'all' ? 'border-gray-900 ring-2 ring-gray-900' : 'border-gray-200'}`}
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500 font-medium">Total Tenants</p>
-              <p className="text-3xl font-bold text-gray-900 mt-1">{stats.total}</p>
+      {/* Stats Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+        {[
+          { key: 'all', label: 'Total Tenants', count: stats.total, color: 'gray', icon: Users },
+          { key: 'expired', label: 'Expired', count: stats.expired, color: 'red', icon: XCircle },
+          { key: 'non-compliant', label: 'Non-Compliant', count: stats.nonCompliant, color: 'orange', icon: AlertCircle },
+          { key: 'expiring', label: 'Expiring', count: stats.expiring, color: 'amber', icon: AlertCircle },
+          { key: 'compliant', label: 'Compliant', count: stats.compliant, color: 'emerald', icon: CheckCircle },
+        ].map(({ key, label, count, color, icon: Icon }) => (
+          <button
+            key={key}
+            onClick={() => setStatusFilter(key)}
+            className={`bg-white rounded-2xl shadow-sm border p-4 hover:shadow-md transition-all text-left ${
+              statusFilter === key ? `border-${color}-500 ring-2 ring-${color}-500` : 'border-gray-200'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-gray-500 font-medium">{label}</p>
+                <p className={`text-2xl font-bold mt-1 ${key === 'all' ? 'text-gray-900' : `text-${color}-600`}`}>{count}</p>
+              </div>
+              <div className={`w-10 h-10 bg-${color}-100 rounded-xl flex items-center justify-center`}>
+                <Icon className={`text-${color}-500`} size={20} />
+              </div>
             </div>
-            <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center">
-              <Users className="text-gray-500" size={24} />
-            </div>
-          </div>
-        </button>
-
-        <button
-          onClick={() => setStatusFilter('expired')}
-          className={`bg-white rounded-2xl shadow-sm border p-5 hover:shadow-md transition-all text-left ${statusFilter === 'expired' ? 'border-red-500 ring-2 ring-red-500' : 'border-gray-200'}`}
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500 font-medium">Expired</p>
-              <p className="text-3xl font-bold text-red-600 mt-1">{stats.expired}</p>
-            </div>
-            <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center">
-              <XCircle className="text-red-500" size={24} />
-            </div>
-          </div>
-        </button>
-
-        <button
-          onClick={() => setStatusFilter('non-compliant')}
-          className={`bg-white rounded-2xl shadow-sm border p-5 hover:shadow-md transition-all text-left ${statusFilter === 'non-compliant' ? 'border-orange-500 ring-2 ring-orange-500' : 'border-gray-200'}`}
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500 font-medium">Non-Compliant</p>
-              <p className="text-3xl font-bold text-orange-600 mt-1">{stats.nonCompliant}</p>
-            </div>
-            <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center">
-              <AlertCircle className="text-orange-500" size={24} />
-            </div>
-          </div>
-        </button>
-
-        <button
-          onClick={() => setStatusFilter('compliant')}
-          className={`bg-white rounded-2xl shadow-sm border p-5 hover:shadow-md transition-all text-left ${statusFilter === 'compliant' ? 'border-emerald-500 ring-2 ring-emerald-500' : 'border-gray-200'}`}
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500 font-medium">Compliant</p>
-              <p className="text-3xl font-bold text-emerald-600 mt-1">{stats.compliant}</p>
-            </div>
-            <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center">
-              <CheckCircle className="text-emerald-500" size={24} />
-            </div>
-          </div>
-        </button>
+          </button>
+        ))}
       </div>
 
-      {/* Filters - Same style as vendors */}
+      {/* Filters & Actions */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5">
         <div className="flex flex-wrap gap-3 items-center">
-          {/* Search */}
           <div className="flex-1 min-w-[200px]">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
@@ -1167,829 +529,516 @@ export function TenantsView({ properties, userRequirements, selectedProperty, on
                 placeholder="Search tenants..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent bg-gray-50 transition-all"
+                className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent bg-gray-50"
               />
             </div>
           </div>
 
-          {/* Sort */}
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
-            className="px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent bg-gray-50 font-medium text-gray-700"
+            className="px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 bg-gray-50 font-medium text-gray-700"
           >
-            <option value="name">Sort: Name (A-Z)</option>
-            <option value="expiration">Sort: Expiration Date</option>
+            <option value="name">Sort: Name</option>
+            <option value="expiration">Sort: Expiration</option>
             <option value="status">Sort: Status</option>
           </select>
 
-          {/* Add Tenant Button - Opens Lease Upload Modal */}
           <button
-            onClick={() => setShowCOIUpload(true)}
+            onClick={() => setShowAddWorkflow(true)}
             className="px-4 py-2.5 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 font-medium flex items-center gap-2"
-            aria-label="Add new tenant from lease"
           >
-            <Plus size={18} aria-hidden="true" />
+            <Plus size={18} />
             <span className="hidden sm:inline">Add Tenant</span>
           </button>
 
-          {/* Bulk Request Button */}
           {tenantsNeedingAttention.length > 0 && (
             <button
               onClick={handleBulkRequest}
               disabled={bulkRequesting}
-              className="px-4 py-2.5 bg-orange-500 text-white rounded-xl hover:bg-orange-600 font-semibold flex items-center gap-2 disabled:opacity-50 transition-all"
-              aria-label={`Send COI requests to ${tenantsNeedingAttention.length} tenants`}
+              className="px-4 py-2.5 bg-amber-500 text-white rounded-xl hover:bg-amber-600 font-medium flex items-center gap-2 disabled:opacity-50"
             >
-              {bulkRequesting ? (
-                <>
-                  <Loader2 size={18} className="animate-spin" aria-hidden="true" />
-                  <span className="hidden sm:inline">Sending...</span>
-                </>
-              ) : (
-                <>
-                  <Send size={18} aria-hidden="true" />
-                  <span className="hidden sm:inline">Request COIs ({tenantsNeedingAttention.length})</span>
-                  <span className="sm:hidden">{tenantsNeedingAttention.length}</span>
-                </>
-              )}
-            </button>
-          )}
-
-          {/* Bulk Results Feedback */}
-          {bulkResults && (
-            <div className="px-4 py-2.5 bg-emerald-100 text-emerald-700 rounded-xl font-medium flex items-center gap-2" role="status">
-              <CheckCircle size={18} aria-hidden="true" />
-              <span>Sent: {bulkResults.success}{bulkResults.failed > 0 && `, Failed: ${bulkResults.failed}`}</span>
-            </div>
-          )}
-
-          {/* Clear */}
-          {(searchQuery || statusFilter !== 'all' || sortBy !== 'name') && (
-            <button
-              onClick={() => {
-                setSearchQuery('');
-                setStatusFilter('all');
-                setSortBy('name');
-              }}
-              className="px-4 py-2.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-xl font-medium transition-all"
-            >
-              Clear Filters
+              {bulkRequesting ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+              <span className="hidden sm:inline">Request All ({tenantsNeedingAttention.length})</span>
             </button>
           )}
         </div>
 
-        {filteredTenants.length > 0 && (
-          <p className="text-sm text-gray-500 mt-4">
-            Showing {filteredTenants.length} of {tenants.length} tenants
-          </p>
+        {bulkResults && (
+          <div className="mt-3 p-3 bg-emerald-50 rounded-lg text-sm text-emerald-700">
+            Sent {bulkResults.success} request{bulkResults.success !== 1 ? 's' : ''}{bulkResults.failed > 0 ? `, ${bulkResults.failed} failed` : ''}
+          </div>
         )}
       </div>
 
-      {/* Tenants List - Card style like vendors */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+      {/* Tenant List */}
+      <div className="space-y-3">
         {loading ? (
-          <div className="p-12 text-center">
-            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500 mb-4"></div>
-            <p className="text-gray-600">Loading tenants...</p>
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="animate-spin text-emerald-500" size={24} />
+            <span className="ml-2 text-gray-500">Loading tenants...</span>
+          </div>
+        ) : filteredTenants.length === 0 ? (
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-12 text-center">
+            <Users size={48} className="mx-auto text-gray-300 mb-4" />
+            <h3 className="text-lg font-semibold text-gray-700">
+              {tenants.length === 0 ? 'No tenants yet' : 'No tenants match your filters'}
+            </h3>
+            <p className="text-sm text-gray-500 mt-2">
+              {tenants.length === 0 ? 'Click "Add Tenant" to get started.' : 'Try adjusting your search or filter criteria.'}
+            </p>
+            {tenants.length === 0 && (
+              <button
+                onClick={() => setShowAddWorkflow(true)}
+                className="mt-4 px-6 py-2 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 font-medium inline-flex items-center gap-2"
+              >
+                <Plus size={18} />
+                Add Your First Tenant
+              </button>
+            )}
           </div>
         ) : (
-          <div className="divide-y divide-gray-100">
-            {filteredTenants.length === 0 ? (
-              <div className="p-8 text-center">
-                <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                  <Users className="text-gray-400" size={32} />
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                  {searchQuery || statusFilter !== 'all'
-                    ? 'No tenants found'
-                    : 'No tenants yet'}
-                </h3>
-                <p className="text-gray-600 mb-6">
-                  {searchQuery || statusFilter !== 'all'
-                    ? 'Try adjusting your search or filters'
-                    : 'Add your first tenant to start tracking their insurance compliance.'}
-                </p>
-                {!searchQuery && statusFilter === 'all' && (
-                  <button
-                    onClick={() => setShowCOIUpload(true)}
-                    className="px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 font-medium inline-flex items-center gap-2"
-                  >
-                    <Plus size={18} />
-                    Add Tenant
-                  </button>
-                )}
-              </div>
-            ) : (
-              filteredTenants.map((tenant) => (
-                <div key={tenant.id} className="p-5 hover:bg-gray-50 transition-colors">
-                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between space-y-3 sm:space-y-0">
-                    <div className="flex items-start space-x-4 flex-1">
-                      <div className="flex-shrink-0 mt-0.5">
-                        {getStatusIcon(tenant.insurance_status)}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex flex-col sm:flex-row sm:items-center space-y-1 sm:space-y-0 sm:space-x-3 mb-2">
-                          <h3 className="text-base font-semibold text-gray-900 truncate">{tenant.name}</h3>
-                          {getStatusBadge(tenant.insurance_status, tenant.policy_expiration_date)}
-                        </div>
+          filteredTenants.map(tenant => {
+            const profile = requirementProfiles[tenant.id];
+            const isExpanded = expandedTenantId === tenant.id;
+            const isSelected = selectedTenant?.id === tenant.id;
 
-                        {/* Property & Unit */}
-                        {(tenant.property || tenant.unit) && (
-                          <p className="text-sm text-gray-500 mb-2 flex items-center gap-1.5">
-                            <Building2 size={14} />
-                            {tenant.property?.name || 'No property'}
-                            {tenant.unit && ` • Unit ${tenant.unit.unit_number}`}
-                          </p>
+            return (
+              <div
+                key={tenant.id}
+                className={`bg-white rounded-2xl shadow-sm border transition-all hover:shadow-md ${
+                  isSelected ? 'border-emerald-500 ring-2 ring-emerald-500' : 'border-gray-200'
+                }`}
+              >
+                {/* Tenant Row */}
+                <div
+                  className="p-4 cursor-pointer"
+                  onClick={() => setSelectedTenant(isSelected ? null : tenant)}
+                >
+                  <div className="flex items-center gap-4">
+                    {getStatusIcon(tenant.insurance_status)}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="font-semibold text-gray-900 truncate">{tenant.name}</h3>
+                        {getStatusBadge(tenant.insurance_status, tenant.coi_expiration_date || tenant.policy_expiration_date)}
+                        <LeaseRenewalBadge leaseEnd={tenant.lease_end} leaseRenewalDate={tenant.lease_renewal_date} />
+                        {tenant.has_requirement_profile && profile && (
+                          <SourceBadge source={profile.creation_method} />
                         )}
-
-                        {/* Issues */}
-                        {tenant.compliance_issues && tenant.compliance_issues.length > 0 && (
-                          <div className="space-y-1.5 mt-2">
-                            {tenant.compliance_issues.map((issue, idx) => (
-                              <div key={idx} className="flex items-start space-x-2 text-sm text-orange-700">
-                                <AlertCircle size={14} className="mt-0.5 flex-shrink-0" />
-                                <span className="break-words">{typeof issue === 'string' ? issue : issue.message}</span>
-                              </div>
-                            ))}
-                          </div>
+                      </div>
+                      <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
+                        {tenant.property?.name && (
+                          <span className="flex items-center gap-1">
+                            <Building2 size={12} />
+                            {tenant.property.name}
+                            {tenant.unit?.unit_number && ` - ${tenant.unit.unit_number}`}
+                          </span>
+                        )}
+                        {tenant.email && (
+                          <span className="flex items-center gap-1">
+                            <Mail size={12} />
+                            {tenant.email}
+                          </span>
+                        )}
+                        {(tenant.coi_expiration_date || tenant.policy_expiration_date) && (
+                          <span className="flex items-center gap-1">
+                            <Calendar size={12} />
+                            Exp: {formatDate(tenant.coi_expiration_date || tenant.policy_expiration_date)}
+                          </span>
                         )}
                       </div>
                     </div>
 
-                    <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-start space-x-2 sm:space-x-0 sm:space-y-2 sm:ml-4 pt-2 sm:pt-0 border-t sm:border-t-0 border-gray-100">
-                      {/* Expiration Date */}
-                      <div className="flex items-center text-sm text-gray-500 bg-gray-100 px-2.5 py-1 rounded-lg">
-                        <Calendar size={14} className="mr-1.5" />
-                        {tenant.policy_expiration_date ? formatDate(tenant.policy_expiration_date) : 'No policy'}
-                      </div>
-
-                      {/* Action Buttons */}
-                      <div className="flex items-center space-x-3">
-                        <button
-                          onClick={() => setSelectedTenant(tenant)}
-                          className="text-sm text-emerald-600 hover:text-emerald-700 font-semibold"
-                        >
-                          Details
-                        </button>
-                        <span className="text-gray-300">|</span>
-                        <button
-                          onClick={() => setDeleteConfirm(tenant)}
-                          className="text-sm text-red-600 hover:text-red-700 font-medium"
-                        >
-                          Delete
-                        </button>
-                      </div>
-
-                      {/* Request COI Button */}
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {/* Upload COI */}
                       <button
-                        onClick={() => handleSendRequest(tenant)}
-                        disabled={sendingRequest === tenant.id || !tenant.email}
-                        className={`text-xs px-3 py-1.5 rounded-lg font-semibold whitespace-nowrap flex items-center space-x-1.5 transition-all ${
-                          requestSuccess === tenant.id
-                            ? 'bg-emerald-500 text-white'
-                            : !tenant.email
-                            ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                            : 'bg-gradient-to-r from-orange-500 to-orange-600 text-white hover:shadow-md disabled:opacity-50'
-                        }`}
+                        onClick={(e) => { e.stopPropagation(); openCOIUpload(tenant); }}
+                        className="p-2 hover:bg-emerald-50 rounded-lg text-emerald-600"
+                        title="Upload COI"
                       >
-                        {requestSuccess === tenant.id ? (
-                          <>
-                            <CheckCircle size={12} />
-                            <span>Sent!</span>
-                          </>
-                        ) : sendingRequest === tenant.id ? (
-                          <Loader2 size={12} className="animate-spin" />
-                        ) : (
-                          <>
-                            <Send size={12} />
-                            <span className="hidden sm:inline">Request COI</span>
-                          </>
-                        )}
+                        <Upload size={16} />
+                      </button>
+
+                      {/* Request COI */}
+                      {tenant.email && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleSendRequest(tenant); }}
+                          disabled={sendingRequest === tenant.id}
+                          className="p-2 hover:bg-blue-50 rounded-lg text-blue-600 disabled:opacity-50"
+                          title="Request COI"
+                        >
+                          {sendingRequest === tenant.id ? (
+                            <Loader2 size={16} className="animate-spin" />
+                          ) : requestSuccess === tenant.id ? (
+                            <CheckCircle size={16} className="text-emerald-500" />
+                          ) : (
+                            <Send size={16} />
+                          )}
+                        </button>
+                      )}
+
+                      {/* Expand toggle */}
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setExpandedTenantId(isExpanded ? null : tenant.id); }}
+                        className="p-2 hover:bg-gray-100 rounded-lg"
+                      >
+                        {isExpanded ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
                       </button>
                     </div>
                   </div>
                 </div>
-              ))
-            )}
-          </div>
+
+                {/* Expanded Compliance Breakdown */}
+                {isExpanded && (
+                  <div className="px-4 pb-4 border-t border-gray-100 pt-3">
+                    {tenant.compliance_details?.fields?.length > 0 ? (
+                      <div className="space-y-1.5">
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Compliance Breakdown</p>
+                        {tenant.compliance_details.fields.map((field, idx) => {
+                          const statusInfo = getComplianceFieldStatusInfo(field.status);
+                          return (
+                            <div key={idx} className="flex items-center justify-between py-1.5 px-3 rounded-lg bg-gray-50">
+                              <div className="flex items-center gap-2">
+                                <span className={`w-2 h-2 rounded-full ${
+                                  field.status === 'compliant' ? 'bg-emerald-500' :
+                                  field.status === 'non_compliant' ? 'bg-red-500' :
+                                  field.status === 'expiring_soon' ? 'bg-amber-500' :
+                                  field.status === 'expired' ? 'bg-red-700' :
+                                  'bg-gray-400'
+                                }`}></span>
+                                <span className="text-sm text-gray-700">{field.label || field.fieldName}</span>
+                              </div>
+                              <div className="flex items-center gap-3 text-xs text-gray-500">
+                                <span>Req: {typeof field.required === 'number' ? formatCurrency(field.required) : String(field.required || 'N/A')}</span>
+                                <span>Actual: {typeof field.actual === 'number' ? formatCurrency(field.actual) : String(field.actual || 'N/A')}</span>
+                                <span className={`px-1.5 py-0.5 rounded ${statusInfo.bg} ${statusInfo.color}`}>{statusInfo.label}</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : tenant.has_requirement_profile ? (
+                      <div className="text-center py-4">
+                        <p className="text-sm text-gray-500">No COI uploaded yet.</p>
+                        <button
+                          onClick={() => openCOIUpload(tenant)}
+                          className="mt-2 text-sm text-emerald-600 hover:text-emerald-700 font-medium flex items-center gap-1 mx-auto"
+                        >
+                          <Upload size={14} />
+                          Upload COI
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="text-center py-4">
+                        <p className="text-sm text-gray-500">No requirement profile set.</p>
+                        <p className="text-xs text-gray-400 mt-1">Add this tenant again with requirements to enable compliance tracking.</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })
         )}
       </div>
 
-      {/* Add/Edit Modal */}
-      <TenantModal
-        isOpen={showModal}
-        onClose={() => { setShowModal(false); setEditingTenant(null); }}
-        onSave={handleSave}
-        tenant={editingTenant}
-        properties={properties}
-      />
-
-      {/* COI Upload Modal - Same component as vendor upload, locked to tenant type */}
-      <SmartUploadModal
-        isOpen={showCOIUpload}
-        onClose={() => setShowCOIUpload(false)}
-        properties={properties}
-        userRequirements={userRequirements}
-        defaultDocumentType="tenant"
-        onUploadComplete={({ type, data: newTenant }) => {
-          showSuccess(`Tenant "${newTenant.name}" added successfully`);
-          refreshTenants();
-        }}
-      />
-
-      {/* Delete Confirmation */}
-      {deleteConfirm && (
-        <div
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-          role="alertdialog"
-          aria-modal="true"
-          aria-labelledby="delete-confirm-title"
-          aria-describedby="delete-confirm-desc"
-        >
-          <div className="bg-white rounded-xl p-6 max-w-md w-full">
-            <h3 id="delete-confirm-title" className="text-lg font-bold text-gray-900 mb-2">Delete Tenant?</h3>
-            <p id="delete-confirm-desc" className="text-gray-600 mb-4">
-              Are you sure you want to delete <strong>{deleteConfirm.name}</strong>? This action cannot be undone.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setDeleteConfirm(null)}
-                className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => handleDelete(deleteConfirm.id)}
-                className="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 font-medium"
-              >
-                Delete
-              </button>
+      {/* Detail Panel (right side / modal for selected tenant) */}
+      {selectedTenant && (
+        <div className="fixed inset-y-0 right-0 w-full max-w-lg bg-white shadow-xl border-l border-gray-200 z-40 flex flex-col animate-fade-in-up">
+          <div className="p-5 border-b border-gray-200 flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-bold text-gray-900">{selectedTenant.name}</h2>
+              <p className="text-sm text-gray-500">
+                {selectedTenant.property?.name}{selectedTenant.unit?.unit_number ? ` - ${selectedTenant.unit.unit_number}` : ''}
+              </p>
             </div>
+            <button onClick={() => setSelectedTenant(null)} className="p-2 hover:bg-gray-100 rounded-lg">
+              <X size={20} className="text-gray-500" />
+            </button>
+          </div>
+
+          {/* Tabs */}
+          <div className="flex border-b border-gray-200">
+            {['details', 'requirements', 'history'].map(tab => (
+              <button
+                key={tab}
+                onClick={() => setTenantDetailsTab(tab)}
+                className={`flex-1 px-4 py-3 text-sm font-medium ${
+                  tenantDetailsTab === tab
+                    ? 'text-emerald-600 border-b-2 border-emerald-600 bg-emerald-50'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                {tab === 'details' ? 'Details' : tab === 'requirements' ? 'Requirements' : 'History'}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-5">
+            {/* Details Tab */}
+            {tenantDetailsTab === 'details' && (
+              <div className="space-y-4">
+                {/* Status */}
+                <div className="flex items-center gap-3">
+                  {getStatusIcon(selectedTenant.insurance_status)}
+                  <div>
+                    {getStatusBadge(selectedTenant.insurance_status, selectedTenant.coi_expiration_date || selectedTenant.policy_expiration_date)}
+                    {selectedTenant.coi_insurance_company && (
+                      <p className="text-xs text-gray-500 mt-1">Insured by: {selectedTenant.coi_insurance_company}</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Contact Info */}
+                <div className="space-y-2">
+                  <h4 className="text-sm font-semibold text-gray-900">Contact</h4>
+                  {selectedTenant.email && (
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <Mail size={14} className="text-gray-400" />
+                      {selectedTenant.email}
+                    </div>
+                  )}
+                  {selectedTenant.phone && (
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <Phone size={14} className="text-gray-400" />
+                      {selectedTenant.phone}
+                    </div>
+                  )}
+                </div>
+
+                {/* Lease Info */}
+                {(selectedTenant.lease_start || selectedTenant.lease_end) && (
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-semibold text-gray-900">Lease</h4>
+                    <div className="flex gap-4 text-sm text-gray-600">
+                      {selectedTenant.lease_start && (
+                        <span>Start: {formatDate(selectedTenant.lease_start)}</span>
+                      )}
+                      {selectedTenant.lease_end && (
+                        <span>End: {formatDate(selectedTenant.lease_end)}</span>
+                      )}
+                    </div>
+                    <LeaseRenewalBadge leaseEnd={selectedTenant.lease_end} leaseRenewalDate={selectedTenant.lease_renewal_date} />
+                  </div>
+                )}
+
+                {/* Actions */}
+                <div className="flex gap-2 pt-2">
+                  <button
+                    onClick={() => openCOIUpload(selectedTenant)}
+                    className="flex-1 px-3 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 text-sm font-medium flex items-center justify-center gap-2"
+                  >
+                    <Upload size={14} />
+                    Upload COI
+                  </button>
+                  {selectedTenant.email && (
+                    <button
+                      onClick={() => handleSendRequest(selectedTenant)}
+                      disabled={sendingRequest === selectedTenant.id}
+                      className="flex-1 px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50"
+                    >
+                      <Send size={14} />
+                      Request COI
+                    </button>
+                  )}
+                </div>
+
+                {/* COI Document */}
+                {(selectedTenant.coi_document_path || selectedTenant.policy_document_path) && (
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-semibold text-gray-900">Document</h4>
+                    <div className="flex gap-2">
+                      {coiPreviewUrl && (
+                        <a
+                          href={coiPreviewUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-xs font-medium flex items-center gap-1"
+                        >
+                          <Eye size={12} />
+                          View COI
+                        </a>
+                      )}
+                    </div>
+                    {selectedTenant.coi_uploaded_at && (
+                      <p className="text-xs text-gray-500">Uploaded: {formatRelativeDate(selectedTenant.coi_uploaded_at)}</p>
+                    )}
+                  </div>
+                )}
+
+                {/* Delete */}
+                <div className="pt-4 border-t border-gray-200">
+                  {deleteConfirm === selectedTenant.id ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-red-600">Delete this tenant?</span>
+                      <button onClick={() => handleDelete(selectedTenant.id)} className="px-3 py-1 bg-red-500 text-white rounded-lg text-sm">Yes</button>
+                      <button onClick={() => setDeleteConfirm(null)} className="px-3 py-1 bg-gray-200 text-gray-700 rounded-lg text-sm">No</button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setDeleteConfirm(selectedTenant.id)}
+                      className="text-sm text-red-500 hover:text-red-700"
+                    >
+                      Delete tenant
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Requirements Tab */}
+            {tenantDetailsTab === 'requirements' && (
+              <div className="space-y-4">
+                {requirementProfiles[selectedTenant.id] ? (
+                  <>
+                    <div className="flex items-center gap-2 mb-3">
+                      <Shield size={16} className="text-emerald-600" />
+                      <span className="text-sm font-semibold text-gray-900">Requirement Profile</span>
+                      <SourceBadge source={requirementProfiles[selectedTenant.id].creation_method} />
+                    </div>
+
+                    {[
+                      { key: 'gl_occurrence_limit', label: 'GL Per Occurrence' },
+                      { key: 'gl_aggregate_limit', label: 'GL Aggregate' },
+                      { key: 'property_contents_limit', label: 'Property / Contents' },
+                      { key: 'umbrella_limit', label: 'Umbrella / Excess' },
+                      { key: 'workers_comp_statutory', label: 'Workers\' Comp', type: 'boolean' },
+                      { key: 'workers_comp_employers_liability_limit', label: 'Employers Liability' },
+                      { key: 'commercial_auto_csl', label: 'Commercial Auto' },
+                      { key: 'professional_liability_limit', label: 'Professional Liability' },
+                      { key: 'waiver_of_subrogation_required', label: 'Waiver of Subrogation', type: 'boolean' },
+                      { key: 'cancellation_notice_days', label: 'Cancellation Notice', type: 'days' },
+                    ].map(({ key, label, type }) => {
+                      const profile = requirementProfiles[selectedTenant.id];
+                      const val = profile[key];
+                      const source = profile[`${key}_source`];
+
+                      if (val == null || val === 0 || val === false) return null;
+
+                      return (
+                        <div key={key} className="flex items-center justify-between py-2 border-b border-gray-100">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm text-gray-700">{label}</span>
+                            {source && <SourceBadge source={source} />}
+                          </div>
+                          <span className="text-sm font-medium text-gray-900">
+                            {type === 'boolean' ? 'Required' :
+                             type === 'days' ? `${val} days` :
+                             formatCurrency(val)}
+                          </span>
+                        </div>
+                      );
+                    }).filter(Boolean)}
+
+                    {/* Certificate Holder */}
+                    {requirementProfiles[selectedTenant.id].certificate_holder_name && (
+                      <div className="pt-2">
+                        <p className="text-xs font-medium text-gray-500">Certificate Holder</p>
+                        <p className="text-sm text-gray-900">{requirementProfiles[selectedTenant.id].certificate_holder_name}</p>
+                      </div>
+                    )}
+
+                    {/* Lease doc reference */}
+                    {requirementProfiles[selectedTenant.id].lease_document_path && (
+                      <div className="pt-2">
+                        <p className="text-xs text-gray-500 flex items-center gap-1">
+                          <FileText size={12} />
+                          Lease document on file
+                        </p>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="text-center py-8">
+                    <Shield size={32} className="mx-auto text-gray-300 mb-3" />
+                    <p className="text-sm text-gray-500">No requirement profile set</p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Requirement profiles are created when adding a tenant via the new workflow.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* History Tab */}
+            {tenantDetailsTab === 'history' && (
+              <div className="space-y-3">
+                {loadingActivity ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="animate-spin text-emerald-500" size={20} />
+                  </div>
+                ) : tenantActivity.length === 0 ? (
+                  <p className="text-sm text-gray-500 text-center py-8">No activity recorded yet.</p>
+                ) : (
+                  tenantActivity.map(activity => (
+                    <div key={activity.id} className="flex items-start gap-3 py-2 border-b border-gray-100">
+                      <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                        {activity.activity_type === 'coi_uploaded' ? <Upload size={14} className="text-emerald-600" /> :
+                         activity.activity_type === 'email_sent' ? <Mail size={14} className="text-blue-600" /> :
+                         <History size={14} className="text-gray-400" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-gray-700">{activity.description}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">{formatRelativeDate(activity.created_at)}</p>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Modals */}
+      <AddTenantWorkflow
+        isOpen={showAddWorkflow}
+        onClose={() => setShowAddWorkflow(false)}
+        onSave={handleSaveNewTenant}
+        properties={properties}
+        selectedProperty={selectedProperty}
+      />
+
+      {showCOIUpload && coiUploadTenant && (
+        <TenantCOIUpload
+          isOpen={showCOIUpload}
+          onClose={() => { setShowCOIUpload(false); setCOIUploadTenant(null); }}
+          tenant={coiUploadTenant}
+          requirementProfile={requirementProfiles[coiUploadTenant.id]}
+          onUploadComplete={handleCOIUploadComplete}
+        />
+      )}
+
+      {showBuildingDefaults && selectedProperty && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={(e) => { if (e.target === e.currentTarget) setShowBuildingDefaults(false); }}>
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6">
+            <BuildingTenantDefaults
+              propertyId={selectedProperty.id}
+              propertyName={selectedProperty.name}
+              onClose={() => setShowBuildingDefaults(false)}
+              onSaved={() => setShowBuildingDefaults(false)}
+            />
           </div>
         </div>
       )}
 
       {/* Bulk Request Confirmation Modal */}
       {bulkRequestConfirm && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4" role="alertdialog" aria-modal="true" aria-labelledby="bulk-confirm-title" aria-describedby="bulk-confirm-desc">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
-            <div className="flex items-center justify-between mb-4">
-              <h3 id="bulk-confirm-title" className="text-xl font-bold flex items-center space-x-2">
-                <div className="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center">
-                  <Send size={20} className="text-orange-600" />
-                </div>
-                <span>Bulk Request COIs</span>
-              </h3>
-              <button onClick={() => setBulkRequestConfirm(false)} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-all" aria-label="Cancel">
-                <X size={20} />
-              </button>
-            </div>
-
-            <p id="bulk-confirm-desc" className="text-gray-600 mb-4">
-              Send COI requests to <strong>{tenantsNeedingAttention.length}</strong> tenants?
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={(e) => { if (e.target === e.currentTarget) setBulkRequestConfirm(false); }}>
+          <div className="bg-white rounded-2xl max-w-md w-full p-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-2">Send Bulk COI Requests</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              This will send COI request emails to {tenantsNeedingAttention.length} tenant{tenantsNeedingAttention.length !== 1 ? 's' : ''} who need updated certificates.
             </p>
-
-            <p className="text-sm text-gray-500 mb-6">
-              This will email all tenants who need updated insurance certificates and have an email address on file.
-            </p>
-
-            <div className="flex space-x-3">
-              <button
-                onClick={executeBulkRequest}
-                className="flex-1 px-4 py-3 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-xl hover:shadow-md font-semibold transition-all"
-              >
-                Send Requests
-              </button>
-              <button
-                onClick={() => setBulkRequestConfirm(false)}
-                className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 font-semibold transition-all"
-              >
-                Cancel
-              </button>
+            <div className="flex gap-3">
+              <button onClick={() => setBulkRequestConfirm(false)} className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium">Cancel</button>
+              <button onClick={executeBulkRequest} className="flex-1 px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 font-medium">Send Requests</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Tenant Details Modal (Two-Column Layout) */}
-      {selectedTenant && (
-        <div
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4 lg:p-6"
-          onClick={(e) => {
-            // Close when clicking the backdrop (not the modal content)
-            if (e.target === e.currentTarget) {
-              setSelectedTenant(null);
-            }
-          }}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="tenant-details-title"
-        >
-          <div className="bg-white rounded-2xl w-full max-w-[95vw] lg:max-w-[85vw] xl:max-w-7xl h-[95vh] shadow-2xl flex flex-col overflow-hidden">
-            {/* Header */}
-            <div className="p-4 border-b border-gray-200 flex items-center justify-between flex-shrink-0">
-              <div>
-                <h2 id="tenant-details-title" className="text-xl font-bold text-gray-900">{selectedTenant.name}</h2>
-                {selectedTenant.unit && <p className="text-gray-500 text-sm">Unit {selectedTenant.unit.unit_number}</p>}
-              </div>
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={() => {
-                    setEditingTenant(selectedTenant);
-                    setShowModal(true);
-                    setSelectedTenant(null);
-                  }}
-                  className="px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg font-medium transition-all"
-                >
-                  Edit
-                </button>
-                <button
-                  onClick={() => setSelectedTenant(null)}
-                  className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-all"
-                  aria-label="Close tenant details"
-                >
-                  <X size={24} aria-hidden="true" />
-                </button>
-              </div>
-            </div>
-
-            {/* Two Column Content */}
-            <div className="flex flex-1 overflow-hidden">
-              {/* Left Column - COI Preview */}
-              <div className="w-1/2 bg-gray-100 flex flex-col border-r border-gray-200">
-                {selectedTenant.policy_document_path && coiPreviewUrl ? (
-                  <div className="flex-1 flex flex-col">
-                    <div className="p-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
-                      <span className="text-sm font-medium text-gray-700">Certificate Preview</span>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleViewCOI(selectedTenant)}
-                          className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 font-medium"
-                        >
-                          Open Full
-                        </button>
-                        <button
-                          onClick={() => handleDownloadCOI(selectedTenant)}
-                          className="text-xs px-2 py-1 bg-emerald-100 text-emerald-700 rounded hover:bg-emerald-200 font-medium"
-                        >
-                          Download
-                        </button>
-                      </div>
-                    </div>
-                    <div className="flex-1">
-                      <iframe
-                        src={`${coiPreviewUrl}#toolbar=0&navpanes=0&scrollbar=0`}
-                        className="w-full h-full"
-                        title="COI Preview"
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex-1 flex items-center justify-center">
-                    <div className="text-center p-8">
-                      <FileText size={48} className="mx-auto text-gray-300 mb-4" />
-                      <p className="text-gray-500 font-medium">No COI Document</p>
-                      <p className="text-sm text-gray-400 mt-1">Request a certificate to view it here</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Right Column - Details */}
-              <div className="w-1/2 flex flex-col overflow-hidden">
-                {/* Tabs */}
-                <div className="flex space-x-1 p-3 bg-gray-50 border-b border-gray-200 flex-shrink-0" role="tablist" aria-label="Tenant information tabs">
-                  <button
-                    onClick={() => setTenantDetailsTab('details')}
-                    className={`flex-1 px-4 py-2 text-sm font-semibold rounded-lg transition-all ${
-                      tenantDetailsTab === 'details'
-                        ? 'bg-white text-gray-900 shadow-sm'
-                        : 'text-gray-600 hover:text-gray-900'
-                    }`}
-                    role="tab"
-                    aria-selected={tenantDetailsTab === 'details'}
-                    aria-controls="tenant-details-panel"
-                    id="tenant-details-tab"
-                  >
-                    <FileText size={14} className="inline mr-1.5 mb-0.5" aria-hidden="true" />
-                    Details
-                  </button>
-                  <button
-                    onClick={() => setTenantDetailsTab('history')}
-                    className={`flex-1 px-4 py-2 text-sm font-semibold rounded-lg transition-all ${
-                      tenantDetailsTab === 'history'
-                        ? 'bg-white text-gray-900 shadow-sm'
-                        : 'text-gray-600 hover:text-gray-900'
-                    }`}
-                    role="tab"
-                    aria-selected={tenantDetailsTab === 'history'}
-                    aria-controls="tenant-history-panel"
-                    id="tenant-history-tab"
-                  >
-                    <History size={14} className="inline mr-1.5 mb-0.5" aria-hidden="true" />
-                    History
-                  </button>
-                </div>
-
-                {/* Scrollable Content */}
-                <div className="flex-1 overflow-y-auto p-4">
-                  {/* Details Tab Content */}
-                  {tenantDetailsTab === 'details' && (
-                    <div
-                      className="space-y-4"
-                      role="tabpanel"
-                      id="tenant-details-panel"
-                      aria-labelledby="tenant-details-tab"
-                    >
-                      {/* Status Grid */}
-                      <div className="grid grid-cols-3 gap-3 p-3 bg-gray-50 rounded-xl">
-                        <div>
-                          <p className="text-xs text-gray-500 font-medium">Status</p>
-                          <div className="mt-1">{getStatusBadge(selectedTenant.insurance_status, selectedTenant.policy_expiration_date)}</div>
-                        </div>
-                        <div className="text-center">
-                          <p className="text-xs text-gray-500 font-medium">Expiration</p>
-                          <p className="font-semibold text-gray-900 text-sm mt-1">
-                            {selectedTenant.policy_expiration_date ? formatDate(selectedTenant.policy_expiration_date) : 'N/A'}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-xs text-gray-500 font-medium">Last Contacted</p>
-                          <p className={`font-semibold text-sm mt-1 ${selectedTenant.last_contacted_at ? 'text-gray-900' : 'text-amber-600'}`}>
-                            {selectedTenant.last_contacted_at ? formatRelativeDate(selectedTenant.last_contacted_at) : 'Never'}
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Property & Unit */}
-                      <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl">
-                        <div className="flex items-center space-x-2">
-                          <Building2 size={16} className="text-gray-600" />
-                          <h4 className="font-semibold text-gray-900 text-sm">Property & Unit</h4>
-                        </div>
-                        <div className="mt-2">
-                          <p className="text-sm text-gray-700">{selectedTenant.property?.name || 'No property assigned'}</p>
-                          {selectedTenant.unit && (
-                            <p className="text-xs text-gray-500 mt-0.5">Unit {selectedTenant.unit.unit_number}</p>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Lease Details */}
-                      {(selectedTenant.lease_start || selectedTenant.lease_end) && (
-                        <div>
-                          <h4 className="font-bold text-gray-900 text-sm mb-2">Lease Details</h4>
-                          <div className="grid grid-cols-2 gap-2">
-                            <div className="p-2.5 bg-gray-50 rounded-lg">
-                              <p className="text-xs text-gray-500">Start Date</p>
-                              <p className="font-medium text-gray-900 text-sm">{formatDate(selectedTenant.lease_start)}</p>
-                            </div>
-                            <div className="p-2.5 bg-gray-50 rounded-lg">
-                              <p className="text-xs text-gray-500">End Date</p>
-                              <p className="font-medium text-gray-900 text-sm">{formatDate(selectedTenant.lease_end)}</p>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Coverage Details - mirrors vendor detail view exactly */}
-                      <div>
-                        <h4 className="font-bold text-gray-900 text-sm mb-2">Coverage Details</h4>
-                        {/* Column headers */}
-                        <div className="flex items-center justify-between px-2.5 pb-1 text-xs text-gray-500 font-medium">
-                          <span>Coverage</span>
-                          <div className="flex items-center space-x-4">
-                            <span className="w-20 text-right">Found</span>
-                            <span className="w-20 text-right">Required</span>
-                          </div>
-                        </div>
-                        <div className="space-y-1.5">
-                          {(() => {
-                            const coverage = selectedTenant.policy_coverage || {};
-                            const reqs = {
-                              general_liability: selectedTenant.required_general_liability || 0,
-                              auto_liability: selectedTenant.required_auto_liability || 0,
-                              workers_comp_required: selectedTenant.required_workers_comp || false,
-                              employers_liability: selectedTenant.required_employers_liability || 0,
-                            };
-                            const reqMap = {
-                              generalLiability: reqs.general_liability,
-                              autoLiability: reqs.auto_liability,
-                              workersComp: reqs.workers_comp_required ? 'Statutory' : null,
-                              employersLiability: reqs.employers_liability,
-                            };
-                            return [
-                              { key: 'generalLiability', label: 'General Liability', coverage: coverage.generalLiability },
-                              { key: 'autoLiability', label: 'Auto Liability', coverage: coverage.autoLiability },
-                              { key: 'workersComp', label: 'Workers Compensation', coverage: coverage.workersComp },
-                              { key: 'employersLiability', label: 'Employers Liability', coverage: coverage.employersLiability },
-                            ].map(({ key, label, coverage: cov }) => {
-                              const amount = cov?.amount;
-                              const hasAmount = amount && amount !== 'N/A' && amount !== 0;
-                              const requiredAmount = reqMap[key];
-                              const hasRequirement = requiredAmount && requiredAmount !== 0;
-
-                              let statusIcon, statusColor, statusBg, statusText;
-                              if (!hasAmount) {
-                                statusIcon = <XCircle size={14} className="text-gray-400" />;
-                                statusColor = 'text-gray-400';
-                                statusBg = 'bg-gray-50';
-                                statusText = 'Not provided';
-                              } else if (cov?.expired) {
-                                statusIcon = <XCircle size={14} className="text-red-600" />;
-                                statusColor = 'text-red-600';
-                                statusBg = 'bg-red-50';
-                                statusText = 'Expired';
-                              } else if (cov?.expiringSoon) {
-                                statusIcon = <AlertCircle size={14} className="text-amber-600" />;
-                                statusColor = 'text-amber-600';
-                                statusBg = 'bg-amber-50';
-                                statusText = 'Expiring Soon';
-                              } else if (cov?.compliant === false) {
-                                statusIcon = <AlertCircle size={14} className="text-orange-600" />;
-                                statusColor = 'text-orange-600';
-                                statusBg = 'bg-orange-50';
-                                statusText = 'Below Requirement';
-                              } else {
-                                statusIcon = <CheckCircle size={14} className="text-emerald-600" />;
-                                statusColor = 'text-emerald-600';
-                                statusBg = 'bg-emerald-50';
-                                statusText = 'Compliant';
-                              }
-
-                              return (
-                                <div key={key} className={`flex items-center justify-between p-2.5 rounded-lg ${statusBg}`}>
-                                  <div className="flex items-center space-x-2">
-                                    {statusIcon}
-                                    <div>
-                                      <p className="font-medium text-gray-900 text-sm">{label}</p>
-                                      <p className={`text-xs ${statusColor}`}>{statusText}</p>
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center space-x-4">
-                                    <p className="font-semibold text-gray-900 text-sm w-20 text-right">
-                                      {key === 'workersComp' ? (amount || 'N/A') : formatCurrency(amount)}
-                                    </p>
-                                    <p className="text-xs text-gray-500 w-20 text-right">
-                                      {key === 'workersComp'
-                                        ? (hasRequirement ? 'Required' : '—')
-                                        : (hasRequirement ? formatCurrency(requiredAmount) : '—')
-                                      }
-                                    </p>
-                                  </div>
-                                </div>
-                              );
-                            });
-                          })()}
-
-                          {/* Additional Coverages */}
-                          {selectedTenant.policy_coverage?.additionalCoverages && selectedTenant.policy_coverage.additionalCoverages.length > 0 && (
-                            <>
-                              {selectedTenant.policy_coverage.additionalCoverages.map((cov, idx) => {
-                                const amount = cov.amount;
-                                const hasAmount = amount && amount !== 0;
-
-                                let statusIcon, statusColor, statusBg, statusText;
-                                if (!hasAmount) {
-                                  statusIcon = <XCircle size={14} className="text-gray-400" />;
-                                  statusColor = 'text-gray-400';
-                                  statusBg = 'bg-gray-50';
-                                  statusText = 'Not provided';
-                                } else {
-                                  statusIcon = <CheckCircle size={14} className="text-emerald-600" />;
-                                  statusColor = 'text-emerald-600';
-                                  statusBg = 'bg-emerald-50';
-                                  statusText = 'Active';
-                                }
-
-                                return (
-                                  <div key={`additional-${idx}`} className={`flex items-center justify-between p-2.5 rounded-lg ${statusBg}`}>
-                                    <div className="flex items-center space-x-2">
-                                      {statusIcon}
-                                      <div>
-                                        <p className="font-medium text-gray-900 text-sm">{cov.type}</p>
-                                        <p className={`text-xs ${statusColor}`}>{statusText}</p>
-                                      </div>
-                                    </div>
-                                    <p className="font-semibold text-gray-900 text-sm">
-                                      {formatCurrency(amount)}
-                                    </p>
-                                  </div>
-                                );
-                              })}
-                            </>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Additional Insured Status - matches vendor style */}
-                      {(selectedTenant.has_additional_insured || (selectedTenant.requires_additional_insured && !selectedTenant.has_additional_insured)) && (
-                        <div className={`p-3 rounded-xl border ${
-                          selectedTenant.has_additional_insured
-                            ? 'bg-emerald-50 border-emerald-200'
-                            : 'bg-red-50 border-red-200'
-                        }`}>
-                          <div className="flex items-start space-x-2">
-                            {selectedTenant.has_additional_insured ? (
-                              <CheckCircle size={16} className="text-emerald-600 flex-shrink-0 mt-0.5" />
-                            ) : (
-                              <AlertCircle size={16} className="text-red-600 flex-shrink-0 mt-0.5" />
-                            )}
-                            <div className="flex-1">
-                              <p className="text-sm font-semibold text-gray-900">Additional Insured</p>
-                              <p className={`text-sm mt-1 ${
-                                selectedTenant.has_additional_insured ? 'text-emerald-700' : 'text-red-700'
-                              }`}>
-                                {selectedTenant.has_additional_insured ? 'Included' : 'Missing — Required'}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Waiver of Subrogation Status - matches vendor style */}
-                      {(selectedTenant.has_waiver_of_subrogation || (selectedTenant.policy_coverage && !selectedTenant.has_waiver_of_subrogation && selectedTenant.required_workers_comp)) && (
-                        <div className={`p-3 rounded-xl border ${
-                          selectedTenant.has_waiver_of_subrogation
-                            ? 'bg-emerald-50 border-emerald-200'
-                            : 'bg-red-50 border-red-200'
-                        }`}>
-                          <div className="flex items-start space-x-2">
-                            {selectedTenant.has_waiver_of_subrogation ? (
-                              <CheckCircle size={16} className="text-emerald-600 flex-shrink-0 mt-0.5" />
-                            ) : (
-                              <AlertCircle size={16} className="text-red-600 flex-shrink-0 mt-0.5" />
-                            )}
-                            <div className="flex-1">
-                              <p className="text-sm font-semibold text-gray-900">Waiver of Subrogation</p>
-                              <p className={`text-sm mt-1 ${
-                                selectedTenant.has_waiver_of_subrogation ? 'text-emerald-700' : 'text-red-700'
-                              }`}>
-                                {selectedTenant.has_waiver_of_subrogation ? 'Included' : 'Missing — Required'}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Issues - matches vendor style */}
-                      {((selectedTenant.compliance_issues && selectedTenant.compliance_issues.length > 0) || (selectedTenant.insurance_issues && selectedTenant.insurance_issues.length > 0)) && (
-                        <div className="p-3 bg-red-50 border border-red-200 rounded-xl">
-                          <h4 className="font-bold text-red-900 text-sm mb-2">Issues</h4>
-                          <div className="space-y-1.5">
-                            {(selectedTenant.compliance_issues || selectedTenant.insurance_issues || []).map((issue, idx) => (
-                              <div key={idx} className={`flex items-start space-x-2 text-sm ${
-                                issue.type === 'critical' ? 'text-red-700' : 'text-orange-700'
-                              }`}>
-                                <AlertCircle size={14} className="mt-0.5 flex-shrink-0" />
-                                <span>{typeof issue === 'string' ? issue : issue.message}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Contact Information */}
-                      {(selectedTenant.name || selectedTenant.email || selectedTenant.phone) && (
-                        <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl">
-                          <h4 className="font-bold text-gray-900 text-sm mb-2">Contact Information</h4>
-                          <div className="space-y-1.5">
-                            {selectedTenant.email && (
-                              <div className="flex items-center space-x-2 text-sm">
-                                <Mail size={14} className="text-gray-500" />
-                                <span className="text-gray-700">{selectedTenant.email}</span>
-                              </div>
-                            )}
-                            {selectedTenant.phone && (
-                              <div className="flex items-center space-x-2 text-sm">
-                                <Phone size={14} className="text-gray-500" />
-                                <span className="text-gray-700">{selectedTenant.phone}</span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* History Tab Content */}
-                  {tenantDetailsTab === 'history' && (
-                    <div
-                      className="space-y-3"
-                      role="tabpanel"
-                      id="tenant-history-panel"
-                      aria-labelledby="tenant-history-tab"
-                    >
-                      {loadingActivity ? (
-                        <div className="text-center py-8">
-                          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
-                          <p className="text-gray-500 mt-2">Loading history...</p>
-                        </div>
-                      ) : tenantActivity.length === 0 ? (
-                        <div className="text-center py-8 bg-gray-50 rounded-xl border border-gray-200">
-                          <Clock size={40} className="mx-auto text-gray-300 mb-3" />
-                          <p className="text-gray-500 font-medium">No activity recorded yet</p>
-                          <p className="text-sm text-gray-400 mt-1">Activity will appear here when emails are sent or certificates are uploaded</p>
-                        </div>
-                      ) : (
-                        <div className="space-y-2">
-                          {tenantActivity.map((activity) => {
-                            const actionType = activity.action || activity.activity_type;
-                            const description = activity.details?.reason || activity.details?.description || activity.description || '';
-                            return (
-                              <div
-                                key={activity.id}
-                                className={`p-3 rounded-xl border ${
-                                  actionType === 'coi_uploaded'
-                                    ? 'bg-emerald-50 border-emerald-200'
-                                    : actionType === 'email_sent' || actionType === 'auto_follow_up_sent'
-                                    ? 'bg-blue-50 border-blue-200'
-                                    : 'bg-gray-50 border-gray-200'
-                                }`}
-                              >
-                                <div className="flex items-start space-x-3">
-                                  <div className={`p-2 rounded-lg ${
-                                    actionType === 'coi_uploaded'
-                                      ? 'bg-emerald-100'
-                                      : actionType === 'email_sent' || actionType === 'auto_follow_up_sent'
-                                      ? 'bg-blue-100'
-                                      : 'bg-gray-100'
-                                  }`}>
-                                    {actionType === 'coi_uploaded' ? (
-                                      <Upload size={14} className="text-emerald-600" />
-                                    ) : actionType === 'email_sent' || actionType === 'auto_follow_up_sent' ? (
-                                      <Mail size={14} className="text-blue-600" />
-                                    ) : (
-                                      <Clock size={14} className="text-gray-600" />
-                                    )}
-                                  </div>
-                                  <div className="flex-1 min-w-0">
-                                    <p className="font-semibold text-gray-900 text-sm">
-                                      {actionType === 'coi_uploaded'
-                                        ? 'Certificate Uploaded'
-                                        : actionType === 'email_sent'
-                                        ? 'Request Email Sent'
-                                        : actionType === 'auto_follow_up_sent'
-                                        ? 'Auto Follow-Up Sent'
-                                        : actionType?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Activity'}
-                                    </p>
-                                    {description && (
-                                      <p className="text-gray-600 text-xs mt-1 line-clamp-2">{description}</p>
-                                    )}
-                                    <p className="text-gray-400 text-xs mt-1">
-                                      {formatRelativeDate(activity.created_at)}
-                                    </p>
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Action Buttons - matches vendor style */}
-                  <div className="flex flex-col sm:flex-row gap-2 pt-4 mt-4 border-t border-gray-200">
-                    {selectedTenant.email && (
-                      (selectedTenant.insurance_status === 'expired' || selectedTenant.insurance_status === 'non-compliant' || selectedTenant.insurance_status === 'expiring') ? (
-                        requestSuccess === selectedTenant.id ? (
-                          <div className="flex-1 px-4 py-2.5 bg-emerald-100 text-emerald-700 rounded-xl font-semibold flex items-center justify-center space-x-2 text-sm">
-                            <CheckCircle size={14} />
-                            <span>Request Sent!</span>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => handleSendRequest(selectedTenant)}
-                            disabled={sendingRequest === selectedTenant.id}
-                            className="flex-1 px-4 py-2.5 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-xl hover:shadow-lg font-semibold flex items-center justify-center space-x-2 disabled:opacity-50 transition-all text-sm"
-                          >
-                            {sendingRequest === selectedTenant.id ? (
-                              <Loader2 size={14} className="animate-spin" />
-                            ) : (
-                              <Send size={14} />
-                            )}
-                            <span>Request New COI</span>
-                          </button>
-                        )
-                      ) : null
-                    )}
-                    <button
-                      onClick={() => setSelectedTenant(null)}
-                      className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 font-semibold transition-all text-sm"
-                    >
-                      Close
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Alert Modal */}
+      {/* Delete Confirmation */}
       <AlertModal {...alertModal} onClose={hideAlert} />
     </div>
   );

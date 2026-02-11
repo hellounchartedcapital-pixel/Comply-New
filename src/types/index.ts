@@ -154,11 +154,29 @@ export interface Tenant {
   upload_token?: string | null;
   upload_token_expires_at?: string | null;
   last_contacted_at?: string | null;
+  // New requirement profile fields
+  requirement_profile_id?: string | null;
+  has_requirement_profile?: boolean;
+  lease_renewal_date?: string | null;
+  coi_document_path?: string | null;
+  coi_uploaded_at?: string | null;
+  coi_raw_data?: Record<string, unknown> | null;
+  coi_coverage?: Record<string, unknown> | null;
+  coi_additional_coverages?: AdditionalCoverage[] | null;
+  coi_expiration_date?: string | null;
+  coi_additional_insured?: string | null;
+  coi_has_additional_insured?: boolean;
+  coi_waiver_of_subrogation?: string | null;
+  coi_has_waiver_of_subrogation?: boolean;
+  coi_certificate_holder?: string | null;
+  coi_insurance_company?: string | null;
+  compliance_details?: TenantComplianceResult | null;
   created_at: string;
   updated_at: string;
   // Relations
   unit?: { id: string; unit_number: string; property_id?: string } | null;
   property?: { id: string; name: string; address?: string } | null;
+  requirement_profile?: TenantRequirementProfile | null;
 }
 
 // ============================================
@@ -322,6 +340,245 @@ export interface ExtractionResult {
     rawData?: Record<string, unknown>;
   };
   error?: string;
+}
+
+// ============================================
+// TENANT REQUIREMENT PROFILE TYPES
+// ============================================
+
+export type RequirementSource = 'building_default' | 'lease_extracted' | 'manual';
+export type ProfileCreationMethod = 'building_default' | 'lease_extracted' | 'manual';
+
+/** A single requirement field with source tracking and AI confidence */
+export interface TrackedField<T> {
+  value: T;
+  source: RequirementSource;
+  confidence?: number; // 0-100, only for lease_extracted
+  leaseRef?: string; // e.g. "Section 12.3" or "Exhibit B, Page 2"
+}
+
+/** Building-level tenant insurance defaults */
+export interface BuildingTenantDefaults {
+  id: string;
+  user_id: string;
+  property_id: string;
+  gl_occurrence_limit?: number | null;
+  gl_aggregate_limit?: number | null;
+  property_contents_limit?: number | null;
+  umbrella_limit?: number | null;
+  workers_comp_statutory?: boolean;
+  workers_comp_employers_liability_limit?: number | null;
+  commercial_auto_csl?: number | null;
+  professional_liability_limit?: number | null;
+  business_interruption_required?: boolean;
+  business_interruption_duration?: string | null;
+  custom_coverages?: CustomCoverageRequirement[];
+  additional_insured_entities?: string[];
+  additional_insured_language?: string | null;
+  loss_payee_entities?: string[];
+  waiver_of_subrogation_required?: boolean;
+  waiver_of_subrogation_coverages?: string[];
+  certificate_holder_name?: string | null;
+  certificate_holder_address?: string | null;
+  cancellation_notice_days?: number;
+  special_endorsements?: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CustomCoverageRequirement {
+  name: string;
+  limit: number;
+  source?: RequirementSource;
+  confidence?: number;
+  leaseRef?: string;
+}
+
+/** Full tenant requirement profile */
+export interface TenantRequirementProfile {
+  id: string;
+  user_id: string;
+  tenant_id: string;
+  property_id?: string | null;
+
+  // General Liability
+  gl_occurrence_limit?: number | null;
+  gl_occurrence_limit_source?: RequirementSource;
+  gl_occurrence_limit_confidence?: number | null;
+  gl_occurrence_limit_lease_ref?: string | null;
+  gl_aggregate_limit?: number | null;
+  gl_aggregate_limit_source?: RequirementSource;
+  gl_aggregate_limit_confidence?: number | null;
+  gl_aggregate_limit_lease_ref?: string | null;
+
+  // Property / Contents
+  property_contents_limit?: number | null;
+  property_contents_limit_source?: RequirementSource;
+  property_contents_limit_confidence?: number | null;
+  property_contents_limit_lease_ref?: string | null;
+
+  // Umbrella / Excess
+  umbrella_limit?: number | null;
+  umbrella_limit_source?: RequirementSource;
+  umbrella_limit_confidence?: number | null;
+  umbrella_limit_lease_ref?: string | null;
+
+  // Workers Comp
+  workers_comp_statutory?: boolean;
+  workers_comp_statutory_source?: RequirementSource;
+  workers_comp_statutory_confidence?: number | null;
+  workers_comp_statutory_lease_ref?: string | null;
+  workers_comp_employers_liability_limit?: number | null;
+  workers_comp_employers_liability_limit_source?: RequirementSource;
+  workers_comp_employers_liability_limit_confidence?: number | null;
+  workers_comp_employers_liability_limit_lease_ref?: string | null;
+
+  // Commercial Auto
+  commercial_auto_csl?: number | null;
+  commercial_auto_csl_source?: RequirementSource;
+  commercial_auto_csl_confidence?: number | null;
+  commercial_auto_csl_lease_ref?: string | null;
+
+  // Professional Liability / E&O
+  professional_liability_limit?: number | null;
+  professional_liability_limit_source?: RequirementSource;
+  professional_liability_limit_confidence?: number | null;
+  professional_liability_limit_lease_ref?: string | null;
+
+  // Business Interruption
+  business_interruption_required?: boolean;
+  business_interruption_required_source?: RequirementSource;
+  business_interruption_required_confidence?: number | null;
+  business_interruption_required_lease_ref?: string | null;
+  business_interruption_duration?: string | null;
+
+  // Custom coverages
+  custom_coverages?: CustomCoverageRequirement[];
+
+  // Additional Insured
+  additional_insured_entities?: string[];
+  additional_insured_language?: string | null;
+  additional_insured_source?: RequirementSource;
+  additional_insured_confidence?: number | null;
+  additional_insured_lease_ref?: string | null;
+
+  // Loss Payee
+  loss_payee_entities?: string[];
+  loss_payee_source?: RequirementSource;
+  loss_payee_confidence?: number | null;
+  loss_payee_lease_ref?: string | null;
+
+  // Waiver of Subrogation
+  waiver_of_subrogation_required?: boolean;
+  waiver_of_subrogation_coverages?: string[];
+  waiver_of_subrogation_source?: RequirementSource;
+  waiver_of_subrogation_confidence?: number | null;
+  waiver_of_subrogation_lease_ref?: string | null;
+
+  // Certificate Holder
+  certificate_holder_name?: string | null;
+  certificate_holder_address?: string | null;
+  certificate_holder_source?: RequirementSource;
+  certificate_holder_confidence?: number | null;
+  certificate_holder_lease_ref?: string | null;
+
+  // Notice of Cancellation
+  cancellation_notice_days?: number;
+  cancellation_notice_days_source?: RequirementSource;
+  cancellation_notice_days_confidence?: number | null;
+  cancellation_notice_days_lease_ref?: string | null;
+
+  // Special endorsements
+  special_endorsements?: string[];
+
+  // Lease details
+  lease_start_date?: string | null;
+  lease_end_date?: string | null;
+  lease_renewal_date?: string | null;
+  lease_document_path?: string | null;
+  lease_document_uploaded_at?: string | null;
+
+  // Creation metadata
+  creation_method: ProfileCreationMethod;
+  raw_extraction_data?: Record<string, unknown> | null;
+
+  created_at: string;
+  updated_at: string;
+}
+
+/** AI lease extraction result */
+export interface LeaseExtractionResult {
+  success: boolean;
+  data?: LeaseExtractionData;
+  error?: string;
+}
+
+export interface LeaseExtractionField {
+  value: unknown;
+  confidence: number;
+  leaseRef?: string;
+}
+
+export interface LeaseExtractionData {
+  documentType: string; // 'lease' | 'insurance_exhibit' | 'unknown'
+  documentTypeConfidence: number;
+
+  tenantName?: LeaseExtractionField;
+  propertyAddress?: LeaseExtractionField;
+  suiteUnit?: LeaseExtractionField;
+  leaseStartDate?: LeaseExtractionField;
+  leaseEndDate?: LeaseExtractionField;
+  leaseRenewalDate?: LeaseExtractionField;
+
+  requirements: {
+    glOccurrenceLimit?: LeaseExtractionField;
+    glAggregateLimit?: LeaseExtractionField;
+    propertyContentsLimit?: LeaseExtractionField;
+    umbrellaLimit?: LeaseExtractionField;
+    workersCompStatutory?: LeaseExtractionField;
+    workersCompEmployersLiabilityLimit?: LeaseExtractionField;
+    commercialAutoCsl?: LeaseExtractionField;
+    professionalLiabilityLimit?: LeaseExtractionField;
+    businessInterruptionRequired?: LeaseExtractionField;
+    businessInterruptionDuration?: LeaseExtractionField;
+    additionalInsuredEntities?: LeaseExtractionField;
+    additionalInsuredLanguage?: LeaseExtractionField;
+    lossPayeeEntities?: LeaseExtractionField;
+    waiverOfSubrogationRequired?: LeaseExtractionField;
+    waiverOfSubrogationCoverages?: LeaseExtractionField;
+    certificateHolderName?: LeaseExtractionField;
+    certificateHolderAddress?: LeaseExtractionField;
+    cancellationNoticeDays?: LeaseExtractionField;
+    specialEndorsements?: LeaseExtractionField;
+    customCoverages?: Array<{
+      name: string;
+      limit: number;
+      confidence: number;
+      leaseRef?: string;
+    }>;
+  };
+
+  extractionNotes?: string;
+  referencesExternalDocuments?: boolean;
+  externalDocumentReferences?: string[];
+}
+
+/** Tenant COI compliance field status */
+export type ComplianceFieldStatus = 'compliant' | 'non_compliant' | 'expiring_soon' | 'expired' | 'not_required';
+
+export interface TenantComplianceField {
+  fieldName: string;
+  required: number | boolean | string | null;
+  actual: number | boolean | string | null;
+  status: ComplianceFieldStatus;
+  source?: RequirementSource;
+  expirationDate?: string | null;
+}
+
+export interface TenantComplianceResult {
+  overallStatus: TenantInsuranceStatus;
+  fields: TenantComplianceField[];
+  issues: VendorIssue[];
 }
 
 // ============================================
