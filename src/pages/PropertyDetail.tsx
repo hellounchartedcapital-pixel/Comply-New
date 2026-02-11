@@ -98,7 +98,7 @@ export default function PropertyDetail() {
               title="No vendors"
               description="Add vendors to this property to track their COI compliance."
               actionLabel="Add Vendor"
-              onAction={() => navigate('/vendors')}
+              onAction={() => navigate('/vendors/add')}
             />
           ) : (
             <Card>
@@ -141,7 +141,7 @@ export default function PropertyDetail() {
               title="No tenants"
               description="Add tenants to this property to track their lease compliance."
               actionLabel="Add Tenant"
-              onAction={() => navigate('/tenants')}
+              onAction={() => navigate('/tenants/add')}
             />
           ) : (
             <Card>

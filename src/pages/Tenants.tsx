@@ -5,26 +5,17 @@ import { Users, Plus, Mail, Upload, Eye, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
-} from '@/components/ui/dialog';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { SearchFilter } from '@/components/shared/SearchFilter';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { EntityDetailModal } from '@/components/shared/EntityDetailModal';
 import { Skeleton } from '@/components/ui/skeleton';
-import { fetchTenants, createTenant, deleteTenant, deleteTenants } from '@/services/tenants';
-import { fetchProperties } from '@/services/properties';
+import { fetchTenants, deleteTenant, deleteTenants } from '@/services/tenants';
 import { formatDate } from '@/lib/utils';
 import type { Tenant } from '@/types';
 
@@ -34,32 +25,11 @@ export default function Tenants() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [detailTenant, setDetailTenant] = useState<Tenant | null>(null);
-  const [showAddDialog, setShowAddDialog] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [newTenant, setNewTenant] = useState({
-    name: '', email: '', phone: '', unit: '',
-    property_id: '', lease_start: '', lease_end: '',
-  });
 
   const { data: tenantData, isLoading } = useQuery({
     queryKey: ['tenants', statusFilter, search],
     queryFn: () => fetchTenants({ status: statusFilter, search: search || undefined, pageSize: 100 }),
-  });
-
-  const { data: properties } = useQuery({
-    queryKey: ['properties'],
-    queryFn: fetchProperties,
-  });
-
-  const createMutation = useMutation({
-    mutationFn: createTenant,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tenants'] });
-      setShowAddDialog(false);
-      setNewTenant({ name: '', email: '', phone: '', unit: '', property_id: '', lease_start: '', lease_end: '' });
-      toast.success('Tenant created successfully');
-    },
-    onError: (err) => toast.error(err instanceof Error ? err.message : 'Failed to create tenant'),
   });
 
   const deleteMutation = useMutation({
@@ -130,7 +100,7 @@ export default function Tenants() {
         title="Tenants"
         subtitle="Manage tenant insurance compliance"
         actions={
-          <Button onClick={() => setShowAddDialog(true)}>
+          <Button onClick={() => navigate('/tenants/add')}>
             <Plus className="mr-2 h-4 w-4" />
             Add Tenant
           </Button>
@@ -182,7 +152,7 @@ export default function Tenants() {
           title="No tenants found"
           description="Add your first tenant to start tracking their insurance compliance."
           actionLabel="Add Tenant"
-          onAction={() => setShowAddDialog(true)}
+          onAction={() => navigate('/tenants/add')}
         />
       ) : (
         <Card>
@@ -277,85 +247,6 @@ export default function Tenants() {
           isDeleting={deleteMutation.isPending}
         />
       )}
-
-      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Add Tenant</DialogTitle></DialogHeader>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (!newTenant.email) {
-                toast.error('Email is required for automated compliance notifications');
-                return;
-              }
-              createMutation.mutate({
-                name: newTenant.name,
-                property_id: newTenant.property_id || undefined,
-                unit: newTenant.unit || undefined,
-                email: newTenant.email,
-                phone: newTenant.phone || undefined,
-                lease_start: newTenant.lease_start || undefined,
-                lease_end: newTenant.lease_end || undefined,
-              });
-            }}
-            className="space-y-4"
-          >
-            <div className="space-y-2">
-              <Label htmlFor="t-name">Tenant Name</Label>
-              <Input id="t-name" value={newTenant.name} onChange={(e) => setNewTenant((p) => ({ ...p, name: e.target.value }))} required />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="t-email">
-                Email <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="t-email"
-                type="email"
-                value={newTenant.email}
-                onChange={(e) => setNewTenant((p) => ({ ...p, email: e.target.value }))}
-                required
-                placeholder="Required for compliance notifications"
-              />
-              <p className="text-xs text-muted-foreground">
-                Used to send automated COI request emails via Resend
-              </p>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="t-property">Property</Label>
-                <Select value={newTenant.property_id} onValueChange={(v) => setNewTenant((p) => ({ ...p, property_id: v }))}>
-                  <SelectTrigger id="t-property"><SelectValue placeholder="Select property" /></SelectTrigger>
-                  <SelectContent>
-                    {(properties ?? []).map((p) => (<SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="t-unit">Unit</Label>
-                <Input id="t-unit" value={newTenant.unit} onChange={(e) => setNewTenant((p) => ({ ...p, unit: e.target.value }))} placeholder="e.g., Suite 200" />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="t-phone">Phone</Label>
-              <Input id="t-phone" value={newTenant.phone} onChange={(e) => setNewTenant((p) => ({ ...p, phone: e.target.value }))} />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="t-lease-start">Lease Start</Label>
-                <Input id="t-lease-start" type="date" value={newTenant.lease_start} onChange={(e) => setNewTenant((p) => ({ ...p, lease_start: e.target.value }))} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="t-lease-end">Lease End</Label>
-                <Input id="t-lease-end" type="date" value={newTenant.lease_end} onChange={(e) => setNewTenant((p) => ({ ...p, lease_end: e.target.value }))} />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setShowAddDialog(false)}>Cancel</Button>
-              <Button type="submit" disabled={createMutation.isPending}>Create Tenant</Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
