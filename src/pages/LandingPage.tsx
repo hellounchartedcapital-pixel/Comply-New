@@ -467,13 +467,8 @@ export default function LandingPage() {
 
             {/* Dashboard Preview */}
             <FadeIn delay={0.15} className="flex justify-center lg:justify-end">
-              <div className="w-full max-w-md lg:max-w-[580px] xl:max-w-[640px]" style={{ perspective: '1200px' }}>
-                <div
-                  className="transition-transform duration-700"
-                  style={{ transform: 'rotateY(-2deg) rotateX(1deg)' }}
-                >
-                  <DashboardPreview />
-                </div>
+              <div className="w-full max-w-md lg:max-w-[580px] xl:max-w-[640px]">
+                <DashboardPreview />
               </div>
             </FadeIn>
           </div>

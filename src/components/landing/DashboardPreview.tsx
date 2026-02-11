@@ -53,9 +53,9 @@ function MiniDonut() {
   let offset = 0;
 
   return (
-    <div className="flex items-center gap-4">
+    <div className="flex flex-col items-center gap-2">
       <div className="relative flex-shrink-0">
-        <svg width="100" height="100" viewBox="0 0 100 100" className="transform -rotate-90">
+        <svg width="90" height="90" viewBox="0 0 100 100" className="transform -rotate-90">
           {segments.map((seg, i) => {
             const dash = (seg.value / total) * circumference;
             const el = (
@@ -77,15 +77,15 @@ function MiniDonut() {
           })}
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-lg font-bold text-gray-900">94%</span>
+          <span className="text-lg font-bold text-emerald-600">94%</span>
           <span className="text-[8px] text-gray-500">Compliant</span>
         </div>
       </div>
-      <div className="space-y-1.5">
+      <div className="flex gap-3">
         {segments.map((seg, i) => (
-          <div key={i} className="flex items-center gap-1.5">
-            <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: seg.color }} />
-            <span className="text-[9px] text-gray-600">{seg.value} {seg.label}</span>
+          <div key={i} className="flex items-center gap-1">
+            <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: seg.color }} />
+            <span className="text-[8px] text-gray-600 whitespace-nowrap">{seg.value} {seg.label}</span>
           </div>
         ))}
       </div>
