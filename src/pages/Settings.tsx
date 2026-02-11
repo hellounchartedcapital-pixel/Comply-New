@@ -37,6 +37,13 @@ function OrganizationTab() {
             <Label htmlFor="company-address">Address</Label>
             <Input id="company-address" placeholder="123 Main St, Suite 100" />
           </div>
+          <div className="space-y-2">
+            <Label htmlFor="additional-insured-name">Additional Insured Name</Label>
+            <Input id="additional-insured-name" placeholder="e.g., ABC Property Management LLC" />
+            <p className="text-xs text-muted-foreground">
+              This name will be used to verify the Additional Insured field on uploaded COI certificates.
+            </p>
+          </div>
           <Button>Save Changes</Button>
         </CardContent>
       </Card>
@@ -186,22 +193,22 @@ function IntegrationsTab() {
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between rounded-lg border p-4">
             <div>
-              <p className="font-medium">Email (Resend)</p>
+              <p className="font-medium">Email Notifications (Resend)</p>
               <p className="text-sm text-muted-foreground">Send automated follow-up emails</p>
             </div>
-            <Badge variant="success">Connected</Badge>
-          </div>
-          <div className="flex items-center justify-between rounded-lg border p-4">
-            <div>
-              <p className="font-medium">AI Document Processing (Claude)</p>
-              <p className="text-sm text-muted-foreground">Extract data from COIs and leases</p>
-            </div>
-            <Badge variant="success">Connected</Badge>
+            <Badge variant="secondary">Coming Soon</Badge>
           </div>
           <div className="flex items-center justify-between rounded-lg border p-4">
             <div>
               <p className="font-medium">Property Management System</p>
-              <p className="text-sm text-muted-foreground">Sync properties and tenants</p>
+              <p className="text-sm text-muted-foreground">Sync properties and tenants from AppFolio, Yardi, etc.</p>
+            </div>
+            <Badge variant="secondary">Coming Soon</Badge>
+          </div>
+          <div className="flex items-center justify-between rounded-lg border p-4">
+            <div>
+              <p className="font-medium">Accounting Software</p>
+              <p className="text-sm text-muted-foreground">Sync with QuickBooks, Xero, and more</p>
             </div>
             <Badge variant="secondary">Coming Soon</Badge>
           </div>

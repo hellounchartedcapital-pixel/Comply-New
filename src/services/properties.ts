@@ -2,13 +2,43 @@ import { supabase } from '@/lib/supabase';
 import type { Property, BuildingDefaults, EntityType } from '@/types';
 
 export async function fetchProperties(): Promise<Property[]> {
-  const { data, error } = await supabase
+  // Fetch properties
+  const { data: properties, error: propError } = await supabase
     .from('properties')
     .select('*')
     .order('name');
 
-  if (error) throw error;
-  return (data as Property[]) ?? [];
+  if (propError) throw propError;
+
+  // Fetch all vendors and tenants to compute live counts
+  const { data: vendors, error: vendorError } = await supabase
+    .from('vendors')
+    .select('property_id, status');
+
+  if (vendorError) throw vendorError;
+
+  const { data: tenants, error: tenantError } = await supabase
+    .from('tenants')
+    .select('property_id, insurance_status');
+
+  if (tenantError) throw tenantError;
+
+  // Compute counts and compliance per property
+  return (properties ?? []).map((p) => {
+    const propVendors = (vendors ?? []).filter((v) => v.property_id === p.id);
+    const propTenants = (tenants ?? []).filter((t) => t.property_id === p.id);
+    const total = propVendors.length + propTenants.length;
+    const compliant =
+      propVendors.filter((v) => v.status === 'compliant').length +
+      propTenants.filter((t) => t.insurance_status === 'compliant').length;
+
+    return {
+      ...p,
+      vendor_count: propVendors.length,
+      tenant_count: propTenants.length,
+      compliance_percentage: total > 0 ? Math.round((compliant / total) * 100) : 0,
+    };
+  }) as Property[];
 }
 
 export async function fetchProperty(id: string): Promise<Property> {

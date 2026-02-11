@@ -1,5 +1,4 @@
-import { useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   Truck,
@@ -7,17 +6,16 @@ import {
   CheckCircle2,
   AlertTriangle,
   Clock,
-  Upload,
-  Plus,
-  RefreshCcw,
-  Building2,
+  FileText,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { StatCard } from '@/components/shared/StatCard';
+import { StatusBadge } from '@/components/shared/StatusBadge';
 import { IconContainer } from '@/components/shared/IconContainer';
 import { Skeleton } from '@/components/ui/skeleton';
 import { fetchVendors } from '@/services/vendors';
@@ -65,7 +63,7 @@ function calculateStats(
 
 const CHART_COLORS = ['hsl(160, 82%, 39%)', 'hsl(0, 84%, 60%)', 'hsl(38, 92%, 50%)', 'hsl(0, 72%, 51%)'];
 
-function ComplianceChart({ stats }: { stats: ComplianceStats }) {
+function ComplianceChart({ stats, rate }: { stats: ComplianceStats; rate: number }) {
   const data = [
     { name: 'Compliant', value: stats.compliant },
     { name: 'Non-Compliant', value: stats.non_compliant },
@@ -75,20 +73,38 @@ function ComplianceChart({ stats }: { stats: ComplianceStats }) {
 
   if (data.length === 0) {
     return (
-      <div className="flex h-[200px] items-center justify-center text-sm text-muted-foreground">
+      <div className="flex h-[220px] items-center justify-center text-sm text-muted-foreground">
         No data to display
       </div>
     );
   }
 
   return (
-    <ResponsiveContainer width="100%" height={200}>
+    <ResponsiveContainer width="100%" height={220}>
       <PieChart>
-        <Pie data={data} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={2} dataKey="value">
+        <Pie data={data} cx="50%" cy="50%" innerRadius={55} outerRadius={85} paddingAngle={2} dataKey="value">
           {data.map((_entry, index) => (
             <Cell key={index} fill={CHART_COLORS[index % CHART_COLORS.length]} />
           ))}
         </Pie>
+        <text
+          x="50%"
+          y="44%"
+          textAnchor="middle"
+          dominantBaseline="central"
+          style={{ fontSize: '26px', fontWeight: 700, fill: 'hsl(222, 47%, 11%)' }}
+        >
+          {rate}%
+        </text>
+        <text
+          x="50%"
+          y="56%"
+          textAnchor="middle"
+          dominantBaseline="central"
+          style={{ fontSize: '11px', fill: 'hsl(215, 16%, 47%)' }}
+        >
+          Compliant
+        </text>
         <RechartsTooltip />
         <Legend />
       </PieChart>
@@ -96,64 +112,86 @@ function ComplianceChart({ stats }: { stats: ComplianceStats }) {
   );
 }
 
-interface RecentActivityItem {
+interface ActionItem {
   id: string;
-  description: string;
-  entityName: string;
-  type: string;
-  time: string;
+  name: string;
+  type: 'vendor' | 'tenant';
+  status: string;
+  property?: string;
 }
 
-function RecentActivity({ vendors, tenants }: { vendors: Vendor[]; tenants: Tenant[] }) {
-  const activities = useMemo((): RecentActivityItem[] => {
-    const items: RecentActivityItem[] = [];
-    for (const v of vendors.slice(0, 5)) {
-      items.push({
-        id: v.id,
-        description: `Vendor ${v.status === 'compliant' ? 'is compliant' : 'needs attention'}`,
-        entityName: v.name,
-        type: 'vendor',
-        time: v.updated_at,
-      });
+function ActionItems({ vendors, tenants }: { vendors: Vendor[]; tenants: Tenant[] }) {
+  const [expanded, setExpanded] = useState(false);
+
+  const items = useMemo((): ActionItem[] => {
+    const result: ActionItem[] = [];
+
+    for (const v of vendors) {
+      if (v.status !== 'compliant') {
+        result.push({
+          id: v.id,
+          name: v.name,
+          type: 'vendor',
+          status: v.status,
+          property: v.property?.name,
+        });
+      }
     }
-    for (const t of tenants.slice(0, 5)) {
-      items.push({
-        id: t.id,
-        description: `Tenant ${t.insurance_status === 'compliant' ? 'is compliant' : 'needs attention'}`,
-        entityName: t.name,
-        type: 'tenant',
-        time: t.updated_at,
-      });
+
+    for (const t of tenants) {
+      if (t.insurance_status !== 'compliant') {
+        result.push({
+          id: t.id,
+          name: t.name,
+          type: 'tenant',
+          status: t.insurance_status,
+          property: t.property?.name,
+        });
+      }
     }
-    items.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
-    return items.slice(0, 10);
+
+    const priority: Record<string, number> = { expired: 0, 'non-compliant': 1, expiring: 2 };
+    result.sort((a, b) => (priority[a.status] ?? 3) - (priority[b.status] ?? 3));
+
+    return result;
   }, [vendors, tenants]);
 
-  if (activities.length === 0) {
+  if (items.length === 0) {
     return (
       <div className="flex h-[200px] items-center justify-center text-sm text-muted-foreground">
-        No recent activity
+        <div className="text-center">
+          <CheckCircle2 className="mx-auto h-8 w-8 text-green-500 mb-2" />
+          <p>All vendors and tenants are compliant!</p>
+        </div>
       </div>
     );
   }
 
+  const displayed = expanded ? items : items.slice(0, 5);
+
   return (
     <div className="space-y-3">
-      {activities.map((activity) => (
-        <div key={activity.id} className="flex items-start gap-3 rounded-lg bg-secondary/50 p-3">
-          <IconContainer
-            icon={activity.type === 'vendor' ? Truck : Users}
-            size="sm"
-          />
+      {displayed.map((item) => (
+        <div key={`${item.type}-${item.id}`} className="flex items-center gap-3 rounded-lg bg-secondary/50 p-3">
+          <IconContainer icon={item.type === 'vendor' ? Truck : Users} size="sm" />
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium truncate">{activity.entityName}</p>
-            <p className="text-xs text-muted-foreground">{activity.description}</p>
+            <p className="text-sm font-medium truncate">{item.name}</p>
+            <p className="text-xs text-muted-foreground">
+              {item.property ?? 'Unassigned'} &middot; {item.type}
+            </p>
           </div>
-          <Badge variant="secondary" className="shrink-0 text-xs">
-            {activity.type}
-          </Badge>
+          <StatusBadge status={item.status as any} />
         </div>
       ))}
+      {items.length > 5 && (
+        <Button variant="ghost" size="sm" className="w-full" onClick={() => setExpanded(!expanded)}>
+          {expanded ? (
+            <>Show Less <ChevronUp className="ml-1 h-4 w-4" /></>
+          ) : (
+            <>View All ({items.length}) <ChevronDown className="ml-1 h-4 w-4" /></>
+          )}
+        </Button>
+      )}
     </div>
   );
 }
@@ -171,16 +209,14 @@ function DashboardSkeleton() {
         ))}
       </div>
       <div className="grid gap-6 lg:grid-cols-3">
-        <Card><CardContent className="p-5"><Skeleton className="h-[200px] w-full" /></CardContent></Card>
-        <Card className="lg:col-span-2"><CardContent className="p-5"><Skeleton className="h-[200px] w-full" /></CardContent></Card>
+        <Card><CardContent className="p-5"><Skeleton className="h-[220px] w-full" /></CardContent></Card>
+        <Card className="lg:col-span-2"><CardContent className="p-5"><Skeleton className="h-[220px] w-full" /></CardContent></Card>
       </div>
     </div>
   );
 }
 
 export default function Dashboard() {
-  const navigate = useNavigate();
-
   const { data: vendorData, isLoading: vendorsLoading } = useQuery({
     queryKey: ['vendors', 'dashboard'],
     queryFn: () => fetchVendors({ pageSize: 100 }),
@@ -198,34 +234,25 @@ export default function Dashboard() {
 
   if (isLoading) return <DashboardSkeleton />;
 
-  const complianceRate = allStats.combined.total > 0
-    ? Math.round((allStats.combined.compliant / allStats.combined.total) * 100)
-    : 0;
+  const calcRate = (s: ComplianceStats) =>
+    s.total > 0 ? Math.round((s.compliant / s.total) * 100) : 0;
+
+  const complianceRate = calcRate(allStats.combined);
+  const vendorRate = calcRate(allStats.vendors);
+  const tenantRate = calcRate(allStats.tenants);
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Dashboard"
         subtitle="Overview of your insurance compliance status"
-        actions={
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => navigate('/upload')}>
-              <Upload className="mr-2 h-4 w-4" />
-              Upload COI
-            </Button>
-            <Button size="sm" onClick={() => navigate('/vendors')}>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Vendor
-            </Button>
-          </div>
-        }
       />
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard
-          title="Total Entities"
+          title="Total Certificates"
           value={allStats.combined.total}
-          icon={Building2}
+          icon={FileText}
           subtitle={`${allStats.vendors.total} vendors, ${allStats.tenants.total} tenants`}
         />
         <StatCard
@@ -261,13 +288,13 @@ export default function Dashboard() {
                 <TabsTrigger value="tenants" className="flex-1">Tenants</TabsTrigger>
               </TabsList>
               <TabsContent value="combined">
-                <ComplianceChart stats={allStats.combined} />
+                <ComplianceChart stats={allStats.combined} rate={complianceRate} />
               </TabsContent>
               <TabsContent value="vendors">
-                <ComplianceChart stats={allStats.vendors} />
+                <ComplianceChart stats={allStats.vendors} rate={vendorRate} />
               </TabsContent>
               <TabsContent value="tenants">
-                <ComplianceChart stats={allStats.tenants} />
+                <ComplianceChart stats={allStats.tenants} rate={tenantRate} />
               </TabsContent>
             </Tabs>
           </CardContent>
@@ -275,39 +302,13 @@ export default function Dashboard() {
 
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle>Recent Activity</CardTitle>
+            <CardTitle>Action Items</CardTitle>
           </CardHeader>
           <CardContent>
-            <RecentActivity vendors={vendors} tenants={tenants} />
+            <ActionItems vendors={vendors} tenants={tenants} />
           </CardContent>
         </Card>
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Button variant="outline" className="h-auto flex-col gap-2 p-4" onClick={() => navigate('/upload')}>
-              <Upload className="h-5 w-5 text-primary" />
-              <span>Upload COI</span>
-            </Button>
-            <Button variant="outline" className="h-auto flex-col gap-2 p-4" onClick={() => navigate('/vendors')}>
-              <Truck className="h-5 w-5 text-primary" />
-              <span>Add Vendor</span>
-            </Button>
-            <Button variant="outline" className="h-auto flex-col gap-2 p-4" onClick={() => navigate('/tenants')}>
-              <Users className="h-5 w-5 text-primary" />
-              <span>Add Tenant</span>
-            </Button>
-            <Button variant="outline" className="h-auto flex-col gap-2 p-4" onClick={() => navigate('/reports')}>
-              <RefreshCcw className="h-5 w-5 text-primary" />
-              <span>Run Compliance Check</span>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }

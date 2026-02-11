@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Users, Plus, X, Mail, Phone, Building2, Calendar } from 'lucide-react';
+import { Users, Plus, X, Mail, Phone, Building2, Calendar, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -21,7 +21,7 @@ import { SearchFilter } from '@/components/shared/SearchFilter';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { Skeleton } from '@/components/ui/skeleton';
-import { fetchTenants, createTenant } from '@/services/tenants';
+import { fetchTenants, createTenant, deleteTenant } from '@/services/tenants';
 import { fetchProperties } from '@/services/properties';
 import { formatDate } from '@/lib/utils';
 import type { Tenant } from '@/types';
@@ -56,6 +56,16 @@ export default function Tenants() {
       toast.success('Tenant created successfully');
     },
     onError: (err) => toast.error(err instanceof Error ? err.message : 'Failed to create tenant'),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: deleteTenant,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tenants'] });
+      setSelectedTenant(null);
+      toast.success('Tenant deleted successfully');
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Failed to delete tenant'),
   });
 
   const tenants = tenantData?.data ?? [];
@@ -188,6 +198,21 @@ export default function Tenants() {
                     <p className="text-sm font-medium">{selectedTenant.unit}</p>
                   </div>
                 )}
+                <Separator />
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => {
+                    if (window.confirm(`Delete tenant "${selectedTenant.name}"?`)) {
+                      deleteMutation.mutate(selectedTenant.id);
+                    }
+                  }}
+                  disabled={deleteMutation.isPending}
+                >
+                  <Trash2 className="mr-2 h-3.5 w-3.5" />
+                  Delete Tenant
+                </Button>
               </CardContent>
             </Card>
           )}
