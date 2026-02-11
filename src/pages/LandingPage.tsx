@@ -227,7 +227,6 @@ const features = [
   },
 ];
 
-/* PRICING — Prices carried over from existing build */
 const pricingTiers = [
   {
     name: 'Free',
@@ -240,21 +239,31 @@ const pricingTiers = [
     popular: false,
   },
   {
+    name: 'Starter',
+    price: '$79',
+    period: '/month',
+    description: 'For small property managers',
+    capacity: 'Up to 50 vendors & tenants',
+    features: ['Everything in Free', 'Multi-property management', 'CSV & PDF export', 'Automated follow-ups'],
+    cta: 'Start Free Trial',
+    popular: false,
+  },
+  {
     name: 'Professional',
     price: '$149',
     period: '/month',
     description: 'For growing portfolios',
     capacity: 'Up to 100 vendors & tenants',
-    features: ['Everything in Free', 'Multi-property management', 'Automated follow-ups', 'CSV & PDF export', 'Priority support'],
+    features: ['Everything in Starter', 'Activity history & audit log', 'Custom compliance thresholds', 'Priority support'],
     cta: 'Start Free Trial',
     popular: true,
   },
   {
     name: 'Enterprise',
-    price: 'Custom',
-    period: '',
+    price: '$299',
+    period: '/month',
     description: 'For large-scale operations',
-    capacity: 'Unlimited vendors & tenants',
+    capacity: 'Up to 500 vendors & tenants',
     features: ['Everything in Professional', 'Unlimited properties', 'Custom integrations', 'SSO & advanced security', 'Dedicated account manager'],
     cta: 'Contact Sales',
     popular: false,
@@ -564,7 +573,7 @@ export default function LandingPage() {
             </div>
           </FadeIn>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto items-start">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto items-start">
             {pricingTiers.map((tier, i) => (
               <FadeIn key={i} delay={i * 0.1}>
                 <div
