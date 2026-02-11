@@ -1,13 +1,18 @@
 import { useState, useCallback, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { Upload, FileText, CheckCircle2, AlertTriangle, Loader2 } from 'lucide-react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
+import { Upload, FileText, CheckCircle2, AlertTriangle, Loader2, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { ConfidenceIndicator } from '@/components/shared/ConfidenceIndicator';
-import { extractCOI } from '@/services/ai-extraction';
+import { extractCOI, uploadCOIFile } from '@/services/ai-extraction';
+import { updateVendor } from '@/services/vendors';
+import { updateTenant } from '@/services/tenants';
 import { FILE_UPLOAD_CONFIG } from '@/constants';
 import type { COIExtractionResult, ExtractedCoverage } from '@/types';
 import { formatCurrency, formatDate, cn } from '@/lib/utils';
@@ -98,15 +103,24 @@ function UploadZone({
 
 function ExtractionResults({
   result,
+  file,
+  entityType,
+  entityId,
   onApprove,
   onFlag,
   onReset,
 }: {
   result: COIExtractionResult;
-  onApprove: () => void;
+  file: File;
+  entityType: 'vendor' | 'tenant';
+  entityId: string | null;
+  onApprove: (name: string, email: string) => void;
   onFlag: () => void;
   onReset: () => void;
 }) {
+  const [name, setName] = useState(result.named_insured ?? '');
+  const [email, setEmail] = useState('');
+
   return (
     <div className="grid gap-6 lg:grid-cols-2">
       <Card>
@@ -120,13 +134,51 @@ function ExtractionResults({
           <div className="flex h-[400px] items-center justify-center rounded-lg bg-secondary">
             <div className="text-center">
               <FileText className="mx-auto h-16 w-16 text-muted-foreground/50" />
-              <p className="mt-2 text-sm text-muted-foreground">Document preview</p>
+              <p className="mt-2 text-sm font-medium">{file.name}</p>
+              <p className="text-xs text-muted-foreground">
+                {(file.size / 1024 / 1024).toFixed(1)} MB
+              </p>
             </div>
           </div>
         </CardContent>
       </Card>
 
       <div className="space-y-4">
+        {!entityId && (
+          <Card>
+            <CardHeader>
+              <CardTitle>
+                {entityType === 'vendor' ? 'Vendor' : 'Tenant'} Information
+              </CardTitle>
+              <CardDescription>
+                Auto-extracted from the COI. Please verify and provide an email.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="space-y-1.5">
+                <Label>Name (from Named Insured)</Label>
+                <Input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder={`${entityType === 'vendor' ? 'Vendor' : 'Tenant'} name`}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>
+                  Email <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Required for compliance notifications"
+                  required
+                />
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <Card>
           <CardHeader>
             <CardTitle>Policy Information</CardTitle>
@@ -166,7 +218,16 @@ function ExtractionResults({
         </Card>
 
         <div className="flex gap-3">
-          <Button onClick={onApprove} className="flex-1">
+          <Button
+            onClick={() => {
+              if (!entityId && !email) {
+                toast.error('Email is required');
+                return;
+              }
+              onApprove(name, email);
+            }}
+            className="flex-1"
+          >
             <CheckCircle2 className="mr-2 h-4 w-4" />
             Approve & Save
           </Button>
@@ -210,10 +271,15 @@ function CoverageRow({ coverage }: { coverage: ExtractedCoverage }) {
 
 export default function COIUpload() {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const entityType = (searchParams.get('type') as 'vendor' | 'tenant') ?? 'vendor';
+  const entityId = searchParams.get('id');
 
   const [isExtracting, setIsExtracting] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [result, setResult] = useState<COIExtractionResult | null>(null);
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
 
   const handleFileSelect = useCallback(
     async (file: File) => {
@@ -226,6 +292,7 @@ export default function COIUpload() {
         return;
       }
 
+      setUploadedFile(file);
       setIsExtracting(true);
       try {
         const extractionResult = await extractCOI(file);
@@ -248,14 +315,86 @@ export default function COIUpload() {
     []
   );
 
-  const handleApprove = useCallback(() => {
-    toast.success('COI approved and saved');
-    setResult(null);
-  }, []);
+  const handleApprove = useCallback(
+    async (name: string, email: string) => {
+      if (!result || !uploadedFile) return;
+
+      setIsSaving(true);
+      try {
+        let targetId = entityId;
+
+        // If no entity ID, create the entity first
+        if (!targetId) {
+          const { supabase } = await import('@/lib/supabase');
+          const table = entityType === 'vendor' ? 'vendors' : 'tenants';
+          const insertData: Record<string, unknown> = { name };
+
+          if (entityType === 'vendor') {
+            insertData.contact_email = email;
+            insertData.status = 'non-compliant';
+            insertData.expiration_date = result.expiration_date;
+          } else {
+            insertData.email = email;
+            insertData.status = 'active';
+            insertData.insurance_status = 'non-compliant';
+          }
+
+          const { data: newEntity, error: createError } = await supabase
+            .from(table)
+            .insert(insertData)
+            .select()
+            .single();
+
+          if (createError) throw createError;
+          targetId = newEntity.id;
+        }
+
+        // Upload the COI file to storage
+        try {
+          await uploadCOIFile(uploadedFile, entityType, targetId!);
+        } catch {
+          // Storage might not be configured - continue anyway
+        }
+
+        // Update entity with expiration date and coverage types
+        const coverageTypes = result.coverages.map((c) => c.type);
+
+        if (entityType === 'vendor') {
+          await updateVendor(targetId!, {
+            expiration_date: result.expiration_date,
+            coverage_types: coverageTypes,
+            status: result.expiration_date
+              ? new Date(result.expiration_date) > new Date()
+                ? 'compliant'
+                : 'expired'
+              : 'non-compliant',
+          } as any);
+        } else {
+          await updateTenant(targetId!, {
+            insurance_status: result.expiration_date
+              ? new Date(result.expiration_date) > new Date()
+                ? 'compliant'
+                : 'expired'
+              : 'non-compliant',
+          } as any);
+        }
+
+        queryClient.invalidateQueries({ queryKey: [entityType === 'vendor' ? 'vendors' : 'tenants'] });
+        toast.success('COI approved and saved successfully');
+        navigate(entityType === 'vendor' ? '/vendors' : '/tenants');
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Failed to save COI data');
+      } finally {
+        setIsSaving(false);
+      }
+    },
+    [result, uploadedFile, entityId, entityType, navigate, queryClient]
+  );
 
   const handleFlag = useCallback(() => {
     toast.info('COI flagged for manual review');
     setResult(null);
+    setUploadedFile(null);
   }, []);
 
   return (
@@ -264,24 +403,62 @@ export default function COIUpload() {
         title="COI Upload"
         subtitle="Upload and analyze certificates of insurance"
         actions={
-          <Tabs value={entityType} className="w-auto">
-            <TabsList>
-              <TabsTrigger value="vendor">Vendor COI</TabsTrigger>
-              <TabsTrigger value="tenant">Tenant COI</TabsTrigger>
-            </TabsList>
-          </Tabs>
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back
+            </Button>
+            <Tabs value={entityType} className="w-auto">
+              <TabsList>
+                <TabsTrigger
+                  value="vendor"
+                  onClick={() => navigate('/upload?type=vendor')}
+                >
+                  Vendor COI
+                </TabsTrigger>
+                <TabsTrigger
+                  value="tenant"
+                  onClick={() => navigate('/upload?type=tenant')}
+                >
+                  Tenant COI
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
         }
       />
 
-      {result?.success ? (
+      {result?.success && uploadedFile ? (
         <ExtractionResults
           result={result}
+          file={uploadedFile}
+          entityType={entityType}
+          entityId={entityId}
           onApprove={handleApprove}
           onFlag={handleFlag}
-          onReset={() => setResult(null)}
+          onReset={() => {
+            setResult(null);
+            setUploadedFile(null);
+          }}
         />
       ) : (
-        <UploadZone onFileSelect={handleFileSelect} isExtracting={isExtracting} />
+        <div className="space-y-4">
+          <UploadZone onFileSelect={handleFileSelect} isExtracting={isExtracting} />
+          {!entityId && (
+            <p className="text-center text-sm text-muted-foreground">
+              Upload a COI to automatically extract the {entityType}&apos;s name, coverages, and expiration date
+            </p>
+          )}
+        </div>
+      )}
+
+      {isSaving && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80">
+          <div className="flex flex-col items-center gap-3">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="text-sm font-medium">Saving COI data...</p>
+          </div>
+        </div>
       )}
     </div>
   );

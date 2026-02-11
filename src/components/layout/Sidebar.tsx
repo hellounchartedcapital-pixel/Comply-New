@@ -10,6 +10,7 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
+  X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Logo } from './Logo';
@@ -27,20 +28,31 @@ const navItems = [
 interface SidebarProps {
   collapsed: boolean;
   onToggle: () => void;
+  mobileOpen?: boolean;
+  onMobileClose?: () => void;
 }
 
-export function Sidebar({ collapsed, onToggle }: SidebarProps) {
+export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: SidebarProps) {
   const location = useLocation();
 
-  return (
+  const sidebarContent = (
     <aside
       className={cn(
         'flex h-screen flex-col border-r border-sidebar-border bg-sidebar transition-all duration-300',
         collapsed ? 'w-16' : 'w-64'
       )}
     >
-      <div className={cn('flex h-16 items-center border-b border-sidebar-border', collapsed ? 'justify-center px-2' : 'px-4')}>
+      <div className={cn('flex h-16 items-center border-b border-sidebar-border', collapsed ? 'justify-center px-2' : 'justify-between px-4')}>
         <Logo collapsed={collapsed} />
+        {mobileOpen && onMobileClose && (
+          <button
+            onClick={onMobileClose}
+            className="rounded-lg p-1 text-sidebar-foreground hover:bg-sidebar-accent md:hidden"
+            aria-label="Close sidebar"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        )}
       </div>
 
       <nav className="flex-1 overflow-y-auto p-2" aria-label="Main navigation">
@@ -53,6 +65,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
               <li key={item.path}>
                 <Link
                   to={item.path}
+                  onClick={onMobileClose}
                   className={cn(
                     'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
                     isActive
@@ -71,7 +84,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         </ul>
       </nav>
 
-      <div className="border-t border-sidebar-border p-2">
+      <div className="hidden border-t border-sidebar-border p-2 md:block">
         <button
           onClick={onToggle}
           className="flex w-full items-center justify-center rounded-lg p-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
@@ -85,5 +98,28 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         </button>
       </div>
     </aside>
+  );
+
+  return (
+    <>
+      {/* Desktop sidebar */}
+      <div className="hidden md:block">
+        {sidebarContent}
+      </div>
+
+      {/* Mobile overlay */}
+      {mobileOpen && (
+        <div className="fixed inset-0 z-40 md:hidden">
+          <div
+            className="fixed inset-0 bg-black/50"
+            onClick={onMobileClose}
+            aria-hidden="true"
+          />
+          <div className="fixed inset-y-0 left-0 z-50">
+            {sidebarContent}
+          </div>
+        </div>
+      )}
+    </>
   );
 }

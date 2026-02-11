@@ -1,13 +1,12 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Users, Plus, X, Mail, Phone, Building2, Calendar, Trash2, Upload } from 'lucide-react';
+import { Users, Plus, Mail, Upload, Eye } from 'lucide-react';
 import { toast } from 'sonner';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
@@ -21,6 +20,7 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { SearchFilter } from '@/components/shared/SearchFilter';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { EmptyState } from '@/components/shared/EmptyState';
+import { EntityDetailModal } from '@/components/shared/EntityDetailModal';
 import { Skeleton } from '@/components/ui/skeleton';
 import { fetchTenants, createTenant, deleteTenant } from '@/services/tenants';
 import { fetchProperties } from '@/services/properties';
@@ -32,7 +32,7 @@ export default function Tenants() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
+  const [detailTenant, setDetailTenant] = useState<Tenant | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [newTenant, setNewTenant] = useState({
     name: '', email: '', phone: '', unit: '',
@@ -64,7 +64,7 @@ export default function Tenants() {
     mutationFn: deleteTenant,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tenants'] });
-      setSelectedTenant(null);
+      setDetailTenant(null);
       toast.success('Tenant deleted successfully');
     },
     onError: (err) => toast.error(err instanceof Error ? err.message : 'Failed to delete tenant'),
@@ -118,116 +118,80 @@ export default function Tenants() {
           onAction={() => setShowAddDialog(true)}
         />
       ) : (
-        <div className="flex gap-0">
-          <Card className={selectedTenant ? 'flex-1' : 'w-full'}>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Property</TableHead>
-                    <TableHead>Unit</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Lease End</TableHead>
+        <Card>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Property</TableHead>
+                  <TableHead>Unit</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Lease End</TableHead>
+                  <TableHead className="w-[100px]">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {tenants.map((tenant) => (
+                  <TableRow key={tenant.id}>
+                    <TableCell className="font-medium">{tenant.name}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {tenant.email ? (
+                        <span className="flex items-center gap-1 text-xs">
+                          <Mail className="h-3 w-3" />
+                          {tenant.email}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-destructive">No email</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">{tenant.property?.name ?? 'Unassigned'}</TableCell>
+                    <TableCell className="text-muted-foreground">{tenant.unit ?? 'N/A'}</TableCell>
+                    <TableCell><StatusBadge status={tenant.insurance_status} /></TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {tenant.lease_end ? formatDate(tenant.lease_end) : 'N/A'}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => setDetailTenant(tenant)}
+                          title="View details"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => navigate(`/upload?type=tenant&id=${tenant.id}`)}
+                          title="Upload COI"
+                        >
+                          <Upload className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {tenants.map((tenant) => (
-                    <TableRow
-                      key={tenant.id}
-                      className="cursor-pointer"
-                      data-state={selectedTenant?.id === tenant.id ? 'selected' : undefined}
-                      onClick={() => setSelectedTenant(selectedTenant?.id === tenant.id ? null : tenant)}
-                    >
-                      <TableCell className="font-medium">{tenant.name}</TableCell>
-                      <TableCell className="text-muted-foreground">{tenant.property?.name ?? 'Unassigned'}</TableCell>
-                      <TableCell className="text-muted-foreground">{tenant.unit ?? 'N/A'}</TableCell>
-                      <TableCell><StatusBadge status={tenant.insurance_status} /></TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {tenant.lease_end ? formatDate(tenant.lease_end) : 'N/A'}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
 
-          {selectedTenant && (
-            <Card className="w-80 shrink-0 border-l-0 rounded-l-none">
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="text-base">{selectedTenant.name}</CardTitle>
-                <Button variant="ghost" size="icon" onClick={() => setSelectedTenant(null)} aria-label="Close panel">
-                  <X className="h-4 w-4" />
-                </Button>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <StatusBadge status={selectedTenant.insurance_status} />
-                <Separator />
-                {selectedTenant.email && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <Mail className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span>{selectedTenant.email}</span>
-                  </div>
-                )}
-                {selectedTenant.phone && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <Phone className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span>{selectedTenant.phone}</span>
-                  </div>
-                )}
-                {selectedTenant.property && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span>{selectedTenant.property.name}</span>
-                  </div>
-                )}
-                <Separator />
-                <div className="space-y-2">
-                  <p className="text-xs text-muted-foreground">Lease Period</p>
-                  <div className="flex items-center gap-2 text-sm">
-                    <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span>
-                      {selectedTenant.lease_start ? formatDate(selectedTenant.lease_start) : 'N/A'}
-                      {' - '}
-                      {selectedTenant.lease_end ? formatDate(selectedTenant.lease_end) : 'N/A'}
-                    </span>
-                  </div>
-                </div>
-                {selectedTenant.unit && (
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">Unit</p>
-                    <p className="text-sm font-medium">{selectedTenant.unit}</p>
-                  </div>
-                )}
-                <Separator />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full"
-                  onClick={() => navigate(`/upload?type=tenant&id=${selectedTenant.id}`)}
-                >
-                  <Upload className="mr-2 h-3.5 w-3.5" />
-                  Upload COI
-                </Button>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  className="w-full"
-                  onClick={() => {
-                    if (window.confirm(`Delete tenant "${selectedTenant.name}"?`)) {
-                      deleteMutation.mutate(selectedTenant.id);
-                    }
-                  }}
-                  disabled={deleteMutation.isPending}
-                >
-                  <Trash2 className="mr-2 h-3.5 w-3.5" />
-                  Delete Tenant
-                </Button>
-              </CardContent>
-            </Card>
-          )}
-        </div>
+      {detailTenant && (
+        <EntityDetailModal
+          open={!!detailTenant}
+          onOpenChange={(open) => !open && setDetailTenant(null)}
+          entity={detailTenant}
+          entityType="tenant"
+          onDelete={() => deleteMutation.mutate(detailTenant.id)}
+          onEdit={() => navigate(`/upload?type=tenant&id=${detailTenant.id}`)}
+          isDeleting={deleteMutation.isPending}
+        />
       )}
 
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
@@ -236,11 +200,15 @@ export default function Tenants() {
           <form
             onSubmit={(e) => {
               e.preventDefault();
+              if (!newTenant.email) {
+                toast.error('Email is required for automated compliance notifications');
+                return;
+              }
               createMutation.mutate({
                 name: newTenant.name,
                 property_id: newTenant.property_id || undefined,
                 unit: newTenant.unit || undefined,
-                email: newTenant.email || undefined,
+                email: newTenant.email,
                 phone: newTenant.phone || undefined,
                 lease_start: newTenant.lease_start || undefined,
                 lease_end: newTenant.lease_end || undefined,
@@ -251,6 +219,22 @@ export default function Tenants() {
             <div className="space-y-2">
               <Label htmlFor="t-name">Tenant Name</Label>
               <Input id="t-name" value={newTenant.name} onChange={(e) => setNewTenant((p) => ({ ...p, name: e.target.value }))} required />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="t-email">
+                Email <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="t-email"
+                type="email"
+                value={newTenant.email}
+                onChange={(e) => setNewTenant((p) => ({ ...p, email: e.target.value }))}
+                required
+                placeholder="Required for compliance notifications"
+              />
+              <p className="text-xs text-muted-foreground">
+                Used to send automated COI request emails via Resend
+              </p>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -267,15 +251,9 @@ export default function Tenants() {
                 <Input id="t-unit" value={newTenant.unit} onChange={(e) => setNewTenant((p) => ({ ...p, unit: e.target.value }))} placeholder="e.g., Suite 200" />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="t-email">Email</Label>
-                <Input id="t-email" type="email" value={newTenant.email} onChange={(e) => setNewTenant((p) => ({ ...p, email: e.target.value }))} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="t-phone">Phone</Label>
-                <Input id="t-phone" value={newTenant.phone} onChange={(e) => setNewTenant((p) => ({ ...p, phone: e.target.value }))} />
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="t-phone">Phone</Label>
+              <Input id="t-phone" value={newTenant.phone} onChange={(e) => setNewTenant((p) => ({ ...p, phone: e.target.value }))} />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">

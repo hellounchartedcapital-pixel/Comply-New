@@ -19,6 +19,7 @@ const Reports = lazy(() => import('@/pages/Reports'));
 const SettingsPage = lazy(() => import('@/pages/Settings'));
 const VendorPortal = lazy(() => import('@/pages/VendorPortal'));
 const Login = lazy(() => import('@/pages/Login'));
+const NotFound = lazy(() => import('@/pages/NotFound'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -160,8 +161,15 @@ function AppRoutes() {
         />
       </Route>
 
-      {/* Catch-all */}
-      <Route path="*" element={<Navigate to="/" replace />} />
+      {/* 404 Page */}
+      <Route
+        path="*"
+        element={
+          <Suspense fallback={<PageLoader />}>
+            <NotFound />
+          </Suspense>
+        }
+      />
     </Routes>
   );
 }
