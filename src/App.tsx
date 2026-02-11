@@ -12,7 +12,9 @@ const Dashboard = lazy(() => import('@/pages/Dashboard'));
 const Properties = lazy(() => import('@/pages/Properties'));
 const PropertyDetail = lazy(() => import('@/pages/PropertyDetail'));
 const Vendors = lazy(() => import('@/pages/Vendors'));
+const AddVendor = lazy(() => import('@/pages/AddVendor'));
 const Tenants = lazy(() => import('@/pages/Tenants'));
+const AddTenant = lazy(() => import('@/pages/AddTenant'));
 const COIUpload = lazy(() => import('@/pages/COIUpload'));
 const Requirements = lazy(() => import('@/pages/Requirements'));
 const Reports = lazy(() => import('@/pages/Reports'));
@@ -120,10 +122,26 @@ function AppRoutes() {
           }
         />
         <Route
+          path="/vendors/add"
+          element={
+            <Suspense fallback={<PageLoader />}>
+              <AddVendor />
+            </Suspense>
+          }
+        />
+        <Route
           path="/tenants"
           element={
             <Suspense fallback={<PageLoader />}>
               <Tenants />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/tenants/add"
+          element={
+            <Suspense fallback={<PageLoader />}>
+              <AddTenant />
             </Suspense>
           }
         />

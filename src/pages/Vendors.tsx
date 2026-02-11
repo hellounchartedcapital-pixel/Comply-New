@@ -5,8 +5,6 @@ import { Truck, Plus, Mail, Upload, Eye, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
   Table,
@@ -16,28 +14,13 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { SearchFilter } from '@/components/shared/SearchFilter';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { EntityDetailModal } from '@/components/shared/EntityDetailModal';
 import { Skeleton } from '@/components/ui/skeleton';
-import { fetchVendors, createVendor, deleteVendor, deleteVendors } from '@/services/vendors';
-import { fetchProperties } from '@/services/properties';
+import { fetchVendors, deleteVendor, deleteVendors } from '@/services/vendors';
 import { formatDate } from '@/lib/utils';
 import type { Vendor } from '@/types';
 
@@ -48,15 +31,7 @@ export default function Vendors() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [propertyFilter] = useState('all');
   const [detailVendor, setDetailVendor] = useState<Vendor | null>(null);
-  const [showAddDialog, setShowAddDialog] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [newVendor, setNewVendor] = useState({
-    name: '',
-    contact_name: '',
-    contact_email: '',
-    contact_phone: '',
-    property_id: '',
-  });
 
   const { data: vendorData, isLoading } = useQuery({
     queryKey: ['vendors', statusFilter, propertyFilter, search],
@@ -67,22 +42,6 @@ export default function Vendors() {
         search: search || undefined,
         pageSize: 100,
       }),
-  });
-
-  const { data: properties } = useQuery({
-    queryKey: ['properties'],
-    queryFn: fetchProperties,
-  });
-
-  const createMutation = useMutation({
-    mutationFn: createVendor,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['vendors'] });
-      setShowAddDialog(false);
-      setNewVendor({ name: '', contact_name: '', contact_email: '', contact_phone: '', property_id: '' });
-      toast.success('Vendor created successfully');
-    },
-    onError: (err) => toast.error(err instanceof Error ? err.message : 'Failed to create vendor'),
   });
 
   const deleteMutation = useMutation({
@@ -153,7 +112,7 @@ export default function Vendors() {
         title="Vendors"
         subtitle="Manage vendor COI compliance"
         actions={
-          <Button onClick={() => setShowAddDialog(true)}>
+          <Button onClick={() => navigate('/vendors/add')}>
             <Plus className="mr-2 h-4 w-4" />
             Add Vendor
           </Button>
@@ -205,7 +164,7 @@ export default function Vendors() {
           title="No vendors found"
           description="Add your first vendor to start tracking their COI compliance."
           actionLabel="Add Vendor"
-          onAction={() => setShowAddDialog(true)}
+          onAction={() => navigate('/vendors/add')}
         />
       ) : (
         <Card>
@@ -302,99 +261,6 @@ export default function Vendors() {
           isDeleting={deleteMutation.isPending}
         />
       )}
-
-      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add Vendor</DialogTitle>
-          </DialogHeader>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (!newVendor.contact_email) {
-                toast.error('Email is required for automated compliance notifications');
-                return;
-              }
-              createMutation.mutate({
-                name: newVendor.name,
-                property_id: newVendor.property_id || undefined,
-                contact_name: newVendor.contact_name || undefined,
-                contact_email: newVendor.contact_email,
-                contact_phone: newVendor.contact_phone || undefined,
-              });
-            }}
-            className="space-y-4"
-          >
-            <div className="space-y-2">
-              <Label htmlFor="v-name">Vendor Name</Label>
-              <Input
-                id="v-name"
-                value={newVendor.name}
-                onChange={(e) => setNewVendor((p) => ({ ...p, name: e.target.value }))}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="v-email">
-                Email <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="v-email"
-                type="email"
-                value={newVendor.contact_email}
-                onChange={(e) => setNewVendor((p) => ({ ...p, contact_email: e.target.value }))}
-                required
-                placeholder="Required for compliance notifications"
-              />
-              <p className="text-xs text-muted-foreground">
-                Used to send automated COI request emails via Resend
-              </p>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="v-property">Property</Label>
-              <Select
-                value={newVendor.property_id}
-                onValueChange={(v) => setNewVendor((p) => ({ ...p, property_id: v }))}
-              >
-                <SelectTrigger id="v-property">
-                  <SelectValue placeholder="Select a property" />
-                </SelectTrigger>
-                <SelectContent>
-                  {(properties ?? []).map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="v-contact">Contact Name</Label>
-              <Input
-                id="v-contact"
-                value={newVendor.contact_name}
-                onChange={(e) => setNewVendor((p) => ({ ...p, contact_name: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="v-phone">Phone</Label>
-              <Input
-                id="v-phone"
-                value={newVendor.contact_phone}
-                onChange={(e) => setNewVendor((p) => ({ ...p, contact_phone: e.target.value }))}
-              />
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setShowAddDialog(false)}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={createMutation.isPending}>
-                Create Vendor
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
