@@ -104,9 +104,6 @@ export default function AddTenant() {
   const [tenantName, setTenantName] = useState('');
   const [tenantEmail, setTenantEmail] = useState('');
   const [propertyId, setPropertyId] = useState('');
-  const [unit, setUnit] = useState('');
-  const [leaseStart, setLeaseStart] = useState('');
-  const [leaseEnd, setLeaseEnd] = useState('');
 
   // Validation
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -132,11 +129,8 @@ export default function AddTenant() {
         const editableReqs = leaseResultToEditableRequirements(result);
         setRequirements(editableReqs.length > 0 ? editableReqs : [createBlankRequirement()]);
 
-        // Pre-fill data from lease
+        // Pre-fill tenant name from lease
         if (result.tenant_name && !tenantName) setTenantName(result.tenant_name);
-        if (result.suite_unit && !unit) setUnit(result.suite_unit);
-        if (result.lease_start && !leaseStart) setLeaseStart(result.lease_start);
-        if (result.lease_end && !leaseEnd) setLeaseEnd(result.lease_end);
 
         if (editableReqs.length === 0) {
           setLeaseError(
@@ -157,7 +151,7 @@ export default function AddTenant() {
     } finally {
       setIsExtractingLease(false);
     }
-  }, [tenantName, unit, leaseStart, leaseEnd]);
+  }, [tenantName]);
 
   // ---- COI upload handler ----
   const handleCOIUpload = useCallback(async (file: File) => {
@@ -218,10 +212,13 @@ export default function AddTenant() {
     }
     if (!propertyId) newErrors.property = 'Please assign this tenant to a property';
 
-    // Must have at least one requirement
-    const validReqs = requirements.filter((r) => r.coverageType.trim());
-    if (validReqs.length === 0 && !showManualRequirements) {
-      newErrors.requirements = 'At least one coverage requirement is needed';
+    // Only require coverage requirements if lease was uploaded or manual entry is active
+    const hasLeaseOrManual = leaseResult?.success || showManualRequirements;
+    if (hasLeaseOrManual) {
+      const validReqs = requirements.filter((r) => r.coverageType.trim());
+      if (validReqs.length === 0) {
+        newErrors.requirements = 'At least one coverage requirement is needed';
+      }
     }
 
     setErrors(newErrors);
@@ -239,9 +236,6 @@ export default function AddTenant() {
         name: tenantName.trim(),
         email: tenantEmail.trim(),
         property_id: propertyId,
-        unit: unit.trim() || undefined,
-        lease_start: leaseStart || undefined,
-        lease_end: leaseEnd || undefined,
       });
 
       // 2. Upload lease file to storage
@@ -384,7 +378,7 @@ export default function AddTenant() {
     } finally {
       setIsCreating(false);
     }
-  }, [tenantName, tenantEmail, propertyId, unit, leaseStart, leaseEnd, leaseFile, leaseResult, coiFile, coiResult, requirements, queryClient]);
+  }, [tenantName, tenantEmail, propertyId, leaseFile, leaseResult, coiFile, coiResult, requirements, showManualRequirements, queryClient]);
 
   // ---- Success view ----
   if (createdSuccessfully) {
@@ -440,9 +434,6 @@ export default function AddTenant() {
               setTenantName('');
               setTenantEmail('');
               setPropertyId('');
-              setUnit('');
-              setLeaseStart('');
-              setLeaseEnd('');
               setComplianceResult(null);
               setErrors({});
               setHadCOI(false);
@@ -726,47 +717,15 @@ export default function AddTenant() {
                 </p>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <PropertySelector
-                  value={propertyId}
-                  onChange={(v) => {
-                    setPropertyId(v);
-                    if (errors.property) setErrors((prev) => ({ ...prev, property: '' }));
-                  }}
-                  required
-                  error={errors.property}
-                />
-                <div className="space-y-2">
-                  <Label htmlFor="tenant-unit">Unit / Suite Number</Label>
-                  <Input
-                    id="tenant-unit"
-                    value={unit}
-                    onChange={(e) => setUnit(e.target.value)}
-                    placeholder="e.g., Suite 200"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="tenant-lease-start">Lease Start Date</Label>
-                  <Input
-                    id="tenant-lease-start"
-                    type="date"
-                    value={leaseStart}
-                    onChange={(e) => setLeaseStart(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="tenant-lease-end">Lease End Date</Label>
-                  <Input
-                    id="tenant-lease-end"
-                    type="date"
-                    value={leaseEnd}
-                    onChange={(e) => setLeaseEnd(e.target.value)}
-                  />
-                </div>
-              </div>
+              <PropertySelector
+                value={propertyId}
+                onChange={(v) => {
+                  setPropertyId(v);
+                  if (errors.property) setErrors((prev) => ({ ...prev, property: '' }));
+                }}
+                required
+                error={errors.property}
+              />
             </CardContent>
           </Card>
 
