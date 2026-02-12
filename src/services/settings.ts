@@ -46,11 +46,28 @@ export async function sendCOIRequest(params: {
   entityId: string;
   entityName: string;
   entityEmail: string;
+  entityStatus?: string;
   complianceGaps: string[];
   propertyName?: string;
+  uploadToken?: string;
 }): Promise<void> {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error('Authentication required');
+
+  // Fetch org settings for companyName
+  const settings = await fetchOrganizationSettings();
+
+  // Transform to the field names the edge function expects
+  const payload = {
+    to: params.entityEmail,
+    vendorName: params.entityName,
+    vendorStatus: params.entityStatus ?? 'non-compliant',
+    issues: params.complianceGaps,
+    companyName: settings?.company_name ?? '',
+    uploadToken: params.uploadToken,
+    propertyName: params.propertyName,
+    isTenant: params.entityType === 'tenant',
+  };
 
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
   const response = await fetch(`${supabaseUrl}/functions/v1/send-coi-request`, {
@@ -59,7 +76,7 @@ export async function sendCOIRequest(params: {
       Authorization: `Bearer ${session.access_token}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify(params),
+    body: JSON.stringify(payload),
   });
 
   if (!response.ok) {

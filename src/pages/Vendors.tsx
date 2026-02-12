@@ -21,6 +21,7 @@ import { EmptyState } from '@/components/shared/EmptyState';
 import { EntityDetailModal } from '@/components/shared/EntityDetailModal';
 import { Skeleton } from '@/components/ui/skeleton';
 import { fetchVendors, deleteVendor, deleteVendors } from '@/services/vendors';
+import { fetchRequirementTemplates } from '@/services/requirements';
 import { generatePortalLink } from '@/services/portal-links';
 import { formatDate } from '@/lib/utils';
 import type { Vendor } from '@/types';
@@ -44,6 +45,24 @@ export default function Vendors() {
         pageSize: 100,
       }),
   });
+
+  const { data: dbTemplates } = useQuery({
+    queryKey: ['requirement-templates'],
+    queryFn: fetchRequirementTemplates,
+  });
+
+  // Resolve the best template for the detail vendor (by property match or first vendor template)
+  const detailTemplate = (() => {
+    if (!detailVendor || !dbTemplates) return undefined;
+    const vendorTemplates = dbTemplates.filter((t) => t.entity_type === 'vendor');
+    if (detailVendor.property_id) {
+      const match = vendorTemplates.find(
+        (t) => t.property_id === detailVendor.property_id || (t.endorsements as any)?._property_id === detailVendor.property_id
+      );
+      if (match) return match;
+    }
+    return vendorTemplates[0] ?? undefined;
+  })();
 
   const deleteMutation = useMutation({
     mutationFn: deleteVendor,
@@ -282,6 +301,7 @@ export default function Vendors() {
           onOpenChange={(open) => !open && setDetailVendor(null)}
           entity={detailVendor}
           entityType="vendor"
+          template={detailTemplate}
           onDelete={() => deleteMutation.mutate(detailVendor.id)}
           onEdit={() => navigate(`/upload?type=vendor&id=${detailVendor.id}`)}
           isDeleting={deleteMutation.isPending}

@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { Upload, FileText, X, Loader2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { FILE_UPLOAD_CONFIG } from '@/constants';
@@ -39,7 +39,30 @@ export function DocumentUploadZone({
 }: DocumentUploadZoneProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [progress, setProgress] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Animate progress bar realistically when processing
+  useEffect(() => {
+    if (!isProcessing) {
+      setProgress(0);
+      return;
+    }
+    setProgress(10);
+    const steps = [
+      { target: 30, delay: 400 },
+      { target: 50, delay: 1200 },
+      { target: 65, delay: 2500 },
+      { target: 78, delay: 4000 },
+      { target: 85, delay: 6000 },
+      { target: 90, delay: 9000 },
+      { target: 94, delay: 13000 },
+    ];
+    const timers = steps.map(({ target, delay }) =>
+      setTimeout(() => setProgress(target), delay)
+    );
+    return () => timers.forEach(clearTimeout);
+  }, [isProcessing]);
 
   const validateAndUpload = useCallback(
     (file: File) => {
@@ -90,8 +113,12 @@ export function DocumentUploadZone({
           <p className="mt-3 text-sm font-medium">{processingText}</p>
           <div className="mt-4 flex w-full max-w-xs flex-col gap-1.5">
             <div className="h-1.5 w-full overflow-hidden rounded-full bg-secondary">
-              <div className="h-full animate-pulse rounded-full bg-primary/60" style={{ width: '70%' }} />
+              <div
+                className="h-full rounded-full bg-primary/60"
+                style={{ width: `${progress}%`, transition: 'width 0.6s ease-out' }}
+              />
             </div>
+            <p className="text-xs text-muted-foreground text-center">{progress}%</p>
           </div>
         </div>
       </div>

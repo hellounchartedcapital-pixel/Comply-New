@@ -256,7 +256,16 @@ export function EntityDetailModal({
   isDeleting = false,
 }: EntityDetailModalProps) {
   const [isEditing, setIsEditing] = useState(false);
-  const [localCoverages, setLocalCoverages] = useState(coverages);
+
+  // Derive coverages from entity's coverage JSONB field if not explicitly passed
+  const derivedCoverages =
+    coverages.length > 0
+      ? coverages
+      : (entityType === 'vendor'
+          ? ((entity as Vendor).coverage ?? [])
+          : []);
+
+  const [localCoverages, setLocalCoverages] = useState(derivedCoverages);
   const [sendingRequest, setSendingRequest] = useState(false);
   const [generatingLink, setGeneratingLink] = useState(false);
 
@@ -286,11 +295,16 @@ export function EntityDetailModal({
         entityId: entity.id,
         entityName,
         entityEmail,
+        entityStatus,
         complianceGaps: gaps,
         propertyName:
           entityType === 'vendor'
             ? (entity as Vendor).property?.name
             : (entity as Tenant).property?.name,
+        uploadToken:
+          entityType === 'vendor'
+            ? (entity as Vendor).upload_token
+            : (entity as Tenant).upload_token,
       });
       toast.success(`COI request sent to ${entityEmail}`);
     } catch (err) {

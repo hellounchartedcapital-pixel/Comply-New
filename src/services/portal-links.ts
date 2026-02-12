@@ -2,12 +2,11 @@ import { supabase } from '@/lib/supabase';
 import type { EntityType } from '@/types';
 
 /**
- * Generate a cryptographically random upload token.
+ * Generate a cryptographically random upload token as a valid UUID v4.
+ * The database column is UUID type so we must produce a properly formatted UUID.
  */
 function generateToken(): string {
-  const bytes = new Uint8Array(32);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  return crypto.randomUUID();
 }
 
 /**

@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { PageHeader } from '@/components/shared/PageHeader';
 import { DocumentUploadZone } from '@/components/shared/DocumentUploadZone';
 import { ExtractedCoverageDisplay } from '@/components/shared/ExtractedCoverageDisplay';
-import { RequirementTemplateSelector } from '@/components/shared/RequirementTemplateSelector';
+import { RequirementTemplateSelector, findTemplateById } from '@/components/shared/RequirementTemplateSelector';
 import { PropertySelector } from '@/components/shared/PropertySelector';
 import { ComplianceResults } from '@/components/shared/ComplianceResults';
 import { extractCOI, uploadCOIFile } from '@/services/ai-extraction';
@@ -138,7 +138,7 @@ export default function AddVendor() {
       } as any);
 
       // 4. Run compliance comparison against the selected requirement template
-      const selectedTemplate = (templates ?? []).find((t) => t.id === templateId);
+      const selectedTemplate = findTemplateById(templateId, templates ?? []);
       if (selectedTemplate) {
         const compliance = compareCoverageToRequirements(extractionResult.coverages, selectedTemplate);
         setComplianceResult(compliance);
