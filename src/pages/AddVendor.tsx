@@ -157,7 +157,9 @@ export default function AddVendor() {
       setCreatedSuccessfully(true);
       toast.success('Vendor created — compliance check complete');
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to create vendor');
+      const message = err instanceof Error ? err.message : 'Failed to create vendor';
+      toast.error(message, { duration: 8000 });
+      console.error('Vendor creation failed:', err);
     } finally {
       setIsCreating(false);
     }
