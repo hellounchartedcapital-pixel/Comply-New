@@ -53,9 +53,17 @@ export async function fetchProperty(id: string): Promise<Property> {
 }
 
 export async function createProperty(property: { name: string; address?: string; ownership_entity?: string }): Promise<Property> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
   const { data, error } = await supabase
     .from('properties')
-    .insert(property)
+    .insert({
+      user_id: user.id,
+      name: property.name,
+      address: property.address,
+      company_name: property.ownership_entity,
+    })
     .select()
     .single();
 

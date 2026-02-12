@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Building2, Plus, MapPin } from 'lucide-react';
+import { Building2, Plus, MapPin, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -114,27 +114,23 @@ export default function Properties() {
                       )}
                     </div>
                   </div>
-                  <div className="mt-4 space-y-2">
-                    <div className="flex justify-between text-xs">
-                      <span className="text-muted-foreground">
-                        {property.vendor_count ?? 0} vendors, {property.tenant_count ?? 0} tenants
-                      </span>
-                      <span className={`font-medium ${
-                        compliance >= 80 ? 'text-emerald-600' :
-                        compliance >= 50 ? 'text-amber-600' :
-                        'text-red-600'
-                      }`}>
-                        {compliance}% Compliant
-                      </span>
+                  <div className="mt-4 flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <Users className="h-3.5 w-3.5" />
+                      <span>{property.vendor_count ?? 0} vendors, {property.tenant_count ?? 0} tenants</span>
                     </div>
-                    <Progress
-                      value={compliance}
-                      indicatorClassName={
-                        compliance >= 80 ? 'bg-emerald-500' :
-                        compliance >= 50 ? 'bg-amber-500' :
-                        'bg-red-500'
-                      }
-                    />
+                    <div className={`text-lg font-bold ${
+                      compliance >= 80 ? 'text-emerald-600' :
+                      compliance >= 50 ? 'text-amber-600' :
+                      'text-red-600'
+                    }`}>
+                      {compliance}%
+                      <span className={`ml-1 text-xs font-medium ${
+                        compliance >= 80 ? 'text-emerald-600/70' :
+                        compliance >= 50 ? 'text-amber-600/70' :
+                        'text-red-600/70'
+                      }`}>Compliant</span>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
