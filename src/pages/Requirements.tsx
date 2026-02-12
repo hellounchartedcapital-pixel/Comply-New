@@ -693,22 +693,20 @@ function EntityTabContent({ entityType }: { entityType: EntityType }) {
       ) : (
         /* Form + Save */
         <>
-          {selectedPreset && (
-            <div className="flex items-center gap-2">
-              {selectedPreset !== 'custom' && (
-                <Badge variant="outline">
-                  Template: {templates.find((t) => t.id === selectedPreset)?.name}
-                </Badge>
-              )}
-              <button
-                type="button"
-                onClick={() => { setShowForm(false); setSelectedPreset(null); }}
-                className="text-xs text-primary hover:underline"
-              >
-                {selectedPreset === 'custom' ? 'Back to templates' : 'Change template'}
-              </button>
-            </div>
-          )}
+          <div className="flex items-center gap-2">
+            {selectedPreset && selectedPreset !== 'custom' && (
+              <Badge variant="outline">
+                Template: {templates.find((t) => t.id === selectedPreset)?.name}
+              </Badge>
+            )}
+            <button
+              type="button"
+              onClick={() => { setShowForm(false); setSelectedPreset(null); setExistingTemplateId(null); }}
+              className="text-xs text-primary hover:underline"
+            >
+              {selectedPreset && selectedPreset !== 'custom' ? 'Change template' : 'Back to templates'}
+            </button>
+          </div>
           <RequirementsForm form={form} setForm={setForm} entityType={entityType} />
           <Button onClick={handleSave} disabled={isSaving || !propertyId} className="w-full h-12 text-base">
             {isSaving ? (
