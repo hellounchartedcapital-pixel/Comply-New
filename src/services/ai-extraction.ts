@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import type { COIExtractionResult, LeaseExtractionResult, ExtractedCoverage, ExtractedEndorsement } from '@/types';
+import type { COIExtractionResult, LeaseExtractionResult, ExtractedCoverage, ExtractedEndorsement, CoverageRequirement } from '@/types';
 
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -141,19 +141,19 @@ function mapRawToCOIResult(raw: any): COIExtractionResult {
 }
 
 export async function extractLeaseRequirements(file: File): Promise<LeaseExtractionResult> {
-  const formData = new FormData();
-  formData.append('file', file);
-
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error('Authentication required');
+
+  const pdfBase64 = await fileToBase64(file);
 
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
   const response = await fetch(`${supabaseUrl}/functions/v1/extract-lease-requirements`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${session.access_token}`,
+      'Content-Type': 'application/json',
     },
-    body: formData,
+    body: JSON.stringify({ pdfBase64 }),
   });
 
   if (!response.ok) {
@@ -161,7 +161,92 @@ export async function extractLeaseRequirements(file: File): Promise<LeaseExtract
     throw new Error(`Lease extraction failed: ${errorText}`);
   }
 
-  return response.json() as Promise<LeaseExtractionResult>;
+  const result = await response.json();
+
+  if (!result.success) {
+    return {
+      success: false,
+      requirements: {},
+      error: result.error ?? 'Extraction failed',
+    };
+  }
+
+  return mapRawToLeaseResult(result.data);
+}
+
+function mapRawToLeaseResult(raw: any): LeaseExtractionResult {
+  const reqs: LeaseExtractionResult['requirements'] = {};
+
+  function toCoverage(
+    occ: { value?: number | null; confidence?: number; leaseRef?: string } | undefined,
+    agg: { value?: number | null; confidence?: number; leaseRef?: string } | undefined,
+    opts?: { is_statutory?: boolean }
+  ): CoverageRequirement | undefined {
+    if (!occ?.value && !agg?.value && !opts?.is_statutory) return undefined;
+    return {
+      occurrence_limit: occ?.value ?? undefined,
+      aggregate_limit: agg?.value ?? undefined,
+      is_statutory: opts?.is_statutory,
+      required: true,
+      source: 'lease_extracted',
+      confidence_score: occ?.confidence ?? agg?.confidence ?? 0,
+      source_reference: occ?.leaseRef ?? agg?.leaseRef,
+    };
+  }
+
+  const r = raw.requirements ?? {};
+
+  const gl = toCoverage(r.glOccurrenceLimit, r.glAggregateLimit);
+  if (gl) reqs.general_liability = gl;
+
+  const auto = toCoverage(r.commercialAutoCsl, undefined);
+  if (auto) reqs.automobile_liability = auto;
+
+  const wc = toCoverage(r.workersCompEmployersLiabilityLimit, undefined, {
+    is_statutory: r.workersCompStatutory?.value === true,
+  });
+  if (wc || r.workersCompStatutory?.value === true) {
+    reqs.workers_compensation = wc ?? {
+      required: true,
+      is_statutory: true,
+      source: 'lease_extracted',
+      confidence_score: r.workersCompStatutory?.confidence ?? 0,
+      source_reference: r.workersCompStatutory?.leaseRef,
+    };
+  }
+
+  const umbrella = toCoverage(r.umbrellaLimit, undefined);
+  if (umbrella) reqs.umbrella_excess = umbrella;
+
+  const prof = toCoverage(r.professionalLiabilityLimit, undefined);
+  if (prof) reqs.professional_liability = prof;
+
+  const prop = toCoverage(r.propertyContentsLimit, undefined);
+  if (prop) reqs.property_insurance = prop;
+
+  if (r.businessInterruptionRequired?.value === true) {
+    reqs.business_interruption = {
+      required: true,
+      source: 'lease_extracted',
+      confidence_score: r.businessInterruptionRequired?.confidence ?? 0,
+      source_reference: r.businessInterruptionRequired?.leaseRef,
+    };
+  }
+
+  return {
+    success: true,
+    document_type: raw.documentType,
+    document_type_confidence: raw.documentTypeConfidence,
+    tenant_name: raw.tenantName?.value ?? undefined,
+    property_address: raw.propertyAddress?.value ?? undefined,
+    suite_unit: raw.suiteUnit?.value ?? undefined,
+    lease_start: raw.leaseStartDate?.value ?? undefined,
+    lease_end: raw.leaseEndDate?.value ?? undefined,
+    requirements: reqs,
+    extraction_notes: raw.extractionNotes,
+    references_external_docs: raw.referencesExternalDocuments,
+    external_doc_references: raw.externalDocumentReferences,
+  };
 }
 
 export async function uploadCOIFile(
