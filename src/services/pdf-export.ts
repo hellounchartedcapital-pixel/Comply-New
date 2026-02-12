@@ -96,7 +96,7 @@ export function exportComplianceReport({ property, vendors, tenants, companyName
         v.name,
         statusLabel(v.status),
         v.expiration_date ? new Date(v.expiration_date).toLocaleDateString('en-US') : 'N/A',
-        (v.coverage_types ?? []).join(', ') || 'N/A',
+        (Array.isArray(v.coverage) ? v.coverage.map((c: { type?: string }) => c.type).filter(Boolean).join(', ') : '') || 'N/A',
       ]),
       styles: { fontSize: 9 },
       headStyles: { fillColor: [41, 128, 185] },

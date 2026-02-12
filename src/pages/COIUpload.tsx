@@ -356,13 +356,11 @@ export default function COIUpload() {
           // Storage might not be configured - continue anyway
         }
 
-        // Update entity with expiration date and coverage types
-        const coverageTypes = result.coverages.map((c) => c.type);
-
+        // Update entity with expiration date and coverage data
         if (entityType === 'vendor') {
           await updateVendor(targetId!, {
             expiration_date: result.expiration_date,
-            coverage_types: coverageTypes,
+            coverage: result.coverages,
             status: result.expiration_date
               ? new Date(result.expiration_date) > new Date()
                 ? 'compliant'

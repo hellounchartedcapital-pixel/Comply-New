@@ -170,7 +170,7 @@ export interface Vendor {
   contact_name?: string;
   contact_email?: string;
   contact_phone?: string;
-  coverage_types?: string[];
+  coverage?: ExtractedCoverage[] | null;
   expiration_date?: string;
   requirement_profile_id?: string;
   requirement_profile?: RequirementProfile;

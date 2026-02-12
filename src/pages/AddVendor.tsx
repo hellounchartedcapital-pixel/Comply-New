@@ -125,7 +125,6 @@ export default function AddVendor() {
       }
 
       // 3. Update vendor with extracted data
-      const coverageTypes = extractionResult.coverages.map((c) => c.type);
       const now = new Date();
       let status: 'compliant' | 'non-compliant' | 'expired' = 'non-compliant';
       if (extractionResult.expiration_date) {
@@ -134,7 +133,7 @@ export default function AddVendor() {
 
       await updateVendor(vendor.id, {
         expiration_date: extractionResult.expiration_date,
-        coverage_types: coverageTypes,
+        coverage: extractionResult.coverages,
         status,
       } as any);
 
