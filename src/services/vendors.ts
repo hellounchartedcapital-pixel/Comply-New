@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import type { Vendor } from '@/types';
 import { PAGINATION } from '@/constants';
 
@@ -75,32 +75,56 @@ export async function createVendor(vendor: {
   contact_email?: string;
   contact_phone?: string;
 }): Promise<Vendor> {
+  if (!isSupabaseConfigured) {
+    throw new Error(
+      'Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your hosting platform\'s environment variables, then redeploy.'
+    );
+  }
+
   const { data: { user }, error: authError } = await supabase.auth.getUser();
-  if (authError) throw new Error('Authentication error — please sign out and sign back in.');
+  if (authError) {
+    console.error('Auth error:', authError);
+    throw new Error(`Authentication error: ${authError.message}. Please sign out and sign back in.`);
+  }
   if (!user) throw new Error('Not authenticated — please sign in to continue.');
+
+  const insertPayload = { ...vendor, user_id: user.id, status: 'non-compliant' as const };
+  console.log('Creating vendor with payload:', JSON.stringify(insertPayload, null, 2));
 
   const { data, error } = await supabase
     .from('vendors')
-    .insert({ ...vendor, user_id: user.id, status: 'non-compliant' as const })
+    .insert(insertPayload)
     .select()
     .single();
 
   if (error) {
-    // Provide actionable error messages based on common Supabase errors
+    console.error('Supabase vendor insert error:', { code: error.code, message: error.message, details: error.details, hint: error.hint });
+
     if (error.code === '42P01') {
-      throw new Error('Database table "vendors" not found. Run the setup SQL in your Supabase SQL Editor.');
+      throw new Error('Database table "vendors" not found. Run the initial setup SQL in your Supabase SQL Editor.');
     }
     if (error.code === '42703') {
-      throw new Error('Database column missing. Run the latest migration SQL in your Supabase SQL Editor.');
+      throw new Error(`Database column missing: ${error.message}. Run the latest migration in Supabase SQL Editor.`);
     }
-    if (error.code === '42501' || error.message.includes('row-level security')) {
-      throw new Error('Permission denied — RLS policies may not be configured. Run the setup SQL in Supabase.');
+    if (error.code === '42501' || error.message?.includes('row-level security') || error.message?.includes('policy')) {
+      throw new Error('Permission denied by RLS policy. Run the setup SQL in Supabase SQL Editor to configure policies.');
     }
-    if (error.code === 'PGRST301' || error.message.includes('JWT')) {
+    if (error.code === 'PGRST301' || error.message?.includes('JWT')) {
       throw new Error('Session expired — please sign out and sign back in.');
     }
-    throw new Error(error.message);
+    if (error.code === 'PGRST116') {
+      throw new Error('Insert was blocked by row-level security. Check that RLS INSERT policy exists for the vendors table.');
+    }
+    if (error.code === '23503') {
+      throw new Error(`Foreign key error: ${error.message}. The selected property may not exist.`);
+    }
+    throw new Error(`Failed to create vendor: ${error.message} (code: ${error.code})`);
   }
+
+  if (!data) {
+    throw new Error('Vendor insert returned no data. This usually means RLS is blocking the SELECT after INSERT. Check your RLS policies.');
+  }
+
   return data as Vendor;
 }
 
