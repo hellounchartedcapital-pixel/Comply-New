@@ -641,7 +641,7 @@ function EntityTabContent({ entityType }: { entityType: EntityType }) {
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
             <Shield className="h-4 w-4" />
-            Assign to Property
+            Choose Property
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -693,17 +693,19 @@ function EntityTabContent({ entityType }: { entityType: EntityType }) {
       ) : (
         /* Form + Save */
         <>
-          {selectedPreset && selectedPreset !== 'custom' && (
+          {selectedPreset && (
             <div className="flex items-center gap-2">
-              <Badge variant="outline">
-                Template: {templates.find((t) => t.id === selectedPreset)?.name}
-              </Badge>
+              {selectedPreset !== 'custom' && (
+                <Badge variant="outline">
+                  Template: {templates.find((t) => t.id === selectedPreset)?.name}
+                </Badge>
+              )}
               <button
                 type="button"
                 onClick={() => { setShowForm(false); setSelectedPreset(null); }}
-                className="text-xs text-muted-foreground hover:underline"
+                className="text-xs text-primary hover:underline"
               >
-                Change template
+                {selectedPreset === 'custom' ? 'Back to templates' : 'Change template'}
               </button>
             </div>
           )}
