@@ -69,7 +69,7 @@ export default function PropertyDetail() {
         </Button>
         <PageHeader
           title={property.name}
-          subtitle={property.address ?? 'No address set'}
+          subtitle={`${property.address ?? 'No address set'}${property.ownership_entity ? ` \u00B7 ${property.ownership_entity}` : ''}`}
           actions={
             <Button variant="outline" size="sm">
               <Settings className="mr-2 h-4 w-4" />

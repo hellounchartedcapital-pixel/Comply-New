@@ -206,3 +206,61 @@ export function getComplianceGaps(fields: ComplianceField[]): string[] {
       return `${f.field_name}: Required ${required}, Found ${actual}`;
     });
 }
+
+/**
+ * Generate a plain-language compliance insight string from a ComplianceResult.
+ * Used in vendor/tenant detail pages, the portal, and automated emails.
+ */
+export function generateComplianceInsight(result: ComplianceResult): string {
+  if (result.fields.length === 0) {
+    return 'No requirements have been configured yet. Set up requirements on the Requirements page to enable compliance checking.';
+  }
+
+  const { overall_status, fields, expired_count, expiring_within_30_days } = result;
+
+  if (overall_status === 'compliant') {
+    return 'This entity is fully compliant. All coverages meet or exceed the required minimums.';
+  }
+
+  const parts: string[] = [];
+
+  if (overall_status === 'expired') {
+    parts.push(`${expired_count} coverage${expired_count > 1 ? 's have' : ' has'} expired`);
+  }
+
+  // Non-compliant fields
+  const nonCompliant = fields.filter((f) => f.status === 'non-compliant');
+  for (const f of nonCompliant) {
+    if (f.actual_value === null) {
+      parts.push(`${f.field_name} coverage is missing entirely`);
+    } else {
+      const actual = typeof f.actual_value === 'number' ? formatCurrency(f.actual_value) : String(f.actual_value);
+      const required = typeof f.required_value === 'number' ? formatCurrency(f.required_value) : String(f.required_value);
+      parts.push(`${f.field_name} limit (${actual}) is below the required minimum (${required})`);
+    }
+  }
+
+  // Expiring fields
+  if (overall_status === 'expiring' && expiring_within_30_days > 0) {
+    const expiringFields = fields.filter((f) => f.expiration_date).filter((f) => {
+      const d = new Date(f.expiration_date!);
+      const now = new Date();
+      return d > now && d < new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    });
+    for (const f of expiringFields) {
+      const dateStr = new Date(f.expiration_date!).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+      parts.push(`${f.field_name} expires ${dateStr}`);
+    }
+  }
+
+  if (parts.length === 0) {
+    return 'Compliance check completed — review the details below.';
+  }
+
+  const statusLabel =
+    overall_status === 'expired' ? 'has expired coverage' :
+    overall_status === 'expiring' ? 'has coverage expiring soon' :
+    'is non-compliant';
+
+  return `This entity ${statusLabel}: ${parts.join('. ')}.`;
+}

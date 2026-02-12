@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import { useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   Truck,
@@ -7,16 +8,13 @@ import {
   AlertTriangle,
   Clock,
   FileText,
-  ChevronDown,
-  ChevronUp,
+  XCircle,
+  AlertCircle,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { StatCard } from '@/components/shared/StatCard';
-import { StatusBadge } from '@/components/shared/StatusBadge';
-import { IconContainer } from '@/components/shared/IconContainer';
 import { Skeleton } from '@/components/ui/skeleton';
 import { fetchVendors } from '@/services/vendors';
 import { fetchTenants } from '@/services/tenants';
@@ -87,22 +85,10 @@ function ComplianceChart({ stats, rate }: { stats: ComplianceStats; rate: number
             <Cell key={index} fill={CHART_COLORS[index % CHART_COLORS.length]} />
           ))}
         </Pie>
-        <text
-          x="50%"
-          y="44%"
-          textAnchor="middle"
-          dominantBaseline="central"
-          style={{ fontSize: '26px', fontWeight: 700, fill: 'hsl(222, 47%, 11%)' }}
-        >
+        <text x="50%" y="44%" textAnchor="middle" dominantBaseline="central" style={{ fontSize: '26px', fontWeight: 700, fill: 'hsl(222, 47%, 11%)' }}>
           {rate}%
         </text>
-        <text
-          x="50%"
-          y="56%"
-          textAnchor="middle"
-          dominantBaseline="central"
-          style={{ fontSize: '11px', fill: 'hsl(215, 16%, 47%)' }}
-        >
+        <text x="50%" y="56%" textAnchor="middle" dominantBaseline="central" style={{ fontSize: '11px', fill: 'hsl(215, 16%, 47%)' }}>
           Compliant
         </text>
         <RechartsTooltip />
@@ -112,87 +98,115 @@ function ComplianceChart({ stats, rate }: { stats: ComplianceStats; rate: number
   );
 }
 
-interface ActionItem {
-  id: string;
-  name: string;
-  type: 'vendor' | 'tenant';
-  status: string;
-  property?: string;
+// ============================================
+// NEEDS ATTENTION SECTION
+// ============================================
+
+interface AttentionItem {
+  label: string;
+  icon: React.ElementType;
+  color: string;
+  bgColor: string;
+  href: string;
 }
 
-function ActionItems({ vendors, tenants }: { vendors: Vendor[]; tenants: Tenant[] }) {
-  const [expanded, setExpanded] = useState(false);
+function NeedsAttention({ vendors, tenants }: { vendors: Vendor[]; tenants: Tenant[] }) {
+  const navigate = useNavigate();
 
-  const items = useMemo((): ActionItem[] => {
-    const result: ActionItem[] = [];
+  const expiredVendors = vendors.filter((v) => v.status === 'expired').length;
+  const expiringVendors = vendors.filter((v) => v.status === 'expiring').length;
+  const nonCompliantVendors = vendors.filter((v) => v.status === 'non-compliant').length;
+  const expiredTenants = tenants.filter((t) => t.insurance_status === 'expired').length;
+  const expiringTenants = tenants.filter((t) => t.insurance_status === 'expiring').length;
+  const nonCompliantTenants = tenants.filter((t) => t.insurance_status === 'non-compliant').length;
 
-    for (const v of vendors) {
-      if (v.status !== 'compliant') {
-        result.push({
-          id: v.id,
-          name: v.name,
-          type: 'vendor',
-          status: v.status,
-          property: v.property?.name,
-        });
-      }
-    }
+  const items: AttentionItem[] = [];
 
-    for (const t of tenants) {
-      if (t.insurance_status !== 'compliant') {
-        result.push({
-          id: t.id,
-          name: t.name,
-          type: 'tenant',
-          status: t.insurance_status,
-          property: t.property?.name,
-        });
-      }
-    }
+  const totalExpired = expiredVendors + expiredTenants;
+  const totalExpiring = expiringVendors + expiringTenants;
 
-    const priority: Record<string, number> = { expired: 0, 'non-compliant': 1, expiring: 2 };
-    result.sort((a, b) => (priority[a.status] ?? 3) - (priority[b.status] ?? 3));
+  if (totalExpired > 0) {
+    items.push({
+      label: `${totalExpired} ${totalExpired === 1 ? 'entity has' : 'entities have'} expired coverage`,
+      icon: XCircle,
+      color: 'text-red-600',
+      bgColor: 'bg-red-50',
+      href: '/vendors?status=expired',
+    });
+  }
 
-    return result;
-  }, [vendors, tenants]);
+  if (totalExpiring > 0) {
+    items.push({
+      label: `${totalExpiring} COI${totalExpiring === 1 ? '' : 's'} expiring in the next 30 days`,
+      icon: AlertTriangle,
+      color: 'text-yellow-600',
+      bgColor: 'bg-yellow-50',
+      href: '/vendors?status=expiring',
+    });
+  }
+
+  if (nonCompliantVendors > 0) {
+    items.push({
+      label: `${nonCompliantVendors} vendor${nonCompliantVendors === 1 ? '' : 's'} non-compliant`,
+      icon: AlertCircle,
+      color: 'text-orange-600',
+      bgColor: 'bg-orange-50',
+      href: '/vendors?status=non-compliant',
+    });
+  }
+
+  if (nonCompliantTenants > 0) {
+    items.push({
+      label: `${nonCompliantTenants} tenant${nonCompliantTenants === 1 ? '' : 's'} non-compliant`,
+      icon: AlertCircle,
+      color: 'text-orange-600',
+      bgColor: 'bg-orange-50',
+      href: '/tenants?status=non-compliant',
+    });
+  }
 
   if (items.length === 0) {
     return (
-      <div className="flex h-[200px] items-center justify-center text-sm text-muted-foreground">
-        <div className="text-center">
-          <CheckCircle2 className="mx-auto h-8 w-8 text-green-500 mb-2" />
-          <p>All vendors and tenants are compliant!</p>
-        </div>
-      </div>
+      <Card>
+        <CardContent className="flex items-center gap-3 p-5">
+          <div className="rounded-full bg-green-50 p-2">
+            <CheckCircle2 className="h-5 w-5 text-green-600" />
+          </div>
+          <div>
+            <p className="text-sm font-medium">All clear</p>
+            <p className="text-xs text-muted-foreground">All vendors and tenants are compliant.</p>
+          </div>
+        </CardContent>
+      </Card>
     );
   }
 
-  const displayed = expanded ? items : items.slice(0, 5);
-
   return (
-    <div className="space-y-3">
-      {displayed.map((item) => (
-        <div key={`${item.type}-${item.id}`} className="flex items-center gap-3 rounded-lg bg-secondary/50 p-3">
-          <IconContainer icon={item.type === 'vendor' ? Truck : Users} size="sm" />
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium truncate">{item.name}</p>
-            <p className="text-xs text-muted-foreground">
-              {item.property ?? 'Unassigned'} &middot; {item.type}
-            </p>
-          </div>
-          <StatusBadge status={item.status as any} />
-        </div>
-      ))}
-      {items.length > 5 && (
-        <Button variant="ghost" size="sm" className="w-full" onClick={() => setExpanded(!expanded)}>
-          {expanded ? (
-            <>Show Less <ChevronUp className="ml-1 h-4 w-4" /></>
-          ) : (
-            <>View All ({items.length}) <ChevronDown className="ml-1 h-4 w-4" /></>
-          )}
-        </Button>
-      )}
-    </div>
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base flex items-center gap-2">
+          <AlertTriangle className="h-4 w-4 text-yellow-600" />
+          Needs Your Attention
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        {items.map((item, i) => {
+          const Icon = item.icon;
+          return (
+            <button
+              key={i}
+              onClick={() => navigate(item.href)}
+              className="flex w-full items-center gap-3 rounded-lg border p-3 text-left hover:bg-secondary/50 transition-colors"
+            >
+              <div className={`rounded-full p-1.5 ${item.bgColor}`}>
+                <Icon className={`h-4 w-4 ${item.color}`} />
+              </div>
+              <span className="text-sm">{item.label}</span>
+            </button>
+          );
+        })}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -202,16 +216,11 @@ function DashboardSkeleton() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {Array.from({ length: 4 }).map((_, i) => (
           <Card key={i}>
-            <CardContent className="p-5">
-              <Skeleton className="h-20 w-full" />
-            </CardContent>
+            <CardContent className="p-5"><Skeleton className="h-20 w-full" /></CardContent>
           </Card>
         ))}
       </div>
-      <div className="grid gap-6 lg:grid-cols-3">
-        <Card><CardContent className="p-5"><Skeleton className="h-[220px] w-full" /></CardContent></Card>
-        <Card className="lg:col-span-2"><CardContent className="p-5"><Skeleton className="h-[220px] w-full" /></CardContent></Card>
-      </div>
+      <Skeleton className="h-[140px] w-full" />
     </div>
   );
 }
@@ -243,43 +252,21 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Dashboard"
-        subtitle="Overview of your insurance compliance status"
-      />
+      <PageHeader title="Dashboard" subtitle="Overview of your insurance compliance status" />
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          title="Total Certificates"
-          value={allStats.combined.total}
-          icon={FileText}
-          subtitle={`${allStats.vendors.total} vendors, ${allStats.tenants.total} tenants`}
-        />
-        <StatCard
-          title="Compliant"
-          value={`${complianceRate}%`}
-          icon={CheckCircle2}
-          subtitle={`${allStats.combined.compliant} of ${allStats.combined.total}`}
-        />
-        <StatCard
-          title="Expiring in 30 Days"
-          value={allStats.combined.expiring}
-          icon={AlertTriangle}
-          subtitle="Requires attention"
-        />
-        <StatCard
-          title="Action Items"
-          value={allStats.combined.non_compliant + allStats.combined.expired}
-          icon={Clock}
-          subtitle="Non-compliant or expired"
-        />
+        <StatCard title="Total Certificates" value={allStats.combined.total} icon={FileText} subtitle={`${allStats.vendors.total} vendors, ${allStats.tenants.total} tenants`} />
+        <StatCard title="Compliant" value={`${complianceRate}%`} icon={CheckCircle2} subtitle={`${allStats.combined.compliant} of ${allStats.combined.total}`} />
+        <StatCard title="Expiring in 30 Days" value={allStats.combined.expiring} icon={AlertTriangle} subtitle="Requires attention" />
+        <StatCard title="Needs Action" value={allStats.combined.non_compliant + allStats.combined.expired} icon={Clock} subtitle="Non-compliant or expired" />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      {/* Needs Attention — prominent section below stat cards */}
+      <NeedsAttention vendors={vendors} tenants={tenants} />
+
+      <div className="grid gap-6 lg:grid-cols-2">
         <Card>
-          <CardHeader>
-            <CardTitle>Compliance Overview</CardTitle>
-          </CardHeader>
+          <CardHeader><CardTitle>Compliance Overview</CardTitle></CardHeader>
           <CardContent>
             <Tabs defaultValue="combined">
               <TabsList className="w-full">
@@ -287,25 +274,56 @@ export default function Dashboard() {
                 <TabsTrigger value="vendors" className="flex-1">Vendors</TabsTrigger>
                 <TabsTrigger value="tenants" className="flex-1">Tenants</TabsTrigger>
               </TabsList>
-              <TabsContent value="combined">
-                <ComplianceChart stats={allStats.combined} rate={complianceRate} />
-              </TabsContent>
-              <TabsContent value="vendors">
-                <ComplianceChart stats={allStats.vendors} rate={vendorRate} />
-              </TabsContent>
-              <TabsContent value="tenants">
-                <ComplianceChart stats={allStats.tenants} rate={tenantRate} />
-              </TabsContent>
+              <TabsContent value="combined"><ComplianceChart stats={allStats.combined} rate={complianceRate} /></TabsContent>
+              <TabsContent value="vendors"><ComplianceChart stats={allStats.vendors} rate={vendorRate} /></TabsContent>
+              <TabsContent value="tenants"><ComplianceChart stats={allStats.tenants} rate={tenantRate} /></TabsContent>
             </Tabs>
           </CardContent>
         </Card>
 
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Action Items</CardTitle>
-          </CardHeader>
+        <Card>
+          <CardHeader><CardTitle>Quick Stats</CardTitle></CardHeader>
           <CardContent>
-            <ActionItems vendors={vendors} tenants={tenants} />
+            <div className="space-y-4">
+              <div className="flex items-center justify-between rounded-lg bg-secondary/50 p-3">
+                <div className="flex items-center gap-2">
+                  <Truck className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm">Vendors</span>
+                </div>
+                <div className="text-right text-sm">
+                  <span className="font-medium">{allStats.vendors.compliant}</span>
+                  <span className="text-muted-foreground"> / {allStats.vendors.total} compliant</span>
+                </div>
+              </div>
+              <div className="flex items-center justify-between rounded-lg bg-secondary/50 p-3">
+                <div className="flex items-center gap-2">
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm">Tenants</span>
+                </div>
+                <div className="text-right text-sm">
+                  <span className="font-medium">{allStats.tenants.compliant}</span>
+                  <span className="text-muted-foreground"> / {allStats.tenants.total} compliant</span>
+                </div>
+              </div>
+              {allStats.combined.expired > 0 && (
+                <div className="flex items-center justify-between rounded-lg bg-red-50 p-3">
+                  <div className="flex items-center gap-2">
+                    <XCircle className="h-4 w-4 text-red-600" />
+                    <span className="text-sm text-red-800">Expired</span>
+                  </div>
+                  <span className="text-sm font-medium text-red-800">{allStats.combined.expired}</span>
+                </div>
+              )}
+              {allStats.combined.expiring > 0 && (
+                <div className="flex items-center justify-between rounded-lg bg-yellow-50 p-3">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-yellow-600" />
+                    <span className="text-sm text-yellow-800">Expiring Soon</span>
+                  </div>
+                  <span className="text-sm font-medium text-yellow-800">{allStats.combined.expiring}</span>
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
       </div>

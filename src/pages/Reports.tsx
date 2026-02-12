@@ -6,6 +6,8 @@ import {
   AlertTriangle,
   PieChart as PieChartIcon,
   FileText,
+  FileDown,
+  Loader2,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,8 +15,12 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { IconContainer } from '@/components/shared/IconContainer';
 import { Skeleton } from '@/components/ui/skeleton';
+import { PropertySelector } from '@/components/shared/PropertySelector';
 import { fetchVendors } from '@/services/vendors';
 import { fetchTenants } from '@/services/tenants';
+import { fetchProperties } from '@/services/properties';
+import { fetchOrganizationSettings } from '@/services/settings';
+import { exportComplianceReport } from '@/services/pdf-export';
 import type { Vendor, Tenant } from '@/types';
 import {
   BarChart,
@@ -99,6 +105,8 @@ function exportCSV(vendors: Vendor[], tenants: Tenant[]) {
 export default function Reports() {
   const navigate = useNavigate();
   const [entityFilter, setEntityFilter] = useState<'all' | 'vendors' | 'tenants'>('all');
+  const [pdfPropertyId, setPdfPropertyId] = useState('');
+  const [generatingPdf, setGeneratingPdf] = useState(false);
 
   const { data: vendorData, isLoading: vendorsLoading } = useQuery({
     queryKey: ['vendors', 'reports'],
@@ -303,6 +311,59 @@ export default function Reports() {
           </Card>
         </div>
       </div>
+
+      {/* PDF Export Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileDown className="h-5 w-5" />
+            Export Compliance Report (PDF)
+          </CardTitle>
+          <CardDescription>
+            Generate a professional PDF compliance report for a specific property.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <PropertySelector
+            value={pdfPropertyId}
+            onChange={setPdfPropertyId}
+            label="Select Property"
+            required
+          />
+          <Button
+            disabled={!pdfPropertyId || generatingPdf}
+            onClick={async () => {
+              setGeneratingPdf(true);
+              try {
+                const [props, orgSettings, vData, tData] = await Promise.all([
+                  fetchProperties(),
+                  fetchOrganizationSettings(),
+                  fetchVendors({ propertyId: pdfPropertyId, pageSize: 500 }),
+                  fetchTenants({ propertyId: pdfPropertyId, pageSize: 500 }),
+                ]);
+                const property = props.find((p) => p.id === pdfPropertyId);
+                if (!property) throw new Error('Property not found');
+                exportComplianceReport({
+                  property,
+                  vendors: vData.data,
+                  tenants: tData.data,
+                  companyName: orgSettings?.company_name ?? undefined,
+                });
+              } catch (err) {
+                console.error('PDF export failed:', err);
+              } finally {
+                setGeneratingPdf(false);
+              }
+            }}
+          >
+            {generatingPdf ? (
+              <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Generating...</>
+            ) : (
+              <><Download className="mr-2 h-4 w-4" />Export PDF Report</>
+            )}
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   );
 }

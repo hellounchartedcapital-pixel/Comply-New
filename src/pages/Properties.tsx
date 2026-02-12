@@ -23,6 +23,7 @@ export default function Properties() {
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [newName, setNewName] = useState('');
   const [newAddress, setNewAddress] = useState('');
+  const [newOwnershipEntity, setNewOwnershipEntity] = useState('');
 
   const { data: properties, isLoading } = useQuery({
     queryKey: ['properties'],
@@ -36,6 +37,7 @@ export default function Properties() {
       setShowAddDialog(false);
       setNewName('');
       setNewAddress('');
+      setNewOwnershipEntity('');
       toast.success('Property created successfully');
     },
     onError: (error) => {
@@ -136,7 +138,7 @@ export default function Properties() {
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              createMutation.mutate({ name: newName, address: newAddress || undefined });
+              createMutation.mutate({ name: newName, address: newAddress || undefined, ownership_entity: newOwnershipEntity || undefined });
             }}
             className="space-y-4"
           >
@@ -158,6 +160,18 @@ export default function Properties() {
                 onChange={(e) => setNewAddress(e.target.value)}
                 placeholder="e.g., 123 Main St, Suite 100"
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="prop-entity">Ownership Entity / Property LLC</Label>
+              <Input
+                id="prop-entity"
+                value={newOwnershipEntity}
+                onChange={(e) => setNewOwnershipEntity(e.target.value)}
+                placeholder="e.g., Sunset Holdings LLC"
+              />
+              <p className="text-xs text-muted-foreground">
+                The legal entity that owns this property
+              </p>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setShowAddDialog(false)}>

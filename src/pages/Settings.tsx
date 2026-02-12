@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Building2, Users, Bell, Plug, CreditCard, UserCircle } from 'lucide-react';
 import { toast } from 'sonner';
@@ -107,10 +107,21 @@ function OrganizationTab() {
 
   // Initialize form from fetched settings
   const [initialized, setInitialized] = useState(false);
-  if (settings && !initialized) {
-    setCompanyName(settings.company_name ?? '');
-    setInitialized(true);
-  }
+  useEffect(() => {
+    if (settings && !initialized) {
+      setCompanyName(settings.company_name ?? '');
+      setCompanyAddress(settings.company_address ?? '');
+      setAdditionalInsuredName(settings.additional_insured_name ?? '');
+      setGlOccurrence(settings.default_gl_occurrence ? String(settings.default_gl_occurrence) : '');
+      setGlAggregate(settings.default_gl_aggregate ? String(settings.default_gl_aggregate) : '');
+      setAutoLiability(settings.default_auto_liability ? String(settings.default_auto_liability) : '');
+      setUmbrellaLimit(settings.default_umbrella_limit ? String(settings.default_umbrella_limit) : '');
+      setWcRequired(settings.default_wc_required ?? false);
+      setAiRequired(settings.default_ai_required ?? false);
+      setWosRequired(settings.default_wos_required ?? false);
+      setInitialized(true);
+    }
+  }, [settings, initialized]);
 
   const saveMutation = useMutation({
     mutationFn: upsertOrganizationSettings,
@@ -165,7 +176,11 @@ function OrganizationTab() {
           </div>
           <Button
             onClick={() =>
-              saveMutation.mutate({ company_name: companyName })
+              saveMutation.mutate({
+                company_name: companyName,
+                company_address: companyAddress,
+                additional_insured_name: additionalInsuredName,
+              })
             }
             disabled={saveMutation.isPending}
           >
@@ -239,9 +254,20 @@ function OrganizationTab() {
             <Label htmlFor="wos-required">Require Waiver of Subrogation</Label>
           </div>
           <Button
-            onClick={() => toast.success('Default requirements saved')}
+            onClick={() =>
+              saveMutation.mutate({
+                default_gl_occurrence: glOccurrence ? Number(glOccurrence) : undefined,
+                default_gl_aggregate: glAggregate ? Number(glAggregate) : undefined,
+                default_auto_liability: autoLiability ? Number(autoLiability) : undefined,
+                default_umbrella_limit: umbrellaLimit ? Number(umbrellaLimit) : undefined,
+                default_wc_required: wcRequired,
+                default_ai_required: aiRequired,
+                default_wos_required: wosRequired,
+              })
+            }
+            disabled={saveMutation.isPending}
           >
-            Save Defaults
+            {saveMutation.isPending ? 'Saving...' : 'Save Defaults'}
           </Button>
         </CardContent>
       </Card>
@@ -293,10 +319,40 @@ function TeamTab() {
 }
 
 function NotificationsTab() {
+  const queryClient = useQueryClient();
+  const { data: settings, isLoading } = useQuery({
+    queryKey: ['organization-settings'],
+    queryFn: fetchOrganizationSettings,
+  });
+
   const [expiringAlerts, setExpiringAlerts] = useState(true);
   const [coiUploaded, setCoiUploaded] = useState(true);
   const [statusChanges, setStatusChanges] = useState(false);
   const [autoFollowUp, setAutoFollowUp] = useState(false);
+
+  const [initialized, setInitialized] = useState(false);
+  useEffect(() => {
+    if (settings && !initialized) {
+      setExpiringAlerts(settings.notify_expiring_alerts ?? true);
+      setCoiUploaded(settings.notify_coi_uploaded ?? true);
+      setStatusChanges(settings.notify_status_changes ?? false);
+      setAutoFollowUp(settings.auto_follow_up_enabled ?? false);
+      setInitialized(true);
+    }
+  }, [settings, initialized]);
+
+  const saveMutation = useMutation({
+    mutationFn: upsertOrganizationSettings,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['organization-settings'] });
+      toast.success('Notification preferences saved');
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Failed to save preferences'),
+  });
+
+  if (isLoading) {
+    return <Skeleton className="h-[300px] w-full" />;
+  }
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -337,8 +393,18 @@ function NotificationsTab() {
             </div>
             <Switch checked={autoFollowUp} onCheckedChange={setAutoFollowUp} />
           </div>
-          <Button onClick={() => toast.success('Notification preferences saved')}>
-            Save Preferences
+          <Button
+            onClick={() =>
+              saveMutation.mutate({
+                notify_expiring_alerts: expiringAlerts,
+                notify_coi_uploaded: coiUploaded,
+                notify_status_changes: statusChanges,
+                auto_follow_up_enabled: autoFollowUp,
+              })
+            }
+            disabled={saveMutation.isPending}
+          >
+            {saveMutation.isPending ? 'Saving...' : 'Save Preferences'}
           </Button>
         </CardContent>
       </Card>

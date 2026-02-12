@@ -147,6 +147,7 @@ export interface Property {
   user_id: string;
   name: string;
   address?: string;
+  ownership_entity?: string;
   vendor_count?: number;
   tenant_count?: number;
   compliance_percentage?: number;
@@ -378,10 +379,24 @@ export interface OrganizationSettings {
   id: string;
   user_id: string;
   company_name?: string;
+  company_address?: string;
+  additional_insured_name?: string;
+  // Default requirement limits
+  default_gl_occurrence?: number;
+  default_gl_aggregate?: number;
+  default_auto_liability?: number;
+  default_umbrella_limit?: number;
+  default_wc_required?: boolean;
+  default_ai_required?: boolean;
+  default_wos_required?: boolean;
+  // Notification settings
   auto_follow_up_enabled?: boolean;
   follow_up_days?: number[];
   notification_email_enabled?: boolean;
   notification_expiring_days?: number;
+  notify_expiring_alerts?: boolean;
+  notify_coi_uploaded?: boolean;
+  notify_status_changes?: boolean;
   created_at: string;
   updated_at: string;
 }

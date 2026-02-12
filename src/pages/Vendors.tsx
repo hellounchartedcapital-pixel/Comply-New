@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Truck, Plus, Mail, Upload, Eye, Trash2 } from 'lucide-react';
+import { Truck, Plus, Mail, Upload, Eye, Trash2, PackagePlus } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -112,10 +112,16 @@ export default function Vendors() {
         title="Vendors"
         subtitle="Manage vendor COI compliance"
         actions={
-          <Button onClick={() => navigate('/vendors/add')}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Vendor
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => navigate('/vendors/bulk-import')}>
+              <PackagePlus className="mr-2 h-4 w-4" />
+              Bulk Upload
+            </Button>
+            <Button onClick={() => navigate('/vendors/add')}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Vendor
+            </Button>
+          </div>
         }
       />
 

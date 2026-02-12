@@ -19,6 +19,8 @@ const COIUpload = lazy(() => import('@/pages/COIUpload'));
 const Requirements = lazy(() => import('@/pages/Requirements'));
 const Reports = lazy(() => import('@/pages/Reports'));
 const SettingsPage = lazy(() => import('@/pages/Settings'));
+const BulkImport = lazy(() => import('@/pages/BulkImport'));
+const Onboarding = lazy(() => import('@/pages/Onboarding'));
 const VendorPortal = lazy(() => import('@/pages/VendorPortal'));
 const Login = lazy(() => import('@/pages/Login'));
 const NotFound = lazy(() => import('@/pages/NotFound'));
@@ -130,6 +132,14 @@ function AppRoutes() {
           }
         />
         <Route
+          path="/vendors/bulk-import"
+          element={
+            <Suspense fallback={<PageLoader />}>
+              <BulkImport />
+            </Suspense>
+          }
+        />
+        <Route
           path="/tenants"
           element={
             <Suspense fallback={<PageLoader />}>
@@ -174,6 +184,14 @@ function AppRoutes() {
           element={
             <Suspense fallback={<PageLoader />}>
               <SettingsPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/onboarding"
+          element={
+            <Suspense fallback={<PageLoader />}>
+              <Onboarding />
             </Suspense>
           }
         />

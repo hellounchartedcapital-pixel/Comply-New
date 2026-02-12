@@ -52,7 +52,7 @@ export async function fetchProperty(id: string): Promise<Property> {
   return data as Property;
 }
 
-export async function createProperty(property: { name: string; address?: string }): Promise<Property> {
+export async function createProperty(property: { name: string; address?: string; ownership_entity?: string }): Promise<Property> {
   const { data, error } = await supabase
     .from('properties')
     .insert(property)
