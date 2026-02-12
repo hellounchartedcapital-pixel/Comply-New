@@ -553,7 +553,7 @@ function EntityTabContent({ entityType }: { entityType: EntityType }) {
           coverages: existing.coverages ?? {},
           endorsements: existing.endorsements ?? {},
         });
-        setShowForm(true);
+        setShowForm(false);
         setSelectedPreset(null);
       } else {
         setExistingTemplateId(null);
@@ -668,8 +668,21 @@ function EntityTabContent({ entityType }: { entityType: EntityType }) {
       ) : !showForm ? (
         /* Template selection */
         <div className="space-y-4">
+          {existingTemplateId && (
+            <Card className="border-primary/30 bg-primary/5">
+              <CardContent className="flex items-center justify-between p-4">
+                <div>
+                  <p className="text-sm font-medium">This property already has saved requirements.</p>
+                  <p className="text-xs text-muted-foreground">Edit them or choose a new template to replace.</p>
+                </div>
+                <Button size="sm" variant="outline" onClick={() => setShowForm(true)}>
+                  Edit Current
+                </Button>
+              </CardContent>
+            </Card>
+          )}
           <div>
-            <h3 className="text-sm font-semibold mb-1">Choose a template</h3>
+            <h3 className="text-sm font-semibold mb-1">{existingTemplateId ? 'Or choose a new template' : 'Choose a template'}</h3>
             <p className="text-xs text-muted-foreground">Pick a starting point, then customize if needed.</p>
           </div>
           <div className="grid gap-3 md:grid-cols-3">
