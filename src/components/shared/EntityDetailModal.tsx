@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   FileText,
   Download,
@@ -9,8 +9,9 @@ import {
   XCircle,
   AlertTriangle,
   Clock,
-  Eye,
   Link2,
+  Upload,
+  ExternalLink,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -24,11 +25,11 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { StatusBadge } from './StatusBadge';
 import { ConfidenceIndicator } from './ConfidenceIndicator';
 import { formatCurrency } from '@/lib/utils';
+import { supabase } from '@/lib/supabase';
 import type {
   Vendor,
   Tenant,
@@ -53,6 +54,10 @@ interface EntityDetailModalProps {
   onEdit?: () => void;
   isDeleting?: boolean;
 }
+
+// ============================================
+// SUB-COMPONENTS
+// ============================================
 
 function ComplianceFieldRow({ field }: { field: ComplianceField }) {
   const statusIcons = {
@@ -243,13 +248,134 @@ function EditCoveragesForm({
   );
 }
 
+// ============================================
+// COI PREVIEW PANEL
+// ============================================
+
+function COIPreviewPanel({ coiUrl, entityType }: { coiUrl: string | null; entityType: string }) {
+  if (!coiUrl) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center rounded-lg border-2 border-dashed border-border bg-secondary/30 p-6">
+        <FileText className="h-16 w-16 text-muted-foreground/30" />
+        <p className="mt-4 text-sm font-medium text-muted-foreground">No COI document on file</p>
+        <p className="mt-1 text-xs text-muted-foreground text-center">
+          Upload a COI or request one from the {entityType}
+        </p>
+      </div>
+    );
+  }
+
+  const isPdf = coiUrl.toLowerCase().includes('.pdf');
+
+  if (isPdf) {
+    return (
+      <div className="flex h-full flex-col rounded-lg border bg-background overflow-hidden">
+        <iframe
+          src={`${coiUrl}#toolbar=1&navpanes=0`}
+          className="flex-1 w-full min-h-0"
+          title="COI Document Preview"
+        />
+        <div className="flex items-center justify-between border-t px-3 py-2 bg-secondary/30">
+          <span className="text-xs text-muted-foreground truncate">Certificate of Insurance</span>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 text-xs"
+            onClick={() => window.open(coiUrl, '_blank')}
+          >
+            <ExternalLink className="mr-1 h-3 w-3" />
+            Open
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Image preview (JPG, PNG)
+  return (
+    <div className="flex h-full flex-col rounded-lg border bg-background overflow-hidden">
+      <div className="flex-1 min-h-0 overflow-auto p-2 flex items-start justify-center bg-secondary/20">
+        <img
+          src={coiUrl}
+          alt="COI Document"
+          className="max-w-full h-auto rounded"
+        />
+      </div>
+      <div className="flex items-center justify-between border-t px-3 py-2 bg-secondary/30">
+        <span className="text-xs text-muted-foreground truncate">Certificate of Insurance</span>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 text-xs"
+          onClick={() => window.open(coiUrl, '_blank')}
+        >
+          <ExternalLink className="mr-1 h-3 w-3" />
+          Open
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ============================================
+// HOOK: Fetch COI URL from storage
+// ============================================
+
+function useCOIUrl(entityType: EntityType, entityId: string, externalUrl?: string) {
+  const [coiUrl, setCoiUrl] = useState<string | null>(externalUrl ?? null);
+  const [loading, setLoading] = useState(!externalUrl);
+
+  useEffect(() => {
+    if (externalUrl) {
+      setCoiUrl(externalUrl);
+      setLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    async function fetchUrl() {
+      try {
+        const prefix = `${entityType}/${entityId}/`;
+        const { data: files } = await supabase.storage
+          .from('coi-documents')
+          .list(`${entityType}/${entityId}`, { limit: 1, sortBy: { column: 'created_at', order: 'desc' } });
+
+        if (cancelled) return;
+
+        const latestFile = files?.[0];
+        if (latestFile) {
+          const { data: urlData } = supabase.storage
+            .from('coi-documents')
+            .getPublicUrl(`${prefix}${latestFile.name}`);
+          setCoiUrl(urlData?.publicUrl ?? null);
+        } else {
+          setCoiUrl(null);
+        }
+      } catch {
+        if (!cancelled) setCoiUrl(null);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    fetchUrl();
+    return () => { cancelled = true; };
+  }, [entityType, entityId, externalUrl]);
+
+  return { coiUrl, loading };
+}
+
+// ============================================
+// MAIN MODAL
+// ============================================
+
 export function EntityDetailModal({
   open,
   onOpenChange,
   entity,
   entityType,
   coverages = [],
-  coiUrl,
+  coiUrl: externalCoiUrl,
   template,
   onDelete,
   onEdit,
@@ -268,6 +394,8 @@ export function EntityDetailModal({
   const [localCoverages, setLocalCoverages] = useState(derivedCoverages);
   const [sendingRequest, setSendingRequest] = useState(false);
   const [generatingLink, setGeneratingLink] = useState(false);
+
+  const { coiUrl } = useCOIUrl(entityType, entity.id, externalCoiUrl);
 
   const entityName = entity.name;
   const entityEmail =
@@ -347,8 +475,9 @@ export function EntityDetailModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="max-w-6xl h-[85vh] flex flex-col p-0 gap-0">
+        {/* Header */}
+        <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0">
           <div className="flex items-center justify-between pr-8">
             <DialogTitle className="text-lg">{entityName}</DialogTitle>
             <StatusBadge status={entityStatus} />
@@ -364,183 +493,163 @@ export function EntityDetailModal({
           </p>
         </DialogHeader>
 
-        <Tabs defaultValue="compliance" className="mt-2">
-          <TabsList className="w-full">
-            <TabsTrigger value="compliance" className="flex-1">
-              Compliance
-            </TabsTrigger>
-            <TabsTrigger value="coverages" className="flex-1">
-              Coverages
-            </TabsTrigger>
-            <TabsTrigger value="document" className="flex-1">
-              COI Document
-            </TabsTrigger>
-          </TabsList>
+        {/* Main content: side-by-side */}
+        <div className="flex flex-1 min-h-0 overflow-hidden">
+          {/* Left: COI Document Preview */}
+          <div className="w-1/2 border-r p-4 flex flex-col min-h-0">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-muted-foreground">COI Document</h3>
+              {coiUrl && (
+                <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={handleDownload}>
+                  <Download className="mr-1 h-3 w-3" />
+                  Download
+                </Button>
+              )}
+            </div>
+            <div className="flex-1 min-h-0">
+              <COIPreviewPanel coiUrl={coiUrl} entityType={entityType} />
+            </div>
+          </div>
 
-          <TabsContent value="compliance" className="space-y-4">
-            {template ? (
-              <>
-                <div className="flex items-center gap-4 rounded-lg border p-4">
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">Overall Compliance</p>
-                    <p className="text-2xl font-bold">
-                      {compliance.compliance_percentage}%
-                    </p>
-                  </div>
-                  <StatusBadge status={compliance.overall_status} />
-                </div>
+          {/* Right: Tabs + Details */}
+          <div className="w-1/2 flex flex-col min-h-0">
+            <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4">
+              <Tabs defaultValue="compliance">
+                <TabsList className="w-full">
+                  <TabsTrigger value="compliance" className="flex-1">
+                    Compliance
+                  </TabsTrigger>
+                  <TabsTrigger value="coverages" className="flex-1">
+                    Coverages
+                  </TabsTrigger>
+                </TabsList>
 
-                {compliance.fields.length > 0 ? (
-                  <div className="space-y-2">
-                    <p className="text-sm font-medium">Requirement Comparison</p>
-                    {compliance.fields.map((field, i) => (
-                      <ComplianceFieldRow key={i} field={field} />
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    No requirements configured for comparison
-                  </p>
-                )}
+                <TabsContent value="compliance" className="space-y-4 mt-4">
+                  {template ? (
+                    <>
+                      <div className="flex items-center gap-4 rounded-lg border p-4">
+                        <div className="flex-1">
+                          <p className="text-sm font-medium">Overall Compliance</p>
+                          <p className="text-2xl font-bold">
+                            {compliance.compliance_percentage}%
+                          </p>
+                        </div>
+                        <StatusBadge status={compliance.overall_status} />
+                      </div>
 
-                {gaps.length > 0 && (
-                  <Card className="border-destructive/30 bg-destructive/5">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm text-destructive">
-                        Compliance Gaps ({gaps.length})
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <ul className="space-y-1">
-                        {gaps.map((gap, i) => (
-                          <li key={i} className="text-xs text-muted-foreground">
-                            • {gap}
-                          </li>
-                        ))}
-                      </ul>
-                    </CardContent>
-                  </Card>
-                )}
-              </>
-            ) : (
-              <div className="flex h-32 items-center justify-center text-sm text-muted-foreground">
-                <div className="text-center">
-                  <p>No requirement template assigned</p>
-                  <p className="text-xs mt-1">
-                    Assign a template from the Requirements page to enable compliance tracking
-                  </p>
-                </div>
-              </div>
-            )}
-          </TabsContent>
+                      {compliance.fields.length > 0 ? (
+                        <div className="space-y-2">
+                          <p className="text-sm font-medium">Requirement Comparison</p>
+                          {compliance.fields.map((field, i) => (
+                            <ComplianceFieldRow key={i} field={field} />
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">
+                          No requirements configured for comparison
+                        </p>
+                      )}
 
-          <TabsContent value="coverages" className="space-y-4">
-            {isEditing ? (
-              <EditCoveragesForm
-                coverages={localCoverages}
-                onSave={handleSaveCoverages}
-                onCancel={() => setIsEditing(false)}
-              />
-            ) : (
-              <>
-                <CoveragesList coverages={localCoverages} />
+                      {gaps.length > 0 && (
+                        <Card className="border-destructive/30 bg-destructive/5">
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-sm text-destructive">
+                              Compliance Gaps ({gaps.length})
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <ul className="space-y-1">
+                              {gaps.map((gap, i) => (
+                                <li key={i} className="text-xs text-muted-foreground">
+                                  • {gap}
+                                </li>
+                              ))}
+                            </ul>
+                          </CardContent>
+                        </Card>
+                      )}
+                    </>
+                  ) : (
+                    <div className="flex h-32 items-center justify-center text-sm text-muted-foreground">
+                      <div className="text-center">
+                        <p>No requirement template assigned</p>
+                        <p className="text-xs mt-1">
+                          Assign a template from the Requirements page to enable compliance tracking
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="coverages" className="space-y-4 mt-4">
+                  {isEditing ? (
+                    <EditCoveragesForm
+                      coverages={localCoverages}
+                      onSave={handleSaveCoverages}
+                      onCancel={() => setIsEditing(false)}
+                    />
+                  ) : (
+                    <>
+                      <CoveragesList coverages={localCoverages} />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setIsEditing(true)}
+                        className="w-full"
+                      >
+                        <Edit className="mr-2 h-3.5 w-3.5" />
+                        Edit Coverages
+                      </Button>
+                    </>
+                  )}
+                </TabsContent>
+              </Tabs>
+            </div>
+
+            {/* Action buttons */}
+            <div className="shrink-0 border-t px-6 py-3">
+              <div className="flex flex-wrap gap-2">
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setIsEditing(true)}
-                  className="w-full"
+                  onClick={handleRequestCOI}
+                  disabled={!entityEmail || sendingRequest}
                 >
-                  <Edit className="mr-2 h-3.5 w-3.5" />
-                  Edit Coverages
+                  <Mail className="mr-1.5 h-3.5 w-3.5" />
+                  {sendingRequest ? 'Sending...' : 'Request COI'}
                 </Button>
-              </>
-            )}
-          </TabsContent>
-
-          <TabsContent value="document" className="space-y-4">
-            {coiUrl ? (
-              <div className="space-y-4">
-                <div className="flex h-[300px] items-center justify-center rounded-lg bg-secondary">
-                  <div className="text-center">
-                    <FileText className="mx-auto h-16 w-16 text-muted-foreground/50" />
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      COI Document on file
-                    </p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="mt-3"
-                      onClick={() => window.open(coiUrl, '_blank')}
-                    >
-                      <Eye className="mr-2 h-3.5 w-3.5" />
-                      View Full Document
-                    </Button>
-                  </div>
-                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCopyPortalLink}
+                  disabled={generatingLink}
+                >
+                  <Link2 className="mr-1.5 h-3.5 w-3.5" />
+                  {generatingLink ? 'Generating...' : 'Portal Link'}
+                </Button>
+                {onEdit && (
+                  <Button variant="outline" size="sm" onClick={onEdit}>
+                    <Upload className="mr-1.5 h-3.5 w-3.5" />
+                    Upload New COI
+                  </Button>
+                )}
+                <div className="flex-1" />
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => {
+                    if (window.confirm(`Delete ${entityType} "${entityName}"?`)) {
+                      onDelete();
+                    }
+                  }}
+                  disabled={isDeleting}
+                >
+                  <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                  Delete
+                </Button>
               </div>
-            ) : (
-              <div className="flex h-[300px] items-center justify-center text-sm text-muted-foreground">
-                <div className="text-center">
-                  <FileText className="mx-auto h-12 w-12 text-muted-foreground/30" />
-                  <p className="mt-2">No COI document on file</p>
-                  <p className="text-xs mt-1">
-                    Upload a COI or request one from the {entityType}
-                  </p>
-                </div>
-              </div>
-            )}
-          </TabsContent>
-        </Tabs>
-
-        <Separator />
-
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleDownload}
-            disabled={!coiUrl}
-          >
-            <Download className="mr-1.5 h-3.5 w-3.5" />
-            Download
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleRequestCOI}
-            disabled={!entityEmail || sendingRequest}
-          >
-            <Mail className="mr-1.5 h-3.5 w-3.5" />
-            {sendingRequest ? 'Sending...' : 'Request COI'}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleCopyPortalLink}
-            disabled={generatingLink}
-          >
-            <Link2 className="mr-1.5 h-3.5 w-3.5" />
-            {generatingLink ? 'Generating...' : 'Portal Link'}
-          </Button>
-          {onEdit && (
-            <Button variant="outline" size="sm" onClick={onEdit}>
-              <Edit className="mr-1.5 h-3.5 w-3.5" />
-              Edit
-            </Button>
-          )}
-          <Button
-            variant="destructive"
-            size="sm"
-            onClick={() => {
-              if (window.confirm(`Delete ${entityType} "${entityName}"?`)) {
-                onDelete();
-              }
-            }}
-            disabled={isDeleting}
-          >
-            <Trash2 className="mr-1.5 h-3.5 w-3.5" />
-            Delete
-          </Button>
+            </div>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
