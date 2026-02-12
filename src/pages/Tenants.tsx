@@ -181,9 +181,8 @@ export default function Tenants() {
                   <TableHead>Name</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Property</TableHead>
-                  <TableHead>Unit</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Lease End</TableHead>
+                  <TableHead>Expiration</TableHead>
                   <TableHead className="w-[100px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -212,10 +211,9 @@ export default function Tenants() {
                       )}
                     </TableCell>
                     <TableCell className="text-muted-foreground">{tenant.property?.name ?? 'Unassigned'}</TableCell>
-                    <TableCell className="text-muted-foreground">{tenant.unit ?? 'N/A'}</TableCell>
                     <TableCell><StatusBadge status={tenant.insurance_status} /></TableCell>
                     <TableCell className="text-muted-foreground">
-                      {tenant.lease_end ? formatDate(tenant.lease_end) : 'N/A'}
+                      {tenant.expiration_date ? formatDate(tenant.expiration_date) : 'N/A'}
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1">

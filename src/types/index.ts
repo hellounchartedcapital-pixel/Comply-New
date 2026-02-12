@@ -195,6 +195,7 @@ export interface Tenant {
   property_id?: string;
   property?: Property;
   unit?: string;
+  expiration_date?: string;
   lease_start?: string;
   lease_end?: string;
   lease_renewal_date?: string;
