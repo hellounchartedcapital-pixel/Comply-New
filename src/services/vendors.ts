@@ -75,8 +75,9 @@ export async function createVendor(vendor: {
   contact_email?: string;
   contact_phone?: string;
 }): Promise<Vendor> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not authenticated');
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError) throw new Error('Authentication error — please sign out and sign back in.');
+  if (!user) throw new Error('Not authenticated — please sign in to continue.');
 
   const { data, error } = await supabase
     .from('vendors')
@@ -84,7 +85,22 @@ export async function createVendor(vendor: {
     .select()
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) {
+    // Provide actionable error messages based on common Supabase errors
+    if (error.code === '42P01') {
+      throw new Error('Database table "vendors" not found. Run the setup SQL in your Supabase SQL Editor.');
+    }
+    if (error.code === '42703') {
+      throw new Error('Database column missing. Run the latest migration SQL in your Supabase SQL Editor.');
+    }
+    if (error.code === '42501' || error.message.includes('row-level security')) {
+      throw new Error('Permission denied — RLS policies may not be configured. Run the setup SQL in Supabase.');
+    }
+    if (error.code === 'PGRST301' || error.message.includes('JWT')) {
+      throw new Error('Session expired — please sign out and sign back in.');
+    }
+    throw new Error(error.message);
+  }
   return data as Vendor;
 }
 
