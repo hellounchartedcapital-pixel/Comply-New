@@ -349,11 +349,26 @@ export function runComplianceCheck(input: ComplianceCheckInput): UnifiedComplian
     });
 
     // Check specific entity names from property
+    // On ACORD 25 forms, the Additional Insured entity name commonly
+    // appears in the Certificate Holder section at the bottom of the form,
+    // not just in the endorsement details. Check both locations.
     if (present && property?.additional_insured_entities?.length) {
+      const certHolderText = input.certificateHolder ?? '';
       for (const reqEntity of property.additional_insured_entities) {
         if (!reqEntity) continue;
         const detailText = aiEndorsement?.details ?? '';
-        const found = detailText && entityNameMatches(reqEntity, detailText);
+
+        // Check endorsement details AND certificate holder text
+        const foundInEndorsement = detailText && entityNameMatches(reqEntity, detailText);
+        const foundInCertHolder = certHolderText && entityNameMatches(reqEntity, certHolderText);
+        const found = foundInEndorsement || foundInCertHolder;
+
+        const location = foundInEndorsement
+          ? 'endorsement details'
+          : foundInCertHolder
+            ? 'certificate holder section'
+            : '';
+
         items.push({
           field: `ai_entity_${reqEntity.replace(/\s+/g, '_').toLowerCase()}`,
           display_name: `AI Entity: ${reqEntity}`,
@@ -361,8 +376,8 @@ export function runComplianceCheck(input: ComplianceCheckInput): UnifiedComplian
           actual_value: found ? 'Found' : 'Not verified',
           status: found ? 'pass' : 'fail',
           reason: found
-            ? `"${reqEntity}" found in endorsement details`
-            : `Could not verify "${reqEntity}" in endorsement text`,
+            ? `"${reqEntity}" found in ${location}`
+            : `Could not verify "${reqEntity}" in COI endorsement or certificate holder text`,
           source: 'Property config',
         });
       }
@@ -460,6 +475,8 @@ export function runComplianceCheck(input: ComplianceCheckInput): UnifiedComplian
 export interface ComplianceCheckOptions {
   endorsements?: ExtractedEndorsement[];
   property?: Pick<Property, 'additional_insured_entities' | 'certificate_holder_name' | 'loss_payee_entities'> | null;
+  /** Certificate holder text extracted from the COI for entity name verification */
+  certificateHolder?: string;
 }
 
 /**
@@ -475,6 +492,7 @@ export function compareCoverageToRequirements(
     coverages,
     endorsements: options?.endorsements,
     template,
+    certificateHolder: options?.certificateHolder,
     property: options?.property,
   });
 

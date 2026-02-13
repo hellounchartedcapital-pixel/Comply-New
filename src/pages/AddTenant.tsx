@@ -407,7 +407,13 @@ export default function AddTenant() {
           insuranceStatus = new Date(coiResult.expiration_date) > now ? 'compliant' : 'expired';
         }
 
-        await updateTenant(tenant.id, { insurance_status: insuranceStatus } as any);
+        await updateTenant(tenant.id, {
+          insurance_status: insuranceStatus,
+          coverage: coiResult.coverages,
+          endorsements: coiResult.endorsements ?? [],
+          certificate_holder_on_coi: coiResult.certificate_holder ?? '',
+          expiration_date: coiResult.expiration_date,
+        } as any);
 
         // Run compliance comparison
         try {
@@ -460,7 +466,7 @@ export default function AddTenant() {
           const compliance = compareCoverageToRequirements(
             coiResult.coverages,
             template,
-            { property: propertyData }
+            { endorsements: coiResult.endorsements, property: propertyData, certificateHolder: coiResult.certificate_holder }
           );
           setComplianceResult(compliance);
         } catch {

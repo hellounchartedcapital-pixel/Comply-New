@@ -114,10 +114,17 @@ function mapRawToCOIResult(raw: any): COIExtractionResult {
 
   // Endorsements
   const endorsements: ExtractedEndorsement[] = [];
+  const certHolderText = raw.certificateHolder ?? '';
+
   if (raw.additionalInsured) {
     endorsements.push({
       type: 'Additional Insured',
       present: (raw.additionalInsured || '').toLowerCase() === 'yes',
+      // Store the certificate holder text as endorsement details so the
+      // compliance engine can verify entity names against it. On ACORD 25
+      // forms, the AI entity name typically appears in the Certificate
+      // Holder section at the bottom of the form.
+      details: certHolderText || undefined,
       confidence_score: 85,
     });
   }
@@ -133,6 +140,7 @@ function mapRawToCOIResult(raw: any): COIExtractionResult {
     success: true,
     carrier: raw.insuranceCompany ?? undefined,
     named_insured: raw.companyName ?? undefined,
+    certificate_holder: certHolderText || undefined,
     expiration_date: raw.expirationDate ?? undefined,
     coverages,
     endorsements,
