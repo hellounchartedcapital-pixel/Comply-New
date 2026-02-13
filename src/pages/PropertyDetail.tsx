@@ -150,9 +150,8 @@ export default function PropertyDetail() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Name</TableHead>
-                      <TableHead>Unit</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead>Lease End</TableHead>
+                      <TableHead>Expiration</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -163,12 +162,11 @@ export default function PropertyDetail() {
                         onClick={() => navigate('/tenants')}
                       >
                         <TableCell className="font-medium">{tenant.name}</TableCell>
-                        <TableCell className="text-muted-foreground">{tenant.unit ?? 'N/A'}</TableCell>
                         <TableCell>
                           <StatusBadge status={tenant.insurance_status} />
                         </TableCell>
                         <TableCell className="text-muted-foreground">
-                          {tenant.lease_end ? formatDate(tenant.lease_end) : 'N/A'}
+                          {tenant.expiration_date ? formatDate(tenant.expiration_date) : 'N/A'}
                         </TableCell>
                       </TableRow>
                     ))}

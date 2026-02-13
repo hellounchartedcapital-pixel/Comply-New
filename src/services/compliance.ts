@@ -1,14 +1,37 @@
 import type {
   ExtractedCoverage,
+  ExtractedEndorsement,
   ComplianceField,
   ComplianceResult,
   RequirementTemplate,
+  Property,
 } from '@/types';
 import { formatCurrency } from '@/lib/utils';
 
+/** Fuzzy entity name matching — strips punctuation, normalizes whitespace, case-insensitive */
+function normalizeEntityName(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[.,;:'"!?()]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function entityNameMatches(required: string, actual: string): boolean {
+  const r = normalizeEntityName(required);
+  const a = normalizeEntityName(actual);
+  return a.includes(r) || r.includes(a);
+}
+
+export interface ComplianceCheckOptions {
+  endorsements?: ExtractedEndorsement[];
+  property?: Pick<Property, 'additional_insured_entities' | 'certificate_holder_name' | 'loss_payee_entities'> | null;
+}
+
 export function compareCoverageToRequirements(
   coverages: ExtractedCoverage[],
-  template: RequirementTemplate | null
+  template: RequirementTemplate | null,
+  options?: ComplianceCheckOptions
 ): ComplianceResult {
   if (!template) {
     return {
@@ -168,6 +191,68 @@ export function compareCoverageToRequirements(
       actual_value: actual,
       status: met ? 'compliant' : 'non-compliant',
     });
+  }
+
+  // ---- Endorsement checks ----
+  const endorsements = options?.endorsements ?? [];
+  const property = options?.property;
+
+  // Additional Insured
+  if (template.endorsements.require_additional_insured) {
+    const aiEndorsement = endorsements.find(
+      (e) => e.type.toLowerCase().includes('additional insured')
+    );
+    const present = aiEndorsement?.present ?? false;
+    fields.push({
+      field_name: 'Additional Insured',
+      required_value: 'Required',
+      actual_value: present ? 'Present' : null,
+      status: present ? 'compliant' : 'non-compliant',
+    });
+
+    // Check specific entity names if property provides them
+    if (present && property?.additional_insured_entities?.length) {
+      for (const reqEntity of property.additional_insured_entities) {
+        if (!reqEntity) continue;
+        // We check if the endorsement details mention the entity (if details available)
+        const detailText = aiEndorsement?.details ?? '';
+        const found = detailText && entityNameMatches(reqEntity, detailText);
+        fields.push({
+          field_name: `AI Entity: ${reqEntity}`,
+          required_value: 'Named',
+          actual_value: found ? 'Found' : 'Not verified',
+          status: found ? 'compliant' : 'non-compliant',
+        });
+      }
+    }
+  }
+
+  // Waiver of Subrogation
+  if (template.endorsements.require_waiver_of_subrogation) {
+    const wosEndorsement = endorsements.find(
+      (e) => e.type.toLowerCase().includes('waiver') || e.type.toLowerCase().includes('subrogation')
+    );
+    const present = wosEndorsement?.present ?? false;
+    fields.push({
+      field_name: 'Waiver of Subrogation',
+      required_value: 'Required',
+      actual_value: present ? 'Present' : null,
+      status: present ? 'compliant' : 'non-compliant',
+    });
+  }
+
+  // Certificate Holder name check
+  if (template.endorsements.certificate_holder_name || property?.certificate_holder_name) {
+    const requiredName = template.endorsements.certificate_holder_name || property?.certificate_holder_name || '';
+    if (requiredName) {
+      // This would need COI certificate holder field — mark as informational for now
+      fields.push({
+        field_name: 'Certificate Holder',
+        required_value: requiredName,
+        actual_value: null,
+        status: 'non-compliant',
+      });
+    }
   }
 
   // Calculate overall

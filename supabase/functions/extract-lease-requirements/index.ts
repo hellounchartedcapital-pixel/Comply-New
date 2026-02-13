@@ -39,91 +39,78 @@ serve(async (req) => {
           },
           {
             type: 'text',
-            text: `You are an expert commercial real estate insurance analyst. Extract ALL tenant insurance requirements from this document.
+            text: `You are an insurance requirements extraction engine for commercial property leases.
 
-This document may be:
-- A full commercial lease agreement
-- An insurance exhibit or addendum from a lease
-- A standalone insurance requirements document
-- Something else entirely
+TASK: Extract all insurance requirements from this lease document and return them as structured JSON matching the schema below. Only populate fields that are explicitly stated or clearly implied in the lease. Leave everything else as null.
 
-FIRST: Determine what type of document this is. If it does NOT appear to be a lease or insurance-related document, set documentType to "unknown" and return mostly empty results.
+This document may be a full commercial lease, an insurance exhibit/addendum, or a standalone insurance requirements document. Search the ENTIRE document — requirements can appear in the main body, exhibits, addendums, riders, schedules, or across multiple sections. Common section titles: "Insurance", "Tenant's Insurance", "Insurance Requirements", "Indemnity and Insurance".
 
-Search the ENTIRE document for insurance-related requirements. They may appear in:
-- A dedicated "Insurance" section or article
-- An exhibit (e.g., "Exhibit B - Insurance Requirements")
-- Scattered across multiple clauses
-- Referenced in definitions, indemnification, or default sections
+RULES:
+- Dollar amounts should be numbers (no formatting): 1000000 not "$1,000,000"
+- If the lease says "replacement cost" without a dollar figure, set property_insurance_type to "replacement_cost" and property_insurance_amount to null
+- If the lease says "annual rent" for business interruption, set business_interruption_minimum to "annual_rent" — do not try to calculate a dollar amount
+- For additional_insured_entities, extract every named entity — landlord, property manager, lenders, and any "other parties reasonably designated by Landlord" (include that phrase if present)
+- If multiple coverage amounts are listed for the same type (e.g. per occurrence AND aggregate for GL), capture both in the appropriate fields
+- Do NOT invent requirements that aren't in the lease
+- Do NOT populate specialty coverages (liquor, pollution, professional, cyber, product) unless the lease explicitly requires them
+- For each field with a value, include a confidence score (0-100) and a lease_ref (e.g. "Section 12.3", "Exhibit B")
+- Dates MUST be in YYYY-MM-DD format
 
-For EACH requirement you find, provide:
-1. The extracted value
-2. A confidence score (0-100):
-   - 90-100: Clearly stated, unambiguous dollar amount or requirement
-   - 70-89: Stated but some interpretation needed (e.g., range given, or requirement uses general language)
-   - 50-69: Implied or indirectly referenced, moderate uncertainty
-   - Below 50: Very uncertain, inferred from context, or couldn't locate clearly
-3. A lease reference showing where it was found (e.g., "Section 12.3", "Exhibit B, Page 2", "Article VII, Paragraph 4")
+Return ONLY valid JSON. No markdown, no explanation, no preamble.
 
-Return this JSON structure:
+SCHEMA:
 {
-  "documentType": "lease" | "insurance_exhibit" | "requirements_doc" | "unknown",
-  "documentTypeConfidence": <0-100>,
+  "document_type": "lease" | "insurance_exhibit" | "requirements_doc" | "unknown",
+  "document_type_confidence": <0-100>,
 
-  "tenantName": { "value": "string or null", "confidence": <0-100>, "leaseRef": "location in document" },
-  "propertyAddress": { "value": "string or null", "confidence": <0-100>, "leaseRef": "location" },
-  "suiteUnit": { "value": "string or null", "confidence": <0-100>, "leaseRef": "location" },
-  "leaseStartDate": { "value": "YYYY-MM-DD or null", "confidence": <0-100>, "leaseRef": "location" },
-  "leaseEndDate": { "value": "YYYY-MM-DD or null", "confidence": <0-100>, "leaseRef": "location" },
-  "leaseRenewalDate": { "value": "YYYY-MM-DD or null", "confidence": <0-100>, "leaseRef": "location" },
+  "tenant_name": { "value": <string or null>, "confidence": <0-100>, "lease_ref": <string> },
+  "property_address": { "value": <string or null>, "confidence": <0-100>, "lease_ref": <string> },
+  "premises_description": { "value": <string or null>, "confidence": <0-100>, "lease_ref": <string> },
+  "lease_start_date": { "value": <"YYYY-MM-DD" or null>, "confidence": <0-100>, "lease_ref": <string> },
+  "lease_end_date": { "value": <"YYYY-MM-DD" or null>, "confidence": <0-100>, "lease_ref": <string> },
 
-  "requirements": {
-    "glOccurrenceLimit": { "value": <integer or null>, "confidence": <0-100>, "leaseRef": "location" },
-    "glAggregateLimit": { "value": <integer or null>, "confidence": <0-100>, "leaseRef": "location" },
-    "propertyContentsLimit": { "value": <integer or null>, "confidence": <0-100>, "leaseRef": "location" },
-    "umbrellaLimit": { "value": <integer or null>, "confidence": <0-100>, "leaseRef": "location" },
-    "workersCompStatutory": { "value": <true/false/null>, "confidence": <0-100>, "leaseRef": "location" },
-    "workersCompEmployersLiabilityLimit": { "value": <integer or null>, "confidence": <0-100>, "leaseRef": "location" },
-    "commercialAutoCsl": { "value": <integer or null>, "confidence": <0-100>, "leaseRef": "location" },
-    "professionalLiabilityLimit": { "value": <integer or null>, "confidence": <0-100>, "leaseRef": "location" },
-    "businessInterruptionRequired": { "value": <true/false/null>, "confidence": <0-100>, "leaseRef": "location" },
-    "businessInterruptionDuration": { "value": "string or null", "confidence": <0-100>, "leaseRef": "location" },
-    "additionalInsuredEntities": { "value": ["entity name 1", "entity name 2"] or null, "confidence": <0-100>, "leaseRef": "location" },
-    "additionalInsuredLanguage": { "value": "exact language required or null", "confidence": <0-100>, "leaseRef": "location" },
-    "lossPayeeEntities": { "value": ["entity name"] or null, "confidence": <0-100>, "leaseRef": "location" },
-    "waiverOfSubrogationRequired": { "value": <true/false/null>, "confidence": <0-100>, "leaseRef": "location" },
-    "waiverOfSubrogationCoverages": { "value": ["coverage type 1"] or null, "confidence": <0-100>, "leaseRef": "location" },
-    "certificateHolderName": { "value": "string or null", "confidence": <0-100>, "leaseRef": "location" },
-    "certificateHolderAddress": { "value": "string or null", "confidence": <0-100>, "leaseRef": "location" },
-    "cancellationNoticeDays": { "value": <integer or null>, "confidence": <0-100>, "leaseRef": "location" },
-    "specialEndorsements": { "value": ["endorsement 1"] or null, "confidence": <0-100>, "leaseRef": "location" },
-    "customCoverages": [
-      {
-        "name": "coverage type name",
-        "limit": <integer>,
-        "confidence": <0-100>,
-        "leaseRef": "location"
-      }
-    ]
-  },
+  "general_liability_per_occurrence": { "value": <integer or null>, "confidence": <0-100>, "lease_ref": <string> },
+  "general_liability_aggregate": { "value": <integer or null>, "confidence": <0-100>, "lease_ref": <string> },
+  "general_liability_must_be_occurrence_basis": { "value": <boolean or null>, "confidence": <0-100>, "lease_ref": <string> },
 
-  "extractionNotes": "Any important notes about the extraction, edge cases, or ambiguities found",
-  "referencesExternalDocuments": <true/false>,
-  "externalDocumentReferences": ["Description of referenced external document, e.g., 'Exhibit C referenced but not included'"]
-}
+  "auto_liability": { "value": <integer or null>, "confidence": <0-100>, "lease_ref": <string> },
+  "auto_liability_includes_hired_non_owned": { "value": <boolean or null>, "confidence": <0-100>, "lease_ref": <string> },
 
-CRITICAL RULES:
-1. Dollar amounts MUST be plain integers (1000000 not "$1,000,000")
-2. Dates MUST be in YYYY-MM-DD format
-3. If a requirement is NOT mentioned at all, set value to null and confidence to 0
-4. If a requirement section exists but the specific limit is not stated, set the limit to null with a note in extractionNotes, and set confidence based on how certain you are it's missing vs you just couldn't find it
-5. For "Additional Insured", look for language like "Landlord shall be named as additional insured" or "add as additional insured on all policies"
-6. For "Waiver of Subrogation", look for mutual or one-way waiver clauses
-7. If the document references another document for insurance requirements (e.g., "per Exhibit C" but Exhibit C is not included), set referencesExternalDocuments to true and describe what's missing
-8. Commercial leases typically require GL minimums of $1M-$2M per occurrence — if you find amounts significantly different, double-check
-9. Include ALL coverage types found, even uncommon ones, in the customCoverages array
-10. Pay special attention to whether Workers' Comp is explicitly required or exempted
+  "workers_comp_required": { "value": <boolean or null>, "confidence": <0-100>, "lease_ref": <string> },
+  "employers_liability": { "value": <integer or null>, "confidence": <0-100>, "lease_ref": <string> },
 
-Return ONLY the JSON object, no other text.`
+  "umbrella_liability": { "value": <integer or null>, "confidence": <0-100>, "lease_ref": <string> },
+
+  "property_insurance_required": { "value": <boolean or null>, "confidence": <0-100>, "lease_ref": <string> },
+  "property_insurance_type": { "value": <"replacement_cost" | "specific_amount" | null>, "confidence": <0-100>, "lease_ref": <string> },
+  "property_insurance_amount": { "value": <integer or null>, "confidence": <0-100>, "lease_ref": <string> },
+  "property_coverage_includes_tenant_improvements": { "value": <boolean or null>, "confidence": <0-100>, "lease_ref": <string> },
+
+  "business_interruption_required": { "value": <boolean or null>, "confidence": <0-100>, "lease_ref": <string> },
+  "business_interruption_minimum": { "value": <string or null>, "confidence": <0-100>, "lease_ref": <string> },
+
+  "professional_liability": { "value": <integer or null>, "confidence": <0-100>, "lease_ref": <string> },
+  "liquor_liability": { "value": <integer or null>, "confidence": <0-100>, "lease_ref": <string> },
+  "pollution_liability": { "value": <integer or null>, "confidence": <0-100>, "lease_ref": <string> },
+  "cyber_liability": { "value": <integer or null>, "confidence": <0-100>, "lease_ref": <string> },
+  "product_liability": { "value": <integer or null>, "confidence": <0-100>, "lease_ref": <string> },
+
+  "additional_insured_required": { "value": <boolean or null>, "confidence": <0-100>, "lease_ref": <string> },
+  "additional_insured_entities": { "value": <string[] or null>, "confidence": <0-100>, "lease_ref": <string> },
+  "waiver_of_subrogation_required": { "value": <boolean or null>, "confidence": <0-100>, "lease_ref": <string> },
+  "loss_payee_required": { "value": <boolean or null>, "confidence": <0-100>, "lease_ref": <string> },
+  "loss_payee_entities": { "value": <string[] or null>, "confidence": <0-100>, "lease_ref": <string> },
+  "certificate_holder_name": { "value": <string or null>, "confidence": <0-100>, "lease_ref": <string> },
+  "certificate_holder_address": { "value": <string or null>, "confidence": <0-100>, "lease_ref": <string> },
+
+  "insurer_rating_minimum": { "value": <string or null>, "confidence": <0-100>, "lease_ref": <string> },
+  "cancellation_notice_days": { "value": <integer or null>, "confidence": <0-100>, "lease_ref": <string> },
+  "renewal_proof_days_before_expiry": { "value": <integer or null>, "confidence": <0-100>, "lease_ref": <string> },
+
+  "extraction_notes": <string>,
+  "references_external_documents": <boolean>,
+  "external_document_references": <string[]>
+}`
           }
         ]
       }]

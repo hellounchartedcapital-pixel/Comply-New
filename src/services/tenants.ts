@@ -71,11 +71,9 @@ export async function fetchTenant(id: string): Promise<Tenant> {
 export async function createTenant(tenant: {
   name: string;
   property_id?: string;
-  unit?: string;
   email?: string;
   phone?: string;
-  lease_start?: string;
-  lease_end?: string;
+  tenant_type?: string;
 }): Promise<Tenant> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');

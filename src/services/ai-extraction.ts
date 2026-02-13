@@ -189,11 +189,49 @@ export async function extractLeaseRequirements(file: File): Promise<LeaseExtract
 }
 
 function mapRawToLeaseResult(raw: any): LeaseExtractionResult {
+  // The new universal schema uses snake_case flat fields
+  // Each field is { value, confidence, lease_ref }
+  const f = (key: string) => raw[key] ?? undefined;
+
+  // Build the extracted fields map (universal schema)
+  const extracted: LeaseExtractionResult['extracted'] = {
+    general_liability_per_occurrence: f('general_liability_per_occurrence'),
+    general_liability_aggregate: f('general_liability_aggregate'),
+    general_liability_must_be_occurrence_basis: f('general_liability_must_be_occurrence_basis'),
+    auto_liability: f('auto_liability'),
+    auto_liability_includes_hired_non_owned: f('auto_liability_includes_hired_non_owned'),
+    workers_comp_required: f('workers_comp_required'),
+    employers_liability: f('employers_liability'),
+    umbrella_liability: f('umbrella_liability'),
+    property_insurance_required: f('property_insurance_required'),
+    property_insurance_type: f('property_insurance_type'),
+    property_insurance_amount: f('property_insurance_amount'),
+    property_coverage_includes_tenant_improvements: f('property_coverage_includes_tenant_improvements'),
+    business_interruption_required: f('business_interruption_required'),
+    business_interruption_minimum: f('business_interruption_minimum'),
+    professional_liability: f('professional_liability'),
+    liquor_liability: f('liquor_liability'),
+    pollution_liability: f('pollution_liability'),
+    cyber_liability: f('cyber_liability'),
+    product_liability: f('product_liability'),
+    additional_insured_required: f('additional_insured_required'),
+    additional_insured_entities: f('additional_insured_entities'),
+    waiver_of_subrogation_required: f('waiver_of_subrogation_required'),
+    loss_payee_required: f('loss_payee_required'),
+    loss_payee_entities: f('loss_payee_entities'),
+    certificate_holder_name: f('certificate_holder_name'),
+    certificate_holder_address: f('certificate_holder_address'),
+    insurer_rating_minimum: f('insurer_rating_minimum'),
+    cancellation_notice_days: f('cancellation_notice_days'),
+    renewal_proof_days_before_expiry: f('renewal_proof_days_before_expiry'),
+  };
+
+  // Also build a legacy RequirementProfile for backwards compat with the review form
   const reqs: LeaseExtractionResult['requirements'] = {};
 
-  function toCoverage(
-    occ: { value?: number | null; confidence?: number; leaseRef?: string } | undefined,
-    agg: { value?: number | null; confidence?: number; leaseRef?: string } | undefined,
+  function covReq(
+    occ: { value?: number | null; confidence?: number; lease_ref?: string } | undefined,
+    agg: { value?: number | null; confidence?: number; lease_ref?: string } | undefined,
     opts?: { is_statutory?: boolean }
   ): CoverageRequirement | undefined {
     if (!occ?.value && !agg?.value && !opts?.is_statutory) return undefined;
@@ -204,62 +242,117 @@ function mapRawToLeaseResult(raw: any): LeaseExtractionResult {
       required: true,
       source: 'lease_extracted',
       confidence_score: occ?.confidence ?? agg?.confidence ?? 0,
-      source_reference: occ?.leaseRef ?? agg?.leaseRef,
+      source_reference: occ?.lease_ref ?? agg?.lease_ref,
     };
   }
 
-  const r = raw.requirements ?? {};
-
-  const gl = toCoverage(r.glOccurrenceLimit, r.glAggregateLimit);
+  const gl = covReq(raw.general_liability_per_occurrence, raw.general_liability_aggregate);
   if (gl) reqs.general_liability = gl;
 
-  const auto = toCoverage(r.commercialAutoCsl, undefined);
+  const auto = covReq(raw.auto_liability, undefined);
   if (auto) reqs.automobile_liability = auto;
 
-  const wc = toCoverage(r.workersCompEmployersLiabilityLimit, undefined, {
-    is_statutory: r.workersCompStatutory?.value === true,
-  });
-  if (wc || r.workersCompStatutory?.value === true) {
+  const wcStatutory = raw.workers_comp_required?.value === true;
+  const wc = covReq(raw.employers_liability, undefined, { is_statutory: wcStatutory });
+  if (wc || wcStatutory) {
     reqs.workers_compensation = wc ?? {
       required: true,
       is_statutory: true,
       source: 'lease_extracted',
-      confidence_score: r.workersCompStatutory?.confidence ?? 0,
-      source_reference: r.workersCompStatutory?.leaseRef,
+      confidence_score: raw.workers_comp_required?.confidence ?? 0,
+      source_reference: raw.workers_comp_required?.lease_ref,
     };
   }
 
-  const umbrella = toCoverage(r.umbrellaLimit, undefined);
+  const umbrella = covReq(raw.umbrella_liability, undefined);
   if (umbrella) reqs.umbrella_excess = umbrella;
 
-  const prof = toCoverage(r.professionalLiabilityLimit, undefined);
+  const prof = covReq(raw.professional_liability, undefined);
   if (prof) reqs.professional_liability = prof;
 
-  const prop = toCoverage(r.propertyContentsLimit, undefined);
-  if (prop) reqs.property_insurance = prop;
+  const prop = covReq(raw.property_insurance_amount, undefined);
+  if (prop || raw.property_insurance_required?.value === true) {
+    reqs.property_insurance = prop ?? {
+      required: true,
+      source: 'lease_extracted',
+      confidence_score: raw.property_insurance_required?.confidence ?? 0,
+      source_reference: raw.property_insurance_required?.lease_ref,
+    };
+  }
 
-  if (r.businessInterruptionRequired?.value === true) {
+  if (raw.business_interruption_required?.value === true) {
     reqs.business_interruption = {
       required: true,
       source: 'lease_extracted',
-      confidence_score: r.businessInterruptionRequired?.confidence ?? 0,
-      source_reference: r.businessInterruptionRequired?.leaseRef,
+      confidence_score: raw.business_interruption_required?.confidence ?? 0,
+      source_reference: raw.business_interruption_required?.lease_ref,
+    };
+  }
+
+  // Endorsements
+  if (raw.additional_insured_required?.value === true) {
+    reqs.additional_insured = {
+      required: true,
+      entities: raw.additional_insured_entities?.value ?? [],
+      source: 'lease_extracted',
+      confidence_score: raw.additional_insured_required?.confidence ?? 0,
+      source_reference: raw.additional_insured_required?.lease_ref,
+    };
+  }
+
+  if (raw.waiver_of_subrogation_required?.value === true) {
+    reqs.waiver_of_subrogation = {
+      required: true,
+      source: 'lease_extracted',
+      confidence_score: raw.waiver_of_subrogation_required?.confidence ?? 0,
+      source_reference: raw.waiver_of_subrogation_required?.lease_ref,
+    };
+  }
+
+  if (raw.loss_payee_required?.value === true) {
+    reqs.loss_payee = {
+      required: true,
+      entities: raw.loss_payee_entities?.value ?? [],
+      source: 'lease_extracted',
+      confidence_score: raw.loss_payee_required?.confidence ?? 0,
+      source_reference: raw.loss_payee_required?.lease_ref,
+    };
+  }
+
+  if (raw.certificate_holder_name?.value) {
+    reqs.certificate_holder = {
+      required: true,
+      name: raw.certificate_holder_name.value,
+      address: raw.certificate_holder_address?.value,
+      source: 'lease_extracted',
+      confidence_score: raw.certificate_holder_name?.confidence ?? 0,
+      source_reference: raw.certificate_holder_name?.lease_ref,
+    };
+  }
+
+  if (raw.cancellation_notice_days?.value) {
+    reqs.notice_of_cancellation_days = {
+      value: raw.cancellation_notice_days.value,
+      source: 'lease_extracted',
+      confidence_score: raw.cancellation_notice_days?.confidence ?? 0,
+      source_reference: raw.cancellation_notice_days?.lease_ref,
     };
   }
 
   return {
     success: true,
-    document_type: raw.documentType,
-    document_type_confidence: raw.documentTypeConfidence,
-    tenant_name: raw.tenantName?.value ?? undefined,
-    property_address: raw.propertyAddress?.value ?? undefined,
-    suite_unit: raw.suiteUnit?.value ?? undefined,
-    lease_start: raw.leaseStartDate?.value ?? undefined,
-    lease_end: raw.leaseEndDate?.value ?? undefined,
+    document_type: raw.document_type,
+    document_type_confidence: raw.document_type_confidence,
+    tenant_name: raw.tenant_name?.value ?? undefined,
+    property_address: raw.property_address?.value ?? undefined,
+    premises_description: raw.premises_description?.value ?? undefined,
+    lease_start: raw.lease_start_date?.value ?? undefined,
+    lease_end: raw.lease_end_date?.value ?? undefined,
+    extracted,
     requirements: reqs,
-    extraction_notes: raw.extractionNotes,
-    references_external_docs: raw.referencesExternalDocuments,
-    external_doc_references: raw.externalDocumentReferences,
+    extraction_notes: raw.extraction_notes,
+    references_external_docs: raw.references_external_documents,
+    external_doc_references: raw.external_document_references,
   };
 }
 

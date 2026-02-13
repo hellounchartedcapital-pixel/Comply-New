@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Building2, Plus, MapPin, Users } from 'lucide-react';
+import { Building2, Plus, MapPin, Users, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -25,19 +25,41 @@ export default function Properties() {
   const [newAddress, setNewAddress] = useState('');
   const [newOwnershipEntity, setNewOwnershipEntity] = useState('');
 
+  // Insurance identity fields
+  const [aiEntities, setAiEntities] = useState<string[]>(['']);
+  const [certHolderName, setCertHolderName] = useState('');
+  const [certHolderAddr1, setCertHolderAddr1] = useState('');
+  const [certHolderAddr2, setCertHolderAddr2] = useState('');
+  const [certHolderCity, setCertHolderCity] = useState('');
+  const [certHolderState, setCertHolderState] = useState('');
+  const [certHolderZip, setCertHolderZip] = useState('');
+  const [lossPayeeEntities, setLossPayeeEntities] = useState<string[]>(['']);
+
   const { data: properties, isLoading } = useQuery({
     queryKey: ['properties'],
     queryFn: fetchProperties,
   });
+
+  const resetForm = () => {
+    setNewName('');
+    setNewAddress('');
+    setNewOwnershipEntity('');
+    setAiEntities(['']);
+    setCertHolderName('');
+    setCertHolderAddr1('');
+    setCertHolderAddr2('');
+    setCertHolderCity('');
+    setCertHolderState('');
+    setCertHolderZip('');
+    setLossPayeeEntities(['']);
+  };
 
   const createMutation = useMutation({
     mutationFn: createProperty,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['properties'] });
       setShowAddDialog(false);
-      setNewName('');
-      setNewAddress('');
-      setNewOwnershipEntity('');
+      resetForm();
       toast.success('Property created successfully');
     },
     onError: (error) => {
@@ -140,14 +162,26 @@ export default function Properties() {
       )}
 
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Add Property</DialogTitle>
           </DialogHeader>
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              createMutation.mutate({ name: newName, address: newAddress || undefined, ownership_entity: newOwnershipEntity || undefined });
+              createMutation.mutate({
+                name: newName,
+                address: newAddress || undefined,
+                ownership_entity: newOwnershipEntity || undefined,
+                additional_insured_entities: aiEntities.filter(Boolean),
+                certificate_holder_name: certHolderName || undefined,
+                certificate_holder_address_line1: certHolderAddr1 || undefined,
+                certificate_holder_address_line2: certHolderAddr2 || undefined,
+                certificate_holder_city: certHolderCity || undefined,
+                certificate_holder_state: certHolderState || undefined,
+                certificate_holder_zip: certHolderZip || undefined,
+                loss_payee_entities: lossPayeeEntities.filter(Boolean),
+              });
             }}
             className="space-y-4"
           >
@@ -182,6 +216,137 @@ export default function Properties() {
                 The legal entity that owns this property
               </p>
             </div>
+
+            {/* Insurance Identity Section */}
+            <div className="border-t pt-4 space-y-4">
+              <div>
+                <h4 className="text-sm font-semibold">Insurance Identity</h4>
+                <p className="text-xs text-muted-foreground">
+                  These names appear on all COIs for this property
+                </p>
+              </div>
+
+              {/* Additional Insured Names */}
+              <div className="space-y-2">
+                <Label>Additional Insured Names</Label>
+                {aiEntities.map((entity, idx) => (
+                  <div key={idx} className="flex gap-2">
+                    <Input
+                      value={entity}
+                      onChange={(e) => {
+                        const updated = [...aiEntities];
+                        updated[idx] = e.target.value;
+                        setAiEntities(updated);
+                      }}
+                      placeholder={idx === 0 ? 'e.g., Sunset Holdings LLC' : 'Additional entity...'}
+                      className="flex-1"
+                    />
+                    {aiEntities.length > 1 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-9 w-9 shrink-0 text-destructive hover:text-destructive"
+                        onClick={() => setAiEntities(aiEntities.filter((_, i) => i !== idx))}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setAiEntities([...aiEntities, ''])}
+                >
+                  <Plus className="mr-1.5 h-3.5 w-3.5" />
+                  Add Entity
+                </Button>
+              </div>
+
+              {/* Certificate Holder */}
+              <div className="space-y-2">
+                <Label>Certificate Holder</Label>
+                <Input
+                  value={certHolderName}
+                  onChange={(e) => setCertHolderName(e.target.value)}
+                  placeholder="Certificate holder name"
+                />
+                <Input
+                  value={certHolderAddr1}
+                  onChange={(e) => setCertHolderAddr1(e.target.value)}
+                  placeholder="Address line 1"
+                />
+                <Input
+                  value={certHolderAddr2}
+                  onChange={(e) => setCertHolderAddr2(e.target.value)}
+                  placeholder="Address line 2 (optional)"
+                />
+                <div className="grid grid-cols-6 gap-2">
+                  <Input
+                    className="col-span-3"
+                    value={certHolderCity}
+                    onChange={(e) => setCertHolderCity(e.target.value)}
+                    placeholder="City"
+                  />
+                  <Input
+                    className="col-span-1"
+                    value={certHolderState}
+                    onChange={(e) => setCertHolderState(e.target.value)}
+                    placeholder="State"
+                    maxLength={2}
+                  />
+                  <Input
+                    className="col-span-2"
+                    value={certHolderZip}
+                    onChange={(e) => setCertHolderZip(e.target.value)}
+                    placeholder="ZIP"
+                    maxLength={10}
+                  />
+                </div>
+              </div>
+
+              {/* Loss Payee */}
+              <div className="space-y-2">
+                <Label>Loss Payee <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                {lossPayeeEntities.map((entity, idx) => (
+                  <div key={idx} className="flex gap-2">
+                    <Input
+                      value={entity}
+                      onChange={(e) => {
+                        const updated = [...lossPayeeEntities];
+                        updated[idx] = e.target.value;
+                        setLossPayeeEntities(updated);
+                      }}
+                      placeholder="Loss payee entity name"
+                      className="flex-1"
+                    />
+                    {lossPayeeEntities.length > 1 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-9 w-9 shrink-0 text-destructive hover:text-destructive"
+                        onClick={() => setLossPayeeEntities(lossPayeeEntities.filter((_, i) => i !== idx))}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setLossPayeeEntities([...lossPayeeEntities, ''])}
+                >
+                  <Plus className="mr-1.5 h-3.5 w-3.5" />
+                  Add Loss Payee
+                </Button>
+              </div>
+            </div>
+
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setShowAddDialog(false)}>
                 Cancel

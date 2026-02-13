@@ -52,7 +52,19 @@ export async function fetchProperty(id: string): Promise<Property> {
   return data as Property;
 }
 
-export async function createProperty(property: { name: string; address?: string; ownership_entity?: string }): Promise<Property> {
+export async function createProperty(property: {
+  name: string;
+  address?: string;
+  ownership_entity?: string;
+  additional_insured_entities?: string[];
+  certificate_holder_name?: string;
+  certificate_holder_address_line1?: string;
+  certificate_holder_address_line2?: string;
+  certificate_holder_city?: string;
+  certificate_holder_state?: string;
+  certificate_holder_zip?: string;
+  loss_payee_entities?: string[];
+}): Promise<Property> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
 
@@ -63,6 +75,14 @@ export async function createProperty(property: { name: string; address?: string;
       name: property.name,
       address: property.address,
       company_name: property.ownership_entity,
+      additional_insured_entities: property.additional_insured_entities?.filter(Boolean) ?? [],
+      certificate_holder_name: property.certificate_holder_name || undefined,
+      certificate_holder_address_line1: property.certificate_holder_address_line1 || undefined,
+      certificate_holder_address_line2: property.certificate_holder_address_line2 || undefined,
+      certificate_holder_city: property.certificate_holder_city || undefined,
+      certificate_holder_state: property.certificate_holder_state || undefined,
+      certificate_holder_zip: property.certificate_holder_zip || undefined,
+      loss_payee_entities: property.loss_payee_entities?.filter(Boolean) ?? [],
     })
     .select()
     .single();

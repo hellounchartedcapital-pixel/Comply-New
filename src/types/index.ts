@@ -6,8 +6,8 @@ export type EntityType = 'vendor' | 'tenant';
 
 export type ComplianceStatus = 'compliant' | 'non-compliant' | 'expiring' | 'expired';
 export type TenantStatus = 'active' | 'pending' | 'moved_out' | 'evicted';
-export type RequirementSource = 'building_default' | 'lease_extracted' | 'coi_prefill' | 'manual';
-export type ProfileCreationMethod = 'building_default' | 'lease_extracted' | 'coi_prefill' | 'manual';
+export type RequirementSource = 'building_default' | 'lease_extracted' | 'coi_prefill' | 'manual' | 'property' | 'template_office' | 'template_retail' | 'template_restaurant' | 'template_industrial' | 'template_medical' | 'template_fitness';
+export type ProfileCreationMethod = 'building_default' | 'lease_extracted' | 'coi_prefill' | 'manual' | 'template_office' | 'template_retail' | 'template_restaurant' | 'template_industrial' | 'template_medical' | 'template_fitness';
 
 // ============================================
 // COVERAGE & REQUIREMENT TYPES
@@ -148,6 +148,16 @@ export interface Property {
   name: string;
   address?: string;
   ownership_entity?: string;
+  // Property-level insurance identity
+  additional_insured_entities?: string[];
+  certificate_holder_name?: string;
+  certificate_holder_address_line1?: string;
+  certificate_holder_address_line2?: string;
+  certificate_holder_city?: string;
+  certificate_holder_state?: string;
+  certificate_holder_zip?: string;
+  loss_payee_entities?: string[];
+  // Computed
   vendor_count?: number;
   tenant_count?: number;
   compliance_percentage?: number;
@@ -194,6 +204,7 @@ export interface Tenant {
   insurance_status: ComplianceStatus;
   property_id?: string;
   property?: Property;
+  tenant_type?: string;
   unit?: string;
   expiration_date?: string;
   lease_start?: string;
@@ -242,20 +253,66 @@ export interface COIExtractionResult {
   error?: string;
 }
 
+/** A single extracted field with confidence and lease reference */
+export interface ExtractedField<T> {
+  value: T | null;
+  confidence: number;
+  lease_ref?: string;
+}
+
 export interface LeaseExtractionResult {
   success: boolean;
+  error?: string;
+
   document_type?: string;
   document_type_confidence?: number;
+
+  // Lease metadata
   tenant_name?: string;
   property_address?: string;
-  suite_unit?: string;
+  premises_description?: string;
   lease_start?: string;
   lease_end?: string;
+
+  // Universal extraction schema — all the raw extracted fields
+  extracted?: {
+    general_liability_per_occurrence?: ExtractedField<number>;
+    general_liability_aggregate?: ExtractedField<number>;
+    general_liability_must_be_occurrence_basis?: ExtractedField<boolean>;
+    auto_liability?: ExtractedField<number>;
+    auto_liability_includes_hired_non_owned?: ExtractedField<boolean>;
+    workers_comp_required?: ExtractedField<boolean>;
+    employers_liability?: ExtractedField<number>;
+    umbrella_liability?: ExtractedField<number>;
+    property_insurance_required?: ExtractedField<boolean>;
+    property_insurance_type?: ExtractedField<string>;
+    property_insurance_amount?: ExtractedField<number>;
+    property_coverage_includes_tenant_improvements?: ExtractedField<boolean>;
+    business_interruption_required?: ExtractedField<boolean>;
+    business_interruption_minimum?: ExtractedField<string>;
+    professional_liability?: ExtractedField<number>;
+    liquor_liability?: ExtractedField<number>;
+    pollution_liability?: ExtractedField<number>;
+    cyber_liability?: ExtractedField<number>;
+    product_liability?: ExtractedField<number>;
+    additional_insured_required?: ExtractedField<boolean>;
+    additional_insured_entities?: ExtractedField<string[]>;
+    waiver_of_subrogation_required?: ExtractedField<boolean>;
+    loss_payee_required?: ExtractedField<boolean>;
+    loss_payee_entities?: ExtractedField<string[]>;
+    certificate_holder_name?: ExtractedField<string>;
+    certificate_holder_address?: ExtractedField<string>;
+    insurer_rating_minimum?: ExtractedField<string>;
+    cancellation_notice_days?: ExtractedField<number>;
+    renewal_proof_days_before_expiry?: ExtractedField<number>;
+  };
+
+  // Legacy compatible — still used by review form
   requirements: Partial<RequirementProfile>;
+
   extraction_notes?: string;
   references_external_docs?: boolean;
   external_doc_references?: string[];
-  error?: string;
 }
 
 // ============================================
