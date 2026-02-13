@@ -158,7 +158,7 @@ export default function BulkImport() {
         // 1. Create vendor record
         const vendor = await createVendor({
           name: entry.vendorName || 'Unknown Vendor',
-          contact_email: entry.vendorEmail || undefined,
+          email: entry.vendorEmail || undefined,
           property_id: propertyId || undefined,
         });
 

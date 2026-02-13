@@ -1,23 +1,43 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import Anthropic from 'npm:@anthropic-ai/sdk@0.52.0';
 import { getCorsHeaders, handleCorsPreflightRequest } from '../_shared/cors.ts';
 
-interface Requirements {
-  general_liability: number;
-  auto_liability: number;
-  workers_comp: string | number;
-  employers_liability: number;
-  company_name?: string;
-  require_additional_insured?: boolean;
-  require_waiver_of_subrogation?: boolean;
-  custom_coverages?: Array<{
-    type: string;
-    amount: number;
-    required: boolean;
-  }>;
+const SYSTEM_PROMPT = `You are extracting insurance data from a Certificate of Insurance (COI) PDF, typically an ACORD 25 or ACORD 28 form.
+
+Extract and return JSON with these fields:
+{
+  "insured_name": string,
+  "general_liability_per_occurrence": number or null,
+  "general_liability_aggregate": number or null,
+  "auto_liability": number or null,
+  "workers_comp_found": boolean,
+  "employers_liability": number or null,
+  "umbrella_per_occurrence": number or null,
+  "umbrella_aggregate": number or null,
+  "property_insurance": number or null,
+  "policies": [
+    {
+      "coverage_type": string,
+      "policy_number": string,
+      "carrier": string,
+      "effective_date": "YYYY-MM-DD",
+      "expiration_date": "YYYY-MM-DD"
+    }
+  ],
+  "additional_insured_names": [string],
+  "certificate_holder_name": string or null,
+  "certificate_holder_address": string or null,
+  "description_of_operations": string or null
 }
 
+Rules:
+- Dollar amounts as numbers: 1000000 not "$1,000,000"
+- Dates as YYYY-MM-DD
+- If a field is not found on the certificate, set it to null
+- For additional_insured_names, extract all entity names from the Additional Insured section or Description of Operations
+- Return ONLY valid JSON`;
+
 serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return handleCorsPreflightRequest(req);
   }
@@ -30,357 +50,106 @@ serve(async (req) => {
       throw new Error('ANTHROPIC_API_KEY not configured');
     }
 
-    const { pdfBase64, requirements, rawOnly } = await req.json();
+    const { file_base64, file_name } = await req.json();
 
-    if (!pdfBase64) {
-      throw new Error('No PDF data provided');
+    if (!file_base64) {
+      throw new Error('No file_base64 provided');
     }
 
-    const reqs: Requirements = requirements || {
-      general_liability: 1000000,
-      auto_liability: 1000000,
-      workers_comp: 'Statutory',
-      employers_liability: 500000
-    };
-
-    const anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
-
-    const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 4000,
-      messages: [{
-        role: 'user',
-        content: [
-          {
-            type: 'document',
-            source: { type: 'base64', media_type: 'application/pdf', data: pdfBase64 }
-          },
-          {
-            type: 'text',
-            text: `Extract ALL insurance coverage data from this Certificate of Insurance (likely an ACORD 25 or similar form).
-
-Read the entire document carefully and extract EVERY policy and coverage type listed, not just the common ones.
-
-ALWAYS EXTRACT:
-1. INSURED/COMPANY NAME - The business or person who holds the insurance
-2. INSURANCE COMPANY - The carrier/insurer name
-3. CERTIFICATE HOLDER - Who the certificate was issued to
-4. ADDITIONAL INSURED - Check Description of Operations section
-5. WAIVER OF SUBROGATION - Check Description of Operations section
-
-STANDARD COVERAGES (extract if present on the certificate):
-
-GENERAL LIABILITY (ACORD 25 Section):
-  The GL section on an ACORD 25 form has MULTIPLE sub-fields. You MUST distinguish between them:
-  - "EACH OCCURRENCE" → This is the PRIMARY per-occurrence limit. Use this for the "amount" field.
-  - "GENERAL AGGREGATE" → Use this for the "aggregate" field.
-  - "DAMAGE TO RENTED PREMISES (Ea occurrence)" → This is NOT the main GL limit. Do NOT use this as "amount".
-  - "MED EXP (Any one person)" → This is NOT the main GL limit. Ignore for amount/aggregate.
-  - "PERSONAL & ADV INJURY" → This is NOT the main GL limit. Ignore for amount/aggregate.
-  - "PRODUCTS - COMP/OP AGG" → This is NOT the general aggregate. Ignore for amount/aggregate.
-  CRITICAL: ONLY use the value from the "EACH OCCURRENCE" row for generalLiability.amount.
-  If the "EACH OCCURRENCE" field is blank/empty but other sub-fields have values, set amount to null.
-
-AUTOMOBILE LIABILITY:
-  - "COMBINED SINGLE LIMIT (Ea accident)" → Use this for the "amount" field.
-
-WORKERS COMPENSATION:
-  - Usually shows "X" in the Statutory Limits box → Use "Statutory".
-
-EMPLOYERS LIABILITY:
-  - "E.L. EACH ACCIDENT" → Use this for the "amount" field.
-  - Do NOT confuse with "E.L. DISEASE - EA EMPLOYEE" or "E.L. DISEASE - POLICY LIMIT".
-
-ADDITIONAL COVERAGES (extract ANY other coverage types found, such as):
-- Umbrella/Excess Liability
-- Professional Liability / Errors & Omissions
-- Cyber Liability
-- Inland Marine
-- Property Insurance
-- Pollution Liability
-- Builders Risk
-- Crime / Fidelity Bond
-- Any other coverage type listed on the certificate
-
-Return this JSON structure:
-{
-  "companyName": "insured company name",
-  "expirationDate": "YYYY-MM-DD (earliest expiration across all policies)",
-  "generalLiability": {
-    "amount": <EACH OCCURRENCE limit as integer, or null if that specific field is blank/empty>,
-    "aggregate": <GENERAL AGGREGATE as integer, or null if blank>,
-    "expirationDate": "YYYY-MM-DD"
-  },
-  "autoLiability": {
-    "amount": <COMBINED SINGLE LIMIT as integer, or null if blank>,
-    "expirationDate": "YYYY-MM-DD"
-  },
-  "workersComp": {
-    "amount": "Statutory",
-    "expirationDate": "YYYY-MM-DD"
-  },
-  "employersLiability": {
-    "amount": <E.L. EACH ACCIDENT amount as integer, or null if blank>,
-    "expirationDate": "YYYY-MM-DD"
-  },
-  "additionalCoverages": [
-    {
-      "type": "coverage type name (e.g. Umbrella Liability)",
-      "amount": <limit as integer>,
-      "aggregate": <aggregate limit as integer if listed, otherwise null>,
-      "expirationDate": "YYYY-MM-DD"
-    }
-  ],
-  "insuranceCompany": "carrier name",
-  "additionalInsured": "yes or no",
-  "certificateHolder": "name from certificate holder section",
-  "waiverOfSubrogation": "yes or no"
-}
-
-IMPORTANT RULES:
-- Include ALL coverage types found on the certificate
-- If a standard coverage section exists on the form but its PRIMARY dollar amount field is BLANK or EMPTY, set the ENTIRE coverage object to null — do NOT use values from other sub-fields
-- If a standard coverage is NOT on the certificate at all, set it to null
-- Put any non-standard coverages in the "additionalCoverages" array
-- If no additional coverages exist, return an empty array []
-- ONLY report dollar amounts that are EXPLICITLY printed with a number on the document
-- Do NOT confuse sub-fields within a section (e.g., "Damage to Rented Premises" is NOT "Each Occurrence")
-- If you are unsure whether a value belongs to a specific field, set it to null rather than guessing
-
-COMMON MISTAKE TO AVOID:
-On ACORD 25 forms, the GL section often has "$1,000,000" next to "DAMAGE TO RENTED PREMISES (Ea occurrence)" while the "EACH OCCURRENCE" line is BLANK. In this case, generalLiability MUST be null because "Damage to Rented Premises" is a DIFFERENT coverage — it is NOT the general liability per-occurrence limit. Similarly, "PERSONAL & ADV INJURY" showing $1,000,000 does NOT mean general liability is $1,000,000. ONLY report the value that is specifically on the "EACH OCCURRENCE" line.
-
-NUMBER FORMAT: Convert dollar amounts to plain integers.
-- $1,000,000 → 1000000
-- $2,000,000 → 2000000
-- $500,000 → 500000
-
-DATE FORMAT: Convert to YYYY-MM-DD (e.g., 01/15/2025 → 2025-01-15)
-
-Return ONLY the JSON object, no other text.`
-          }
-        ]
-      }]
-    });
-
-    const responseText = message.content[0].type === 'text' ? message.content[0].text : '';
-    console.log('Claude response:', responseText);
-
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-
-    if (!jsonMatch) {
-      throw new Error('Could not extract JSON from AI response');
+    if (!file_name) {
+      throw new Error('No file_name provided');
     }
 
-    const extractedData = JSON.parse(jsonMatch[0]);
-    console.log('Extracted data:', JSON.stringify(extractedData));
+    console.log(`Processing COI extraction for file: ${file_name}`);
 
-    // If rawOnly flag is set, return just the AI extraction without compliance processing
-    if (rawOnly) {
+    // Send to Claude API with the PDF as a document
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60000);
+
+    try {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 4096,
+          messages: [{
+            role: 'user',
+            content: [
+              {
+                type: 'document',
+                source: {
+                  type: 'base64',
+                  media_type: 'application/pdf',
+                  data: file_base64,
+                },
+              },
+              {
+                type: 'text',
+                text: 'Extract all insurance data from this COI.',
+              },
+            ],
+          }],
+          system: SYSTEM_PROMPT,
+        }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorBody = await response.text();
+        console.error('Claude API error:', response.status, errorBody);
+        throw new Error(`Claude API returned status ${response.status}: ${errorBody}`);
+      }
+
+      const messageResponse = await response.json();
+
+      // Extract text content from Claude's response
+      const responseText = messageResponse.content?.[0]?.type === 'text'
+        ? messageResponse.content[0].text
+        : '';
+
+      console.log('Claude response received, parsing JSON...');
+
+      // Parse JSON from the response
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error('Could not extract JSON from AI response');
+      }
+
+      const extractedData = JSON.parse(jsonMatch[0]);
+      console.log('Successfully extracted COI data for:', extractedData.insured_name);
+
       return new Response(
-        JSON.stringify({ success: true, data: extractedData, raw: true }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+        JSON.stringify({ success: true, data: extractedData }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        },
       );
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      if (fetchError.name === 'AbortError') {
+        throw new Error('Claude API request timed out after 60 seconds');
+      }
+      throw fetchError;
     }
-
-    const vendorData = buildVendorData(extractedData, reqs);
-
-    return new Response(
-      JSON.stringify({ success: true, data: vendorData }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
-    );
-
   } catch (error) {
-    console.error('Extraction error:', error);
+    console.error('COI extraction error:', error);
     return new Response(
-      JSON.stringify({ success: false, error: error.message || 'Failed to extract data from PDF' }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      JSON.stringify({
+        success: false,
+        error: error.message || 'Failed to extract data from COI PDF',
+      }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
+      },
     );
   }
 });
-
-function buildVendorData(extractedData: any, requirements: Requirements) {
-  // Build coverage object - only include coverages that were actually found on the COI
-  const coverage: any = {};
-
-  // General Liability
-  // The AI may return generalLiability as an object with amount: null when the
-  // "Each Occurrence" field is blank. We must check amount specifically, not just
-  // the existence of the object. A GL section can exist on the form (with sub-fields
-  // like Damage to Rented Premises) while the primary Each Occurrence field is blank.
-  if (extractedData.generalLiability && extractedData.generalLiability.amount != null && extractedData.generalLiability.amount !== 0) {
-    const glAmount = extractedData.generalLiability.amount;
-    const glAggregate = extractedData.generalLiability.aggregate || (glAmount * 2);
-    coverage.generalLiability = {
-      amount: glAmount,
-      aggregate: glAggregate,
-      expirationDate: extractedData.generalLiability.expirationDate,
-      compliant: glAmount >= requirements.general_liability
-    };
-  } else {
-    // GL not found on COI or amount is null/0 - mark as not found
-    coverage.generalLiability = {
-      amount: 0,
-      aggregate: 0,
-      expirationDate: extractedData.generalLiability?.expirationDate || null,
-      compliant: requirements.general_liability <= 0,
-      notFound: true
-    };
-  }
-
-  // Auto Liability
-  if (extractedData.autoLiability && extractedData.autoLiability.amount != null && extractedData.autoLiability.amount !== 0) {
-    coverage.autoLiability = {
-      amount: extractedData.autoLiability.amount,
-      expirationDate: extractedData.autoLiability.expirationDate,
-      compliant: extractedData.autoLiability.amount >= requirements.auto_liability
-    };
-  } else {
-    coverage.autoLiability = {
-      amount: 0,
-      expirationDate: extractedData.autoLiability?.expirationDate || null,
-      compliant: requirements.auto_liability <= 0,
-      notFound: true
-    };
-  }
-
-  // Workers Comp
-  if (extractedData.workersComp) {
-    coverage.workersComp = {
-      amount: extractedData.workersComp.amount || 'Statutory',
-      expirationDate: extractedData.workersComp.expirationDate,
-      compliant: true
-    };
-  } else {
-    coverage.workersComp = {
-      amount: null,
-      expirationDate: null,
-      compliant: true,
-      notFound: true
-    };
-  }
-
-  // Employers Liability
-  if (extractedData.employersLiability && extractedData.employersLiability.amount != null && extractedData.employersLiability.amount !== 0) {
-    coverage.employersLiability = {
-      amount: extractedData.employersLiability.amount,
-      expirationDate: extractedData.employersLiability.expirationDate,
-      compliant: extractedData.employersLiability.amount >= requirements.employers_liability
-    };
-  } else {
-    coverage.employersLiability = {
-      amount: 0,
-      expirationDate: extractedData.employersLiability?.expirationDate || null,
-      compliant: requirements.employers_liability <= 0,
-      notFound: true
-    };
-  }
-
-  // Process additional coverages extracted from the COI
-  const additionalCoverages = (extractedData.additionalCoverages || []).map((cov: any) => ({
-    type: cov.type || 'Unknown Coverage',
-    amount: cov.amount || 0,
-    aggregate: cov.aggregate || null,
-    expirationDate: cov.expirationDate || null
-  }));
-
-  const vendorData: any = {
-    name: extractedData.companyName || 'Unknown Company',
-    expirationDate: extractedData.expirationDate || new Date().toISOString().split('T')[0],
-    coverage: coverage,
-    additionalCoverages: additionalCoverages,
-    rawData: extractedData,
-    requirements: requirements,
-    additionalInsured: extractedData.additionalInsured || 'no',
-    hasAdditionalInsured: (extractedData.additionalInsured || '').toLowerCase() === 'yes',
-    hasWaiverOfSubrogation: (extractedData.waiverOfSubrogation || '').toLowerCase() === 'yes',
-    certificateHolder: extractedData.certificateHolder || '',
-    waiverOfSubrogation: extractedData.waiverOfSubrogation || '',
-    insuranceCompany: extractedData.insuranceCompany || ''
-  };
-
-  const issues: any[] = [];
-  const today = new Date();
-  const expirationDate = new Date(vendorData.expirationDate);
-  const daysUntilExpiration = Math.floor((expirationDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-
-  if (daysUntilExpiration < 0) {
-    vendorData.status = 'expired';
-    issues.push({ type: 'critical', message: `Policy expired on ${vendorData.expirationDate}` });
-  } else if (daysUntilExpiration <= 30) {
-    vendorData.status = 'expiring';
-    issues.push({ type: 'warning', message: `Policy expiring in ${daysUntilExpiration} days` });
-  } else {
-    vendorData.status = 'compliant';
-  }
-
-  // Check standard coverage compliance
-  if (!coverage.generalLiability.compliant) {
-    if (vendorData.status === 'compliant') vendorData.status = 'non-compliant';
-    if (coverage.generalLiability.notFound) {
-      issues.push({ type: 'error', message: `General Liability not found on certificate (required $${(requirements.general_liability/1000000).toFixed(1)}M)` });
-    } else {
-      issues.push({ type: 'error', message: `General Liability $${(coverage.generalLiability.amount/1000000).toFixed(1)}M below required $${(requirements.general_liability/1000000).toFixed(1)}M` });
-    }
-  }
-
-  if (!coverage.autoLiability.compliant) {
-    if (vendorData.status === 'compliant') vendorData.status = 'non-compliant';
-    if (coverage.autoLiability.notFound) {
-      issues.push({ type: 'error', message: `Auto Liability not found on certificate (required $${(requirements.auto_liability/1000000).toFixed(1)}M)` });
-    } else {
-      issues.push({ type: 'error', message: `Auto Liability $${(coverage.autoLiability.amount/1000000).toFixed(1)}M below required $${(requirements.auto_liability/1000000).toFixed(1)}M` });
-    }
-  }
-
-  if (!coverage.employersLiability.compliant) {
-    if (vendorData.status === 'compliant') vendorData.status = 'non-compliant';
-    if (coverage.employersLiability.notFound) {
-      issues.push({ type: 'error', message: `Employers Liability not found on certificate (required $${(requirements.employers_liability/1000).toFixed(0)}K)` });
-    } else {
-      issues.push({ type: 'error', message: `Employers Liability $${(coverage.employersLiability.amount/1000).toFixed(0)}K below required $${(requirements.employers_liability/1000).toFixed(0)}K` });
-    }
-  }
-
-  // Check custom coverage requirements against extracted additional coverages
-  if (requirements.custom_coverages && requirements.custom_coverages.length > 0) {
-    requirements.custom_coverages.forEach((requiredCoverage: any) => {
-      if (!requiredCoverage.required) return;
-
-      const foundCoverage = additionalCoverages.find(
-        (cov: any) => cov.type && cov.type.toLowerCase().includes(requiredCoverage.type.toLowerCase())
-      );
-
-      if (!foundCoverage) {
-        if (vendorData.status === 'compliant') vendorData.status = 'non-compliant';
-        issues.push({ type: 'error', message: `Missing required coverage: ${requiredCoverage.type}` });
-      } else if (foundCoverage.amount < requiredCoverage.amount) {
-        if (vendorData.status === 'compliant') vendorData.status = 'non-compliant';
-        issues.push({ type: 'error', message: `${requiredCoverage.type} $${(foundCoverage.amount / 1000000).toFixed(1)}M below required $${(requiredCoverage.amount / 1000000).toFixed(1)}M` });
-      }
-    });
-  }
-
-  // Check waiver of subrogation requirement
-  if (requirements.require_waiver_of_subrogation) {
-    if (vendorData.hasWaiverOfSubrogation) {
-      // Already set to true above
-    } else {
-      if (vendorData.status === 'compliant') vendorData.status = 'non-compliant';
-      vendorData.missingWaiverOfSubrogation = true;
-      issues.push({ type: 'error', message: 'Waiver of Subrogation not included' });
-    }
-  }
-
-  // Check additional insured requirement
-  if (requirements.require_additional_insured) {
-    if (!vendorData.hasAdditionalInsured) {
-      if (vendorData.status === 'compliant') vendorData.status = 'non-compliant';
-      vendorData.missingAdditionalInsured = true;
-      issues.push({ type: 'error', message: 'Missing Additional Insured endorsement' });
-    }
-  }
-
-  vendorData.issues = issues;
-  return vendorData;
-}

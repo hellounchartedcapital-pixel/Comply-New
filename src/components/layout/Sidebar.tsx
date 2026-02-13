@@ -5,8 +5,6 @@ import {
   Building2,
   Truck,
   Users,
-  ClipboardCheck,
-  BarChart3,
   Settings,
   ChevronLeft,
   ChevronRight,
@@ -20,8 +18,6 @@ const navItems = [
   { path: '/properties', label: 'Properties', icon: Building2 },
   { path: '/vendors', label: 'Vendors', icon: Truck },
   { path: '/tenants', label: 'Tenants', icon: Users },
-  { path: '/requirements', label: 'Requirements', icon: ClipboardCheck },
-  { path: '/reports', label: 'Reports', icon: BarChart3 },
   { path: '/settings', label: 'Settings', icon: Settings },
 ] as const;
 

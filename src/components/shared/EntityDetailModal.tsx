@@ -35,7 +35,8 @@ import type {
   Tenant,
   ExtractedCoverage,
   ExtractedEndorsement,
-  ComplianceField,
+  ComplianceItem,
+  ComplianceStatus,
   RequirementTemplate,
   EntityType,
   Property,
@@ -62,54 +63,45 @@ interface EntityDetailModalProps {
 // SUB-COMPONENTS
 // ============================================
 
-function ComplianceFieldRow({ field }: { field: ComplianceField }) {
+function ComplianceItemRow({ item }: { item: ComplianceItem }) {
   const statusIcons = {
-    compliant: <CheckCircle2 className="h-4 w-4 text-success" />,
-    'non-compliant': <XCircle className="h-4 w-4 text-destructive" />,
+    pass: <CheckCircle2 className="h-4 w-4 text-success" />,
+    fail: <XCircle className="h-4 w-4 text-destructive" />,
+    not_found: <XCircle className="h-4 w-4 text-destructive" />,
     expiring: <AlertTriangle className="h-4 w-4 text-warning" />,
     expired: <Clock className="h-4 w-4 text-destructive" />,
-    'not-required': null,
-  };
-
-  const formatValue = (val: number | boolean | string | null) => {
-    if (val === null) return 'Missing';
-    if (typeof val === 'number') return formatCurrency(val);
-    if (typeof val === 'boolean') return val ? 'Yes' : 'No';
-    return val;
   };
 
   return (
     <div className="flex items-center justify-between rounded-lg bg-secondary/50 px-3 py-2">
       <div className="flex-1">
-        <p className="text-sm font-medium">{field.field_name}</p>
+        <p className="text-sm font-medium">{item.display_name}</p>
         <div className="flex gap-4 text-xs text-muted-foreground">
-          <span>Required: {formatValue(field.required_value)}</span>
-          <span>Found: {formatValue(field.actual_value)}</span>
+          <span>Required: {item.required}</span>
+          <span>Found: {item.actual ?? 'Missing'}</span>
         </div>
       </div>
       <div className="flex items-center gap-2">
-        {statusIcons[field.status]}
+        {statusIcons[item.status]}
         <Badge
           variant={
-            field.status === 'compliant'
+            item.status === 'pass'
               ? 'success'
-              : field.status === 'expiring'
+              : item.status === 'expiring'
                 ? 'warning'
-                : field.status === 'not-required'
-                  ? 'secondary'
-                  : 'destructive'
+                : 'destructive'
           }
           className="text-[10px]"
         >
-          {field.status === 'compliant'
+          {item.status === 'pass'
             ? 'Met'
-            : field.status === 'non-compliant'
+            : item.status === 'fail'
               ? 'Gap'
-              : field.status === 'expiring'
+              : item.status === 'expiring'
                 ? 'Expiring'
-                : field.status === 'expired'
+                : item.status === 'expired'
                   ? 'Expired'
-                  : 'N/A'}
+                  : 'Missing'}
         </Badge>
       </div>
     </div>
@@ -412,10 +404,10 @@ export function EntityDetailModal({
     entityType === 'vendor'
       ? (entity as Vendor).contact_email
       : (entity as Tenant).email;
-  const entityStatus =
+  const entityStatus: ComplianceStatus =
     entityType === 'vendor'
       ? (entity as Vendor).status
-      : (entity as Tenant).insurance_status;
+      : (((entity as Tenant).insurance_status ?? (entity as Tenant).status ?? 'pending') as ComplianceStatus);
 
   // Get certificate holder text from the entity for AI entity name verification
   const certHolderOnCoi =
@@ -428,7 +420,12 @@ export function EntityDetailModal({
     property: property ?? null,
     certificateHolder: certHolderOnCoi,
   });
-  const gaps = getComplianceGaps(compliance.fields);
+  const gaps = getComplianceGaps(compliance.items);
+
+  // Compute compliance percentage from items
+  const totalItems = compliance.items.length;
+  const passItems = compliance.items.filter(i => i.status === 'pass' || i.status === 'expiring').length;
+  const compliancePercentage = totalItems > 0 ? Math.round((passItems / totalItems) * 100) : 0;
 
   const handleRequestCOI = async () => {
     if (!entityEmail) {
@@ -551,17 +548,17 @@ export function EntityDetailModal({
                         <div className="flex-1">
                           <p className="text-sm font-medium">Overall Compliance</p>
                           <p className="text-2xl font-bold">
-                            {compliance.compliance_percentage}%
+                            {compliancePercentage}%
                           </p>
                         </div>
                         <StatusBadge status={compliance.overall_status} />
                       </div>
 
-                      {compliance.fields.length > 0 ? (
+                      {compliance.items.length > 0 ? (
                         <div className="space-y-2">
                           <p className="text-sm font-medium">Requirement Comparison</p>
-                          {compliance.fields.map((field, i) => (
-                            <ComplianceFieldRow key={i} field={field} />
+                          {compliance.items.map((item, i) => (
+                            <ComplianceItemRow key={i} item={item} />
                           ))}
                         </div>
                       ) : (
