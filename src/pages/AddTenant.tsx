@@ -144,10 +144,17 @@ export default function AddTenant() {
           result.error ?? "We couldn't extract requirements from this document. Please check that it's a valid lease or insurance exhibit and try again."
         );
       }
-    } catch {
-      setLeaseError(
-        "We couldn't extract requirements from this document. Please check that it's a valid lease or insurance exhibit and try again."
-      );
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '';
+      if (msg.includes('too large') || msg.includes('413') || msg.includes('payload')) {
+        setLeaseError(
+          'This file is too large to process. Try uploading just the insurance exhibit or requirements section instead of the full lease.'
+        );
+      } else {
+        setLeaseError(
+          msg || "We couldn't extract requirements from this document. Please check that it's a valid lease or insurance exhibit and try again."
+        );
+      }
     } finally {
       setIsExtractingLease(false);
     }

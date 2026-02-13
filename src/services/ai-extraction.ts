@@ -146,6 +146,14 @@ export async function extractLeaseRequirements(file: File): Promise<LeaseExtract
 
   const pdfBase64 = await fileToBase64(file);
 
+  // Check if payload might be too large for edge function (approx 6MB limit for Supabase)
+  const payloadSizeMB = (pdfBase64.length * 0.75) / (1024 * 1024);
+  if (payloadSizeMB > 5) {
+    throw new Error(
+      'This file is too large to process. Try uploading just the insurance exhibit or requirements section instead of the full lease.'
+    );
+  }
+
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
   const response = await fetch(`${supabaseUrl}/functions/v1/extract-lease-requirements`, {
     method: 'POST',
@@ -157,8 +165,14 @@ export async function extractLeaseRequirements(file: File): Promise<LeaseExtract
   });
 
   if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Lease extraction failed: ${errorText}`);
+    let errorDetail: string;
+    try {
+      const errJson = await response.json();
+      errorDetail = errJson.error || errJson.message || response.statusText;
+    } catch {
+      errorDetail = await response.text().catch(() => response.statusText);
+    }
+    throw new Error(errorDetail);
   }
 
   const result = await response.json();
