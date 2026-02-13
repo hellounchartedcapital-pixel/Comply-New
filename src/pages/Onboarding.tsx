@@ -41,6 +41,8 @@ export default function Onboarding() {
   // Step 2 - First Property
   const [propertyName, setPropertyName] = useState('');
   const [propertyAddress, setPropertyAddress] = useState('');
+  const [certHolderName, setCertHolderName] = useState('');
+  const [additionalInsured, setAdditionalInsured] = useState('');
 
   // Step 3 - Default Requirements
   const [glOccurrence, setGlOccurrence] = useState('');
@@ -82,6 +84,12 @@ export default function Onboarding() {
         await createProperty({
           name: propertyName.trim(),
           address: propertyAddress.trim(),
+          certificate_holder_name: certHolderName.trim() || companyName.trim() || undefined,
+          additional_insured_entities: additionalInsured.trim()
+            ? [additionalInsured.trim()]
+            : companyName.trim()
+              ? [companyName.trim()]
+              : undefined,
         });
         queryClient.invalidateQueries({ queryKey: ['properties'] });
         toast.success('Property created');
@@ -216,6 +224,39 @@ export default function Onboarding() {
                   onChange={(e) => setPropertyAddress(e.target.value)}
                   placeholder="e.g., 456 Oak Ave, Los Angeles, CA 90001"
                 />
+              </div>
+
+              <div className="border-t pt-4 mt-2 space-y-4">
+                <div>
+                  <p className="text-sm font-medium">Insurance Identity</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    These names will be verified on every COI uploaded for this property.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="onboard-cert-holder">Certificate Holder Name</Label>
+                  <Input
+                    id="onboard-cert-holder"
+                    value={certHolderName}
+                    onChange={(e) => setCertHolderName(e.target.value)}
+                    placeholder={companyName || 'e.g., Apex Property Management LLC'}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Defaults to your company name if left blank
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="onboard-ai-entity">Additional Insured Entity</Label>
+                  <Input
+                    id="onboard-ai-entity"
+                    value={additionalInsured}
+                    onChange={(e) => setAdditionalInsured(e.target.value)}
+                    placeholder={companyName || 'e.g., Apex Property Management LLC'}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    The entity name that must appear as Additional Insured on COIs. Defaults to your company name.
+                  </p>
+                </div>
               </div>
             </CardContent>
           </Card>

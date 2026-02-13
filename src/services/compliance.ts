@@ -8,7 +8,10 @@ import type {
 } from '@/types';
 import { formatCurrency } from '@/lib/utils';
 
-/** Fuzzy entity name matching — strips punctuation, normalizes whitespace, case-insensitive */
+// ============================================
+// FUZZY MATCHING UTILITIES
+// ============================================
+
 function normalizeEntityName(name: string): string {
   return name
     .toLowerCase()
@@ -23,256 +26,497 @@ function entityNameMatches(required: string, actual: string): boolean {
   return a.includes(r) || r.includes(a);
 }
 
-export interface ComplianceCheckOptions {
+// ============================================
+// UNIFIED COMPLIANCE ENGINE (Part 8)
+// ============================================
+
+export interface ComplianceCheckInput {
+  /** Extracted coverages from the COI */
+  coverages: ExtractedCoverage[];
+  /** Extracted endorsements from the COI */
   endorsements?: ExtractedEndorsement[];
-  property?: Pick<Property, 'additional_insured_entities' | 'certificate_holder_name' | 'loss_payee_entities'> | null;
+  /** The requirement template to check against */
+  template: RequirementTemplate | null;
+  /** Property data for entity name / cert holder checks */
+  property?: Pick<
+    Property,
+    | 'additional_insured_entities'
+    | 'certificate_holder_name'
+    | 'certificate_holder_address_line1'
+    | 'certificate_holder_city'
+    | 'certificate_holder_state'
+    | 'certificate_holder_zip'
+    | 'loss_payee_entities'
+  > | null;
+  /** Named insured from the COI (for cert-holder matching) */
+  certificateHolder?: string;
 }
 
-export function compareCoverageToRequirements(
-  coverages: ExtractedCoverage[],
-  template: RequirementTemplate | null,
-  options?: ComplianceCheckOptions
-): ComplianceResult {
+export type LineItemStatus = 'pass' | 'fail' | 'missing' | 'expiring' | 'expired';
+
+export interface ComplianceLineItem {
+  field: string;
+  display_name: string;
+  required_value: string;
+  actual_value: string;
+  status: LineItemStatus;
+  reason: string;
+  source: string;
+  expiration_date?: string;
+}
+
+export interface UnifiedComplianceResult {
+  overall_status: 'compliant' | 'non-compliant' | 'expiring' | 'expired';
+  compliance_percentage: number;
+  line_items: ComplianceLineItem[];
+  expiring_within_30_days: number;
+  expired_count: number;
+  summary: string;
+}
+
+function fmtLimit(val: number | null | undefined): string {
+  if (val == null) return 'Missing';
+  return formatCurrency(val);
+}
+
+function getExpirationStatus(
+  expDate: string | undefined,
+  now: Date,
+  thirtyDaysFromNow: Date
+): { isExpired: boolean; isExpiring: boolean } {
+  if (!expDate) return { isExpired: false, isExpiring: false };
+  const d = new Date(expDate);
+  return {
+    isExpired: d < now,
+    isExpiring: d >= now && d < thirtyDaysFromNow,
+  };
+}
+
+/**
+ * The new unified compliance check.
+ * Takes a ComplianceCheckInput and returns a full ComplianceLineItem breakdown.
+ */
+export function runComplianceCheck(input: ComplianceCheckInput): UnifiedComplianceResult {
+  const { coverages, endorsements = [], template, property } = input;
+
   if (!template) {
     return {
       overall_status: 'non-compliant',
       compliance_percentage: 0,
-      fields: [],
+      line_items: [],
       expiring_within_30_days: 0,
       expired_count: 0,
+      summary: 'No requirement template configured.',
     };
   }
 
-  const fields: ComplianceField[] = [];
+  const items: ComplianceLineItem[] = [];
   const now = new Date();
   const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
   let expiringCount = 0;
   let expiredCount = 0;
 
-  // Helper to find coverage by type
   const findCoverage = (type: string) =>
-    coverages.find(
-      (c) => c.type.toLowerCase().includes(type.toLowerCase())
-    );
+    coverages.find((c) => c.type.toLowerCase().includes(type.toLowerCase()));
 
-  const trackExpiration = (cov: ExtractedCoverage | undefined) => {
-    if (cov?.expiration_date) {
-      const expDate = new Date(cov.expiration_date);
-      if (expDate < now) expiredCount++;
-      else if (expDate < thirtyDaysFromNow) expiringCount++;
-    }
+  const trackExp = (cov: ExtractedCoverage | undefined) => {
+    if (!cov?.expiration_date) return;
+    const { isExpired, isExpiring } = getExpirationStatus(cov.expiration_date, now, thirtyDaysFromNow);
+    if (isExpired) expiredCount++;
+    else if (isExpiring) expiringCount++;
   };
 
-  // General Liability — check if required via toggle or legacy presence of limit
-  const glRequired = template.coverages.general_liability_required
-    ?? (!!template.coverages.general_liability_occurrence);
+  // ------ GENERAL LIABILITY (Occurrence) ------
+  const glRequired = template.coverages.general_liability_required ?? !!template.coverages.general_liability_occurrence;
   if (glRequired && template.coverages.general_liability_occurrence) {
     const cov = findCoverage('general liability');
     const actual = cov?.occurrence_limit ?? null;
     const required = template.coverages.general_liability_occurrence;
     const met = actual !== null && actual >= required;
-    fields.push({
-      field_name: 'General Liability (Occurrence)',
-      required_value: required,
-      actual_value: actual,
-      status: met ? 'compliant' : 'non-compliant',
+    const { isExpired, isExpiring } = getExpirationStatus(cov?.expiration_date, now, thirtyDaysFromNow);
+
+    items.push({
+      field: 'gl_occurrence',
+      display_name: 'General Liability (Per Occurrence)',
+      required_value: fmtLimit(required),
+      actual_value: fmtLimit(actual),
+      status: isExpired ? 'expired' : !met ? (actual === null ? 'missing' : 'fail') : isExpiring ? 'expiring' : 'pass',
+      reason: actual === null
+        ? 'No General Liability coverage found on COI'
+        : !met
+          ? `Limit ${fmtLimit(actual)} is below required ${fmtLimit(required)}`
+          : isExpired
+            ? 'Coverage has expired'
+            : isExpiring
+              ? 'Coverage expiring within 30 days'
+              : 'Meets or exceeds requirement',
+      source: 'COI extraction',
       expiration_date: cov?.expiration_date,
     });
-    trackExpiration(cov);
+    trackExp(cov);
   }
 
+  // ------ GENERAL LIABILITY (Aggregate) ------
   if (glRequired && template.coverages.general_liability_aggregate) {
     const cov = findCoverage('general liability');
     const actual = cov?.aggregate_limit ?? null;
     const required = template.coverages.general_liability_aggregate;
     const met = actual !== null && actual >= required;
-    fields.push({
-      field_name: 'General Liability (Aggregate)',
-      required_value: required,
-      actual_value: actual,
-      status: met ? 'compliant' : 'non-compliant',
+
+    items.push({
+      field: 'gl_aggregate',
+      display_name: 'General Liability (Aggregate)',
+      required_value: fmtLimit(required),
+      actual_value: fmtLimit(actual),
+      status: !met ? (actual === null ? 'missing' : 'fail') : 'pass',
+      reason: actual === null
+        ? 'No aggregate limit found'
+        : !met
+          ? `Limit ${fmtLimit(actual)} is below required ${fmtLimit(required)}`
+          : 'Meets or exceeds requirement',
+      source: 'COI extraction',
     });
   }
 
-  // Automobile Liability
-  const autoRequired = template.coverages.automobile_liability_required
-    ?? (!!template.coverages.automobile_liability_csl);
+  // ------ AUTOMOBILE LIABILITY ------
+  const autoRequired = template.coverages.automobile_liability_required ?? !!template.coverages.automobile_liability_csl;
   if (autoRequired && template.coverages.automobile_liability_csl) {
     const cov = findCoverage('auto');
     const actual = cov?.combined_single_limit ?? cov?.occurrence_limit ?? null;
     const required = template.coverages.automobile_liability_csl;
     const met = actual !== null && actual >= required;
-    fields.push({
-      field_name: 'Automobile Liability (CSL)',
-      required_value: required,
-      actual_value: actual,
-      status: met ? 'compliant' : 'non-compliant',
+    const { isExpired, isExpiring } = getExpirationStatus(cov?.expiration_date, now, thirtyDaysFromNow);
+
+    items.push({
+      field: 'auto_liability',
+      display_name: 'Automobile Liability (CSL)',
+      required_value: fmtLimit(required),
+      actual_value: fmtLimit(actual),
+      status: isExpired ? 'expired' : !met ? (actual === null ? 'missing' : 'fail') : isExpiring ? 'expiring' : 'pass',
+      reason: actual === null
+        ? 'No Auto Liability coverage found on COI'
+        : !met
+          ? `Limit ${fmtLimit(actual)} is below required ${fmtLimit(required)}`
+          : isExpired ? 'Coverage has expired' : isExpiring ? 'Coverage expiring within 30 days' : 'Meets or exceeds requirement',
+      source: 'COI extraction',
       expiration_date: cov?.expiration_date,
     });
-    trackExpiration(cov);
+    trackExp(cov);
   }
 
-  // Workers' Compensation
+  // ------ WORKERS' COMPENSATION ------
   if (template.coverages.workers_comp_statutory) {
     const cov = findCoverage('workers');
     const actual = cov?.is_statutory ?? null;
-    fields.push({
-      field_name: "Workers' Compensation",
+    const { isExpired, isExpiring } = getExpirationStatus(cov?.expiration_date, now, thirtyDaysFromNow);
+
+    items.push({
+      field: 'workers_comp',
+      display_name: "Workers' Compensation",
       required_value: 'Statutory',
-      actual_value: actual ? 'Statutory' : actual === null ? null : 'Not Statutory',
-      status: actual ? 'compliant' : 'non-compliant',
+      actual_value: actual ? 'Statutory' : actual === null ? 'Missing' : 'Not Statutory',
+      status: isExpired ? 'expired' : !actual ? (actual === null ? 'missing' : 'fail') : isExpiring ? 'expiring' : 'pass',
+      reason: actual === null
+        ? "No Workers' Comp coverage found on COI"
+        : !actual
+          ? 'Coverage is not statutory'
+          : isExpired ? 'Coverage has expired' : isExpiring ? 'Coverage expiring within 30 days' : 'Statutory coverage confirmed',
+      source: 'COI extraction',
       expiration_date: cov?.expiration_date,
     });
-    trackExpiration(cov);
+    trackExp(cov);
   }
 
-  // Employers' Liability
-  const elRequired = template.coverages.employers_liability_required
-    ?? (!!template.coverages.workers_comp_employers_liability);
+  // ------ EMPLOYERS' LIABILITY ------
+  const elRequired = template.coverages.employers_liability_required ?? !!template.coverages.workers_comp_employers_liability;
   if (elRequired && template.coverages.workers_comp_employers_liability) {
     const cov = findCoverage('employer');
     const actual = cov?.occurrence_limit ?? cov?.combined_single_limit ?? null;
     const required = template.coverages.workers_comp_employers_liability;
     const met = actual !== null && actual >= required;
-    fields.push({
-      field_name: "Employers' Liability",
-      required_value: required,
-      actual_value: actual,
-      status: met ? 'compliant' : 'non-compliant',
+    const { isExpired, isExpiring } = getExpirationStatus(cov?.expiration_date, now, thirtyDaysFromNow);
+
+    items.push({
+      field: 'employers_liability',
+      display_name: "Employers' Liability",
+      required_value: fmtLimit(required),
+      actual_value: fmtLimit(actual),
+      status: isExpired ? 'expired' : !met ? (actual === null ? 'missing' : 'fail') : isExpiring ? 'expiring' : 'pass',
+      reason: actual === null
+        ? "No Employers' Liability coverage found"
+        : !met
+          ? `Limit ${fmtLimit(actual)} is below required ${fmtLimit(required)}`
+          : isExpired ? 'Coverage has expired' : isExpiring ? 'Coverage expiring within 30 days' : 'Meets or exceeds requirement',
+      source: 'COI extraction',
       expiration_date: cov?.expiration_date,
     });
-    trackExpiration(cov);
+    trackExp(cov);
   }
 
-  // Umbrella / Excess
-  const umbrellaRequired = template.coverages.umbrella_required
-    ?? (!!template.coverages.umbrella_limit);
+  // ------ UMBRELLA / EXCESS ------
+  const umbrellaRequired = template.coverages.umbrella_required ?? !!template.coverages.umbrella_limit;
   if (umbrellaRequired && template.coverages.umbrella_limit) {
     const cov = findCoverage('umbrella') ?? findCoverage('excess');
     const actual = cov?.occurrence_limit ?? cov?.aggregate_limit ?? null;
     const required = template.coverages.umbrella_limit;
     const met = actual !== null && actual >= required;
-    fields.push({
-      field_name: 'Umbrella / Excess Liability',
-      required_value: required,
-      actual_value: actual,
-      status: met ? 'compliant' : 'non-compliant',
+    const { isExpired, isExpiring } = getExpirationStatus(cov?.expiration_date, now, thirtyDaysFromNow);
+
+    items.push({
+      field: 'umbrella',
+      display_name: 'Umbrella / Excess Liability',
+      required_value: fmtLimit(required),
+      actual_value: fmtLimit(actual),
+      status: isExpired ? 'expired' : !met ? (actual === null ? 'missing' : 'fail') : isExpiring ? 'expiring' : 'pass',
+      reason: actual === null
+        ? 'No Umbrella/Excess coverage found on COI'
+        : !met
+          ? `Limit ${fmtLimit(actual)} is below required ${fmtLimit(required)}`
+          : isExpired ? 'Coverage has expired' : isExpiring ? 'Coverage expiring within 30 days' : 'Meets or exceeds requirement',
+      source: 'COI extraction',
       expiration_date: cov?.expiration_date,
     });
-    trackExpiration(cov);
+    trackExp(cov);
   }
 
-  // Professional Liability / E&O
-  const profRequired = template.coverages.professional_liability_required
-    ?? (!!template.coverages.professional_liability_limit);
+  // ------ PROFESSIONAL LIABILITY / E&O ------
+  const profRequired = template.coverages.professional_liability_required ?? !!template.coverages.professional_liability_limit;
   if (profRequired && template.coverages.professional_liability_limit) {
     const cov = findCoverage('professional') ?? findCoverage('e&o');
     const actual = cov?.occurrence_limit ?? cov?.aggregate_limit ?? null;
     const required = template.coverages.professional_liability_limit;
     const met = actual !== null && actual >= required;
-    fields.push({
-      field_name: 'Professional Liability / E&O',
-      required_value: required,
-      actual_value: actual,
-      status: met ? 'compliant' : 'non-compliant',
+
+    items.push({
+      field: 'professional_liability',
+      display_name: 'Professional Liability / E&O',
+      required_value: fmtLimit(required),
+      actual_value: fmtLimit(actual),
+      status: !met ? (actual === null ? 'missing' : 'fail') : 'pass',
+      reason: actual === null
+        ? 'No Professional Liability coverage found'
+        : !met
+          ? `Limit ${fmtLimit(actual)} is below required ${fmtLimit(required)}`
+          : 'Meets or exceeds requirement',
+      source: 'COI extraction',
       expiration_date: cov?.expiration_date,
     });
   }
 
-  // Property Insurance (tenant)
+  // ------ PROPERTY INSURANCE (tenant) ------
   if (template.coverages.property_insurance_limit) {
     const cov = findCoverage('property');
     const actual = cov?.occurrence_limit ?? cov?.aggregate_limit ?? null;
     const required = template.coverages.property_insurance_limit;
     const met = actual !== null && actual >= required;
-    fields.push({
-      field_name: 'Property Insurance',
-      required_value: required,
-      actual_value: actual,
-      status: met ? 'compliant' : 'non-compliant',
+
+    items.push({
+      field: 'property_insurance',
+      display_name: 'Property Insurance',
+      required_value: fmtLimit(required),
+      actual_value: fmtLimit(actual),
+      status: !met ? (actual === null ? 'missing' : 'fail') : 'pass',
+      reason: actual === null
+        ? 'No Property Insurance coverage found'
+        : !met
+          ? `Limit ${fmtLimit(actual)} is below required ${fmtLimit(required)}`
+          : 'Meets or exceeds requirement',
+      source: 'COI extraction',
     });
   }
 
-  // ---- Endorsement checks ----
-  const endorsements = options?.endorsements ?? [];
-  const property = options?.property;
+  // ============================================
+  // ENDORSEMENT CHECKS
+  // ============================================
 
-  // Additional Insured
+  // ------ ADDITIONAL INSURED ------
   if (template.endorsements.require_additional_insured) {
     const aiEndorsement = endorsements.find(
       (e) => e.type.toLowerCase().includes('additional insured')
     );
     const present = aiEndorsement?.present ?? false;
-    fields.push({
-      field_name: 'Additional Insured',
+
+    items.push({
+      field: 'additional_insured',
+      display_name: 'Additional Insured',
       required_value: 'Required',
-      actual_value: present ? 'Present' : null,
-      status: present ? 'compliant' : 'non-compliant',
+      actual_value: present ? 'Present' : 'Missing',
+      status: present ? 'pass' : 'missing',
+      reason: present
+        ? 'Additional insured endorsement found on COI'
+        : 'Additional insured endorsement not found on COI',
+      source: 'COI extraction',
     });
 
-    // Check specific entity names if property provides them
+    // Check specific entity names from property
     if (present && property?.additional_insured_entities?.length) {
       for (const reqEntity of property.additional_insured_entities) {
         if (!reqEntity) continue;
-        // We check if the endorsement details mention the entity (if details available)
         const detailText = aiEndorsement?.details ?? '';
         const found = detailText && entityNameMatches(reqEntity, detailText);
-        fields.push({
-          field_name: `AI Entity: ${reqEntity}`,
+        items.push({
+          field: `ai_entity_${reqEntity.replace(/\s+/g, '_').toLowerCase()}`,
+          display_name: `AI Entity: ${reqEntity}`,
           required_value: 'Named',
           actual_value: found ? 'Found' : 'Not verified',
-          status: found ? 'compliant' : 'non-compliant',
+          status: found ? 'pass' : 'fail',
+          reason: found
+            ? `"${reqEntity}" found in endorsement details`
+            : `Could not verify "${reqEntity}" in endorsement text`,
+          source: 'Property config',
         });
       }
     }
   }
 
-  // Waiver of Subrogation
+  // ------ WAIVER OF SUBROGATION ------
   if (template.endorsements.require_waiver_of_subrogation) {
     const wosEndorsement = endorsements.find(
       (e) => e.type.toLowerCase().includes('waiver') || e.type.toLowerCase().includes('subrogation')
     );
     const present = wosEndorsement?.present ?? false;
-    fields.push({
-      field_name: 'Waiver of Subrogation',
+
+    items.push({
+      field: 'waiver_of_subrogation',
+      display_name: 'Waiver of Subrogation',
       required_value: 'Required',
-      actual_value: present ? 'Present' : null,
-      status: present ? 'compliant' : 'non-compliant',
+      actual_value: present ? 'Present' : 'Missing',
+      status: present ? 'pass' : 'missing',
+      reason: present
+        ? 'Waiver of subrogation endorsement found'
+        : 'Waiver of subrogation endorsement not found on COI',
+      source: 'COI extraction',
     });
   }
 
-  // Certificate Holder name check
+  // ------ CERTIFICATE HOLDER ------
   if (template.endorsements.certificate_holder_name || property?.certificate_holder_name) {
     const requiredName = template.endorsements.certificate_holder_name || property?.certificate_holder_name || '';
     if (requiredName) {
-      // This would need COI certificate holder field — mark as informational for now
-      fields.push({
-        field_name: 'Certificate Holder',
+      const certHolder = input.certificateHolder ?? '';
+      const matched = certHolder && entityNameMatches(requiredName, certHolder);
+
+      items.push({
+        field: 'certificate_holder',
+        display_name: 'Certificate Holder',
         required_value: requiredName,
-        actual_value: null,
-        status: 'non-compliant',
+        actual_value: certHolder || 'Not verified',
+        status: matched ? 'pass' : 'fail',
+        reason: matched
+          ? 'Certificate holder matches required entity'
+          : certHolder
+            ? `Certificate holder "${certHolder}" does not match "${requiredName}"`
+            : 'Certificate holder could not be verified from COI',
+        source: 'Property config',
       });
     }
   }
 
-  // Calculate overall
-  const totalFields = fields.length;
-  const compliantFields = fields.filter((f) => f.status === 'compliant').length;
-  const compliancePercentage = totalFields > 0 ? Math.round((compliantFields / totalFields) * 100) : 0;
+  // ============================================
+  // CALCULATE OVERALL
+  // ============================================
+  const totalItems = items.length;
+  const passItems = items.filter((i) => i.status === 'pass' || i.status === 'expiring').length;
+  const compliancePercentage = totalItems > 0 ? Math.round((passItems / totalItems) * 100) : 0;
 
-  let overallStatus: ComplianceResult['overall_status'] = 'compliant';
+  let overallStatus: UnifiedComplianceResult['overall_status'] = 'compliant';
   if (expiredCount > 0) overallStatus = 'expired';
-  else if (compliantFields < totalFields) overallStatus = 'non-compliant';
+  else if (items.some((i) => i.status === 'fail' || i.status === 'missing')) overallStatus = 'non-compliant';
   else if (expiringCount > 0) overallStatus = 'expiring';
+
+  // Generate summary
+  const failItems = items.filter((i) => i.status === 'fail' || i.status === 'missing');
+  let summary: string;
+  if (overallStatus === 'compliant') {
+    summary = 'All coverages meet or exceed required minimums.';
+  } else if (overallStatus === 'expired') {
+    summary = `${expiredCount} coverage${expiredCount > 1 ? 's have' : ' has'} expired. ${failItems.length > 0 ? `${failItems.length} additional item${failItems.length > 1 ? 's' : ''} non-compliant.` : ''}`.trim();
+  } else if (overallStatus === 'expiring') {
+    summary = `All requirements met, but ${expiringCount} coverage${expiringCount > 1 ? 's are' : ' is'} expiring within 30 days.`;
+  } else {
+    const missingItems = items.filter((i) => i.status === 'missing');
+    const belowItems = items.filter((i) => i.status === 'fail');
+    const parts: string[] = [];
+    if (missingItems.length > 0) parts.push(`${missingItems.length} missing`);
+    if (belowItems.length > 0) parts.push(`${belowItems.length} below requirement`);
+    summary = `Non-compliant: ${parts.join(', ')}.`;
+  }
 
   return {
     overall_status: overallStatus,
     compliance_percentage: compliancePercentage,
-    fields,
+    line_items: items,
     expiring_within_30_days: expiringCount,
     expired_count: expiredCount,
+    summary,
   };
 }
+
+// ============================================
+// LEGACY COMPATIBILITY LAYER
+// Keeps existing call sites working without changes
+// ============================================
+
+export interface ComplianceCheckOptions {
+  endorsements?: ExtractedEndorsement[];
+  property?: Pick<Property, 'additional_insured_entities' | 'certificate_holder_name' | 'loss_payee_entities'> | null;
+}
+
+/**
+ * Legacy API — wraps the new unified engine and converts back to the old ComplianceResult shape.
+ * All existing call sites (AddVendor, AddTenant, EntityDetailModal, BulkImport) continue to work.
+ */
+export function compareCoverageToRequirements(
+  coverages: ExtractedCoverage[],
+  template: RequirementTemplate | null,
+  options?: ComplianceCheckOptions
+): ComplianceResult {
+  const unified = runComplianceCheck({
+    coverages,
+    endorsements: options?.endorsements,
+    template,
+    property: options?.property,
+  });
+
+  // Convert line items to legacy ComplianceField format
+  const fields: ComplianceField[] = unified.line_items.map((item) => {
+    const statusMap: Record<LineItemStatus, ComplianceField['status']> = {
+      pass: 'compliant',
+      fail: 'non-compliant',
+      missing: 'non-compliant',
+      expiring: 'expiring',
+      expired: 'expired',
+    };
+
+    // Parse values back to numeric where possible
+    const parseVal = (s: string): number | string | null => {
+      if (s === 'Missing') return null;
+      const stripped = s.replace(/[$,]/g, '');
+      const num = Number(stripped);
+      return !isNaN(num) && stripped.length > 0 ? num : s;
+    };
+
+    return {
+      field_name: item.display_name,
+      required_value: parseVal(item.required_value),
+      actual_value: parseVal(item.actual_value),
+      status: statusMap[item.status],
+      expiration_date: item.expiration_date,
+    };
+  });
+
+  return {
+    overall_status: unified.overall_status,
+    compliance_percentage: unified.compliance_percentage,
+    fields,
+    expiring_within_30_days: unified.expiring_within_30_days,
+    expired_count: unified.expired_count,
+  };
+}
+
+// ============================================
+// UTILITY FUNCTIONS
+// ============================================
 
 export function getComplianceGaps(fields: ComplianceField[]): string[] {
   return fields
@@ -292,10 +536,12 @@ export function getComplianceGaps(fields: ComplianceField[]): string[] {
     });
 }
 
-/**
- * Generate a plain-language compliance insight string from a ComplianceResult.
- * Used in vendor/tenant detail pages, the portal, and automated emails.
- */
+export function getComplianceGapsFromLineItems(items: ComplianceLineItem[]): string[] {
+  return items
+    .filter((i) => i.status !== 'pass')
+    .map((i) => `${i.display_name}: Required ${i.required_value}, Found ${i.actual_value}`);
+}
+
 export function generateComplianceInsight(result: ComplianceResult): string {
   if (result.fields.length === 0) {
     return 'No requirements have been configured yet. Set up requirements on the Requirements page to enable compliance checking.';
@@ -313,7 +559,6 @@ export function generateComplianceInsight(result: ComplianceResult): string {
     parts.push(`${expired_count} coverage${expired_count > 1 ? 's have' : ' has'} expired`);
   }
 
-  // Non-compliant fields
   const nonCompliant = fields.filter((f) => f.status === 'non-compliant');
   for (const f of nonCompliant) {
     if (f.actual_value === null) {
@@ -325,7 +570,6 @@ export function generateComplianceInsight(result: ComplianceResult): string {
     }
   }
 
-  // Expiring fields
   if (overall_status === 'expiring' && expiring_within_30_days > 0) {
     const expiringFields = fields.filter((f) => f.expiration_date).filter((f) => {
       const d = new Date(f.expiration_date!);
