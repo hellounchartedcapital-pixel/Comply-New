@@ -6,8 +6,8 @@ export type EntityType = 'vendor' | 'tenant';
 
 export type ComplianceStatus = 'compliant' | 'non-compliant' | 'expiring' | 'expired';
 export type TenantStatus = 'active' | 'pending' | 'moved_out' | 'evicted';
-export type RequirementSource = 'building_default' | 'lease_extracted' | 'coi_prefill' | 'manual' | 'property' | 'template_office' | 'template_retail' | 'template_restaurant' | 'template_industrial' | 'template_medical' | 'template_fitness';
-export type ProfileCreationMethod = 'building_default' | 'lease_extracted' | 'coi_prefill' | 'manual' | 'template_office' | 'template_retail' | 'template_restaurant' | 'template_industrial' | 'template_medical' | 'template_fitness';
+export type RequirementSource = 'building_default' | 'lease_extracted' | 'coi_prefill' | 'manual' | 'property' | 'template_office' | 'template_retail' | 'template_restaurant';
+export type ProfileCreationMethod = 'building_default' | 'lease_extracted' | 'coi_prefill' | 'manual' | 'template_office' | 'template_retail' | 'template_restaurant';
 
 // ============================================
 // COVERAGE & REQUIREMENT TYPES

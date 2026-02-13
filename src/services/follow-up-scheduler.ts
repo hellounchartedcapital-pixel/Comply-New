@@ -53,7 +53,7 @@ async function wasRecentlyQueued(
 
   return existing.some(
     (e) =>
-      e.email_type === emailType &&
+      e.trigger_type === emailType &&
       new Date(e.created_at) > sevenDaysAgo
   );
 }
@@ -117,7 +117,7 @@ export async function runFollowUpScheduler(): Promise<SchedulerResult> {
             await queueEmail({
               entityType: 'vendor',
               entityId: vendor.id,
-              emailType,
+              triggerType: emailType,
               recipientEmail: email,
               recipientName: vendor.name,
               propertyName,
@@ -137,7 +137,7 @@ export async function runFollowUpScheduler(): Promise<SchedulerResult> {
           await queueEmail({
             entityType: 'vendor',
             entityId: vendor.id,
-            emailType: 'non_compliance',
+            triggerType: 'non_compliance',
             recipientEmail: email,
             recipientName: vendor.name,
             propertyName,
@@ -184,7 +184,7 @@ export async function runFollowUpScheduler(): Promise<SchedulerResult> {
             await queueEmail({
               entityType: 'tenant',
               entityId: tenant.id,
-              emailType,
+              triggerType: emailType,
               recipientEmail: email,
               recipientName: tenant.name,
               propertyName,
@@ -204,7 +204,7 @@ export async function runFollowUpScheduler(): Promise<SchedulerResult> {
           await queueEmail({
             entityType: 'tenant',
             entityId: tenant.id,
-            emailType: 'non_compliance',
+            triggerType: 'non_compliance',
             recipientEmail: email,
             recipientName: tenant.name,
             propertyName,

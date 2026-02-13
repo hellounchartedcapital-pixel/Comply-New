@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft, Loader2, Plus, Trash2, FileText,
-  Building2, Store, UtensilsCrossed, Factory, Stethoscope, Dumbbell,
+  Building2, Store, UtensilsCrossed,
   Upload, LayoutTemplate, Edit3, type LucideIcon,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -54,7 +54,7 @@ interface EditableRequirement {
 // ============================================
 
 const ICON_MAP: Record<string, LucideIcon> = {
-  Building2, Store, UtensilsCrossed, Factory, Stethoscope, Dumbbell,
+  Building2, Store, UtensilsCrossed,
 };
 
 function createBlankRequirement(): EditableRequirement {
