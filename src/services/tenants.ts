@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import type { Tenant } from '@/types';
+import type { Tenant, TenantRequirements } from '@/types';
 import { PAGINATION } from '@/constants';
 
 interface FetchTenantsParams {
@@ -33,7 +33,8 @@ export async function fetchTenants({
   }
 
   if (status && status !== 'all') {
-    query = query.eq('insurance_status', status);
+    // Check both status and insurance_status for backward compat
+    query = query.or(`status.eq.${status},insurance_status.eq.${status}`);
   }
 
   if (search) {
@@ -43,9 +44,7 @@ export async function fetchTenants({
   const from = page * pageSize;
   const to = from + pageSize - 1;
 
-  const { data, error, count } = await query
-    .order('name')
-    .range(from, to);
+  const { data, error, count } = await query.order('name').range(from, to);
 
   if (error) throw error;
 
@@ -70,21 +69,36 @@ export async function fetchTenant(id: string): Promise<Tenant> {
 
 export async function createTenant(tenant: {
   name: string;
-  property_id?: string;
   email?: string;
-  phone?: string;
+  property_id?: string;
+  unit_suite?: string;
   tenant_type?: string;
+  lease_start_date?: string;
+  lease_end_date?: string;
 }): Promise<Tenant> {
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
+
+  // Generate upload_token for self-service portal
+  const upload_token = crypto.randomUUID();
 
   const { data, error } = await supabase
     .from('tenants')
     .insert({
-      ...tenant,
+      name: tenant.name,
+      email: tenant.email || null,
+      property_id: tenant.property_id || null,
+      unit_suite: tenant.unit_suite || null,
+      unit: tenant.unit_suite || null, // legacy column
+      tenant_type: tenant.tenant_type || null,
+      lease_start_date: tenant.lease_start_date || null,
+      lease_end_date: tenant.lease_end_date || null,
       user_id: user.id,
-      status: 'active' as const,
-      insurance_status: 'non-compliant' as const,
+      status: 'pending' as const,
+      insurance_status: 'pending' as const, // legacy column
+      upload_token,
     })
     .select()
     .single();
@@ -96,7 +110,7 @@ export async function createTenant(tenant: {
 export async function updateTenant(id: string, updates: Partial<Tenant>): Promise<Tenant> {
   const { data, error } = await supabase
     .from('tenants')
-    .update(updates)
+    .update({ ...updates, updated_at: new Date().toISOString() })
     .eq('id', id)
     .select()
     .single();
@@ -106,14 +120,12 @@ export async function updateTenant(id: string, updates: Partial<Tenant>): Promis
 }
 
 export async function deleteTenant(id: string): Promise<void> {
-  // Soft-delete first to ensure record is hidden from queries immediately
   const { error: softError } = await supabase
     .from('tenants')
     .update({ deleted_at: new Date().toISOString() })
     .eq('id', id);
   if (softError) throw softError;
 
-  // Then attempt hard delete as cleanup
   await supabase.from('tenants').delete().eq('id', id);
 }
 
@@ -125,4 +137,47 @@ export async function deleteTenants(ids: string[]): Promise<void> {
   if (softError) throw softError;
 
   await supabase.from('tenants').delete().in('id', ids);
+}
+
+// ============================================
+// TENANT REQUIREMENTS
+// ============================================
+
+export async function fetchTenantRequirements(
+  tenantId: string
+): Promise<TenantRequirements | null> {
+  const { data, error } = await supabase
+    .from('tenant_requirements')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data as TenantRequirements | null;
+}
+
+export async function upsertTenantRequirements(
+  tenantId: string,
+  requirements: Partial<TenantRequirements>
+): Promise<TenantRequirements> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  const { data, error } = await supabase
+    .from('tenant_requirements')
+    .upsert(
+      {
+        tenant_id: tenantId,
+        user_id: user.id,
+        ...requirements,
+      },
+      { onConflict: 'tenant_id' }
+    )
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data as TenantRequirements;
 }

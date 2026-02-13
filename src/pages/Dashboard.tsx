@@ -1,31 +1,44 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
-  ShieldCheck,
-  ShieldX,
-  Clock,
+  Shield,
+  ShieldAlert,
   AlertTriangle,
-  ChevronRight,
-  Eye,
-  Link2,
+  Plus,
+  Upload,
+  Search,
+  Building2,
   Truck,
   Users,
-  Building2,
-  Plus,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { PageHeader } from '@/components/shared/PageHeader';
 import { StatusBadge } from '@/components/shared/StatusBadge';
-import { EmptyState } from '@/components/shared/EmptyState';
+import { PageHeader } from '@/components/shared/PageHeader';
 import { fetchVendors } from '@/services/vendors';
 import { fetchTenants } from '@/services/tenants';
-import { generatePortalLink } from '@/services/portal-links';
-import { formatDate, cn } from '@/lib/utils';
+import { fetchProperties } from '@/services/properties';
+import { formatDate, formatRelativeDate, cn } from '@/lib/utils';
 import type { Vendor, Tenant, ComplianceStatus } from '@/types';
 
 // ============================================
@@ -37,232 +50,139 @@ interface UnifiedEntity {
   name: string;
   type: 'vendor' | 'tenant';
   status: ComplianceStatus;
-  email?: string;
+  propertyId?: string;
   propertyName?: string;
   expirationDate?: string;
+  updatedAt: string;
   raw: Vendor | Tenant;
 }
 
-type DashboardFilter = 'all' | 'vendors' | 'tenants' | 'non-compliant' | 'expiring' | 'expired';
+type StatFilter = 'compliant' | 'non_compliant' | 'expiring_soon' | null;
 
 // ============================================
-// HERO NUMBER CARDS
+// STATUS SORT ORDER — problems at top
 // ============================================
 
-function HeroNumbers({
-  compliant,
-  nonCompliant,
-  expiring,
-  total,
-  onFilter,
-}: {
-  compliant: number;
-  nonCompliant: number;
-  expiring: number;
-  total: number;
-  onFilter: (filter: DashboardFilter) => void;
-}) {
-  return (
-    <div className="grid gap-4 md:grid-cols-3">
-      <button onClick={() => onFilter('all')} className="text-left">
-        <Card className="border-emerald-200 bg-emerald-50/50 hover:shadow-md transition-shadow cursor-pointer">
-          <CardContent className="p-5">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm font-medium text-emerald-700">Compliant</p>
-                <p className="mt-1 text-3xl font-bold text-emerald-800">{compliant}</p>
-                <p className="mt-0.5 text-xs text-emerald-600">of {total} total entities</p>
-              </div>
-              <div className="rounded-full bg-emerald-100 p-2.5">
-                <ShieldCheck className="h-5 w-5 text-emerald-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </button>
+const STATUS_SORT_ORDER: Record<string, number> = {
+  expired: 0,
+  non_compliant: 1,
+  expiring_soon: 2,
+  pending: 3,
+  compliant: 4,
+};
 
-      <button onClick={() => onFilter('non-compliant')} className="text-left">
-        <Card className="border-red-200 bg-red-50/50 hover:shadow-md transition-shadow cursor-pointer">
-          <CardContent className="p-5">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm font-medium text-red-700">Non-Compliant</p>
-                <p className="mt-1 text-3xl font-bold text-red-800">{nonCompliant}</p>
-                <p className="mt-0.5 text-xs text-red-600">need updated COI</p>
-              </div>
-              <div className="rounded-full bg-red-100 p-2.5">
-                <ShieldX className="h-5 w-5 text-red-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </button>
+// ============================================
+// HELPER: resolve tenant status with legacy fallback
+// ============================================
 
-      <button onClick={() => onFilter('expiring')} className="text-left">
-        <Card className="border-amber-200 bg-amber-50/50 hover:shadow-md transition-shadow cursor-pointer">
-          <CardContent className="p-5">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm font-medium text-amber-700">Expiring Soon</p>
-                <p className="mt-1 text-3xl font-bold text-amber-800">{expiring}</p>
-                <p className="mt-0.5 text-xs text-amber-600">within 30 days</p>
-              </div>
-              <div className="rounded-full bg-amber-100 p-2.5">
-                <Clock className="h-5 w-5 text-amber-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </button>
-    </div>
-  );
+function resolveTenantStatus(tenant: Tenant): ComplianceStatus {
+  if (tenant.status !== 'pending') return tenant.status;
+  // Legacy fallback: insurance_status
+  const legacy = tenant.insurance_status;
+  if (
+    legacy === 'compliant' ||
+    legacy === 'non_compliant' ||
+    legacy === 'expired' ||
+    legacy === 'expiring_soon' ||
+    legacy === 'pending'
+  ) {
+    return legacy as ComplianceStatus;
+  }
+  return tenant.status;
 }
 
 // ============================================
-// FILTER TABS
+// STAT CARD
 // ============================================
 
-const FILTERS: { value: DashboardFilter; label: string }[] = [
-  { value: 'all', label: 'All' },
-  { value: 'vendors', label: 'Vendors' },
-  { value: 'tenants', label: 'Tenants' },
-  { value: 'non-compliant', label: 'Non-Compliant' },
-  { value: 'expiring', label: 'Expiring' },
-  { value: 'expired', label: 'Expired' },
-];
-
-// ============================================
-// ENTITY ROW
-// ============================================
-
-function EntityRow({
-  entity,
-  onView,
-  onCopyLink,
+function StatCard({
+  label,
+  count,
+  subtitle,
+  icon: Icon,
+  accentBg,
+  accentBorder,
+  accentText,
+  accentIconBg,
+  accentIcon,
+  isActive,
+  onClick,
 }: {
-  entity: UnifiedEntity;
-  onView: () => void;
-  onCopyLink: () => void;
+  label: string;
+  count: number;
+  subtitle: string;
+  icon: typeof Shield;
+  accentBg: string;
+  accentBorder: string;
+  accentText: string;
+  accentIconBg: string;
+  accentIcon: string;
+  isActive: boolean;
+  onClick: () => void;
 }) {
   return (
-    <div className="flex items-center justify-between px-4 py-3 hover:bg-secondary/30 transition-colors">
-      <div className="flex items-center gap-3 min-w-0 flex-1">
-        <div className={cn(
-          'flex h-8 w-8 items-center justify-center rounded-full shrink-0',
-          entity.type === 'vendor' ? 'bg-blue-50' : 'bg-purple-50'
-        )}>
-          {entity.type === 'vendor' ? (
-            <Truck className="h-4 w-4 text-blue-600" />
-          ) : (
-            <Users className="h-4 w-4 text-purple-600" />
-          )}
-        </div>
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <p className="text-sm font-medium truncate">{entity.name}</p>
-            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 shrink-0">
-              {entity.type}
-            </Badge>
-          </div>
-          <p className="text-xs text-muted-foreground truncate">
-            {entity.propertyName ?? 'No property'}{entity.email ? ` \u00B7 ${entity.email}` : ''}
-          </p>
-        </div>
-      </div>
-
-      <div className="flex items-center gap-3 shrink-0 ml-2">
-        {entity.expirationDate && (
-          <span className="text-xs text-muted-foreground hidden sm:block">
-            Exp: {formatDate(entity.expirationDate)}
-          </span>
+    <button onClick={onClick} className="text-left w-full">
+      <Card
+        className={cn(
+          'hover:shadow-md transition-all cursor-pointer',
+          accentBorder,
+          accentBg,
+          isActive && 'ring-2 ring-offset-2 ring-primary'
         )}
-        <StatusBadge status={entity.status} />
-        <div className="flex gap-0.5">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7"
-            onClick={onView}
-            title="View details"
-          >
-            <Eye className="h-3.5 w-3.5" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7"
-            onClick={onCopyLink}
-            title="Copy portal link"
-          >
-            <Link2 className="h-3.5 w-3.5" />
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ============================================
-// NEEDS ATTENTION ALERTS
-// ============================================
-
-function NeedsAttention({
-  expired,
-  expiring,
-  nonCompliantCount,
-}: {
-  expired: number;
-  expiring: number;
-  nonCompliantCount: number;
-}) {
-  if (expired === 0 && expiring === 0 && nonCompliantCount === 0) return null;
-
-  const alerts: { icon: typeof AlertTriangle; text: string; color: string; bg: string }[] = [];
-  if (expired > 0) {
-    alerts.push({
-      icon: ShieldX,
-      text: `${expired} ${expired === 1 ? 'entity has' : 'entities have'} expired coverage`,
-      color: 'text-red-700',
-      bg: 'bg-red-50 border-red-200',
-    });
-  }
-  if (expiring > 0) {
-    alerts.push({
-      icon: Clock,
-      text: `${expiring} COI${expiring === 1 ? '' : 's'} expiring in the next 30 days`,
-      color: 'text-amber-700',
-      bg: 'bg-amber-50 border-amber-200',
-    });
-  }
-
-  return (
-    <div className="space-y-2">
-      {alerts.map((alert, i) => {
-        const Icon = alert.icon;
-        return (
-          <div key={i} className={cn('flex items-center gap-3 rounded-lg border p-3', alert.bg)}>
-            <Icon className={cn('h-4 w-4 shrink-0', alert.color)} />
-            <span className={cn('text-sm', alert.color)}>{alert.text}</span>
+      >
+        <CardContent className="p-5">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className={cn('text-sm font-medium', accentText)}>{label}</p>
+              <p className={cn('mt-1 text-3xl font-bold', accentText.replace(/700/, '800'))}>
+                {count}
+              </p>
+              <p className={cn('mt-0.5 text-xs', accentText.replace(/700/, '600'))}>
+                {subtitle}
+              </p>
+            </div>
+            <div className={cn('rounded-full p-2.5', accentIconBg)}>
+              <Icon className={cn('h-5 w-5', accentIcon)} />
+            </div>
           </div>
-        );
-      })}
-    </div>
+        </CardContent>
+      </Card>
+    </button>
   );
 }
 
 // ============================================
-// SKELETON
+// LOADING SKELETON
 // ============================================
 
 function DashboardSkeleton() {
   return (
     <div className="space-y-6">
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <Skeleton className="h-8 w-48" />
+          <Skeleton className="mt-1 h-4 w-64" />
+        </div>
+        <div className="flex gap-2">
+          <Skeleton className="h-9 w-28" />
+          <Skeleton className="h-9 w-28" />
+          <Skeleton className="h-9 w-28" />
+        </div>
+      </div>
       <div className="grid gap-4 md:grid-cols-3">
         {[1, 2, 3].map((i) => (
-          <Card key={i}><CardContent className="p-5"><Skeleton className="h-20 w-full" /></CardContent></Card>
+          <Card key={i}>
+            <CardContent className="p-5">
+              <Skeleton className="h-20 w-full" />
+            </CardContent>
+          </Card>
         ))}
       </div>
-      <Skeleton className="h-[400px] w-full" />
+      <Card>
+        <CardContent className="p-0">
+          <Skeleton className="h-[400px] w-full" />
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -273,32 +193,64 @@ function DashboardSkeleton() {
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const [activeFilter, setActiveFilter] = useState<DashboardFilter>('all');
 
-  const { data: vendorData, isLoading: vendorsLoading } = useQuery({
+  // --- Filters state ---
+  const [statFilter, setStatFilter] = useState<StatFilter>(null);
+  const [propertyFilter, setPropertyFilter] = useState<string>('all');
+  const [statusFilters, setStatusFilters] = useState<ComplianceStatus[]>([]);
+  const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // --- Data fetching ---
+  const {
+    data: vendorData,
+    isLoading: vendorsLoading,
+    error: vendorsError,
+  } = useQuery({
     queryKey: ['vendors', 'dashboard'],
-    queryFn: () => fetchVendors({ pageSize: 200 }),
+    queryFn: () => fetchVendors({ pageSize: 500 }),
   });
 
-  const { data: tenantData, isLoading: tenantsLoading } = useQuery({
+  const {
+    data: tenantData,
+    isLoading: tenantsLoading,
+    error: tenantsError,
+  } = useQuery({
     queryKey: ['tenants', 'dashboard'],
-    queryFn: () => fetchTenants({ pageSize: 200 }),
+    queryFn: () => fetchTenants({ pageSize: 500 }),
   });
 
-  const isLoading = vendorsLoading || tenantsLoading;
+  const {
+    data: properties,
+    isLoading: propertiesLoading,
+    error: propertiesError,
+  } = useQuery({
+    queryKey: ['properties'],
+    queryFn: fetchProperties,
+  });
+
+  // Show toast for fetch errors
+  if (vendorsError) toast.error('Failed to load vendors');
+  if (tenantsError) toast.error('Failed to load tenants');
+  if (propertiesError) toast.error('Failed to load properties');
+
+  const isLoading = vendorsLoading || tenantsLoading || propertiesLoading;
+
   const vendors = useMemo(() => vendorData?.data ?? [], [vendorData]);
   const tenants = useMemo(() => tenantData?.data ?? [], [tenantData]);
+  const propertyList = useMemo(() => properties ?? [], [properties]);
 
-  // Build unified entity list
+  // --- Build unified entity list ---
   const allEntities = useMemo<UnifiedEntity[]>(() => {
     const vendorEntities: UnifiedEntity[] = vendors.map((v) => ({
       id: v.id,
       name: v.name,
       type: 'vendor' as const,
       status: v.status,
-      email: v.contact_email,
+      propertyId: v.property_id,
       propertyName: v.property?.name,
       expirationDate: v.expiration_date,
+      updatedAt: v.updated_at,
       raw: v,
     }));
 
@@ -306,114 +258,109 @@ export default function Dashboard() {
       id: t.id,
       name: t.name,
       type: 'tenant' as const,
-      status: t.insurance_status,
-      email: t.email,
+      status: resolveTenantStatus(t),
+      propertyId: t.property_id,
       propertyName: t.property?.name,
       expirationDate: t.expiration_date,
+      updatedAt: t.updated_at,
       raw: t,
     }));
 
     return [...vendorEntities, ...tenantEntities];
   }, [vendors, tenants]);
 
-  // Stats
+  // --- Compute stats ---
   const stats = useMemo(() => {
-    const total = allEntities.length;
     const compliant = allEntities.filter((e) => e.status === 'compliant').length;
-    const nonCompliant = allEntities.filter((e) => e.status === 'non-compliant').length;
-    const expiring = allEntities.filter((e) => e.status === 'expiring').length;
-    const expired = allEntities.filter((e) => e.status === 'expired').length;
-    return { total, compliant, nonCompliant, expiring, expired };
+    const nonCompliant = allEntities.filter(
+      (e) => e.status === 'non_compliant' || e.status === 'expired'
+    ).length;
+    const expiringSoon = allEntities.filter((e) => e.status === 'expiring_soon').length;
+    return { compliant, nonCompliant, expiringSoon };
   }, [allEntities]);
 
-  // Filter entities
+  // --- Handle stat card clicks (toggle) ---
+  const handleStatClick = useCallback(
+    (filter: StatFilter) => {
+      setStatFilter((prev) => (prev === filter ? null : filter));
+      // Clear manual status filters when using stat cards
+      setStatusFilters([]);
+    },
+    []
+  );
+
+  // --- Toggle status in multi-select ---
+  const toggleStatusFilter = useCallback((status: ComplianceStatus) => {
+    setStatFilter(null); // Clear stat card filter when using manual status filter
+    setStatusFilters((prev) =>
+      prev.includes(status) ? prev.filter((s) => s !== status) : [...prev, status]
+    );
+  }, []);
+
+  // --- Filter and sort entities ---
   const filteredEntities = useMemo(() => {
     let filtered = allEntities;
 
-    switch (activeFilter) {
-      case 'vendors':
-        filtered = allEntities.filter((e) => e.type === 'vendor');
-        break;
-      case 'tenants':
-        filtered = allEntities.filter((e) => e.type === 'tenant');
-        break;
-      case 'non-compliant':
-        filtered = allEntities.filter((e) => e.status === 'non-compliant');
-        break;
-      case 'expiring':
-        filtered = allEntities.filter((e) => e.status === 'expiring');
-        break;
-      case 'expired':
-        filtered = allEntities.filter((e) => e.status === 'expired');
-        break;
+    // Stat card filter
+    if (statFilter === 'compliant') {
+      filtered = filtered.filter((e) => e.status === 'compliant');
+    } else if (statFilter === 'non_compliant') {
+      filtered = filtered.filter(
+        (e) => e.status === 'non_compliant' || e.status === 'expired'
+      );
+    } else if (statFilter === 'expiring_soon') {
+      filtered = filtered.filter((e) => e.status === 'expiring_soon');
     }
 
-    // Sort: non-compliant/expired first, then expiring, then compliant
-    const statusOrder: Record<string, number> = {
-      expired: 0,
-      'non-compliant': 1,
-      expiring: 2,
-      compliant: 3,
-    };
-
-    return filtered.sort((a, b) => (statusOrder[a.status] ?? 4) - (statusOrder[b.status] ?? 4));
-  }, [allEntities, activeFilter]);
-
-  const handleCopyPortalLink = async (entity: UnifiedEntity) => {
-    try {
-      const link = await generatePortalLink(entity.type, entity.id);
-      await navigator.clipboard.writeText(link);
-      toast.success(`Portal link for ${entity.name} copied to clipboard`);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to generate portal link');
+    // Property filter
+    if (propertyFilter !== 'all') {
+      filtered = filtered.filter((e) => e.propertyId === propertyFilter);
     }
-  };
 
-  const handleViewEntity = (entity: UnifiedEntity) => {
-    navigate(entity.type === 'vendor' ? '/vendors' : '/tenants', {
-      state: { openDetailId: entity.id },
-    });
-  };
+    // Status multi-select filter
+    if (statusFilters.length > 0) {
+      filtered = filtered.filter((e) => statusFilters.includes(e.status));
+    }
 
+    // Type filter
+    if (typeFilter !== 'all') {
+      filtered = filtered.filter((e) => e.type === typeFilter);
+    }
+
+    // Search by name
+    if (searchQuery.trim()) {
+      const query = searchQuery.trim().toLowerCase();
+      filtered = filtered.filter((e) => e.name.toLowerCase().includes(query));
+    }
+
+    // Sort: expired -> non_compliant -> expiring_soon -> pending -> compliant
+    return filtered.sort(
+      (a, b) => (STATUS_SORT_ORDER[a.status] ?? 5) - (STATUS_SORT_ORDER[b.status] ?? 5)
+    );
+  }, [allEntities, statFilter, propertyFilter, statusFilters, typeFilter, searchQuery]);
+
+  // --- Loading state ---
   if (isLoading) return <DashboardSkeleton />;
 
-  // Empty state — no entities at all
-  if (allEntities.length === 0) {
+  // --- Empty state: no data at all ---
+  const hasNoData = vendors.length === 0 && tenants.length === 0 && propertyList.length === 0;
+
+  if (hasNoData) {
     return (
       <div className="space-y-6">
         <PageHeader title="Dashboard" subtitle="Your compliance command center" />
-        <EmptyState
-          icon={Building2}
-          title="Welcome to SmartCOI"
-          description="Get started by adding a property, then add vendors and tenants to track their insurance compliance."
-          actionLabel="Add Property"
-          onAction={() => navigate('/properties')}
-        />
-        <div className="grid gap-3 md:grid-cols-2">
-          <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate('/vendors/add')}>
-            <CardContent className="flex items-center gap-3 p-5">
-              <div className="rounded-full bg-blue-50 p-2">
-                <Plus className="h-4 w-4 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-sm font-medium">Add Vendor</p>
-                <p className="text-xs text-muted-foreground">Upload a vendor's COI to get started</p>
-              </div>
-              <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground" />
-            </CardContent>
-          </Card>
-          <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate('/tenants/add')}>
-            <CardContent className="flex items-center gap-3 p-5">
-              <div className="rounded-full bg-purple-50 p-2">
-                <Plus className="h-4 w-4 text-purple-600" />
-              </div>
-              <div>
-                <p className="text-sm font-medium">Add Tenant</p>
-                <p className="text-xs text-muted-foreground">Upload a lease or start from a template</p>
-              </div>
-              <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground" />
-            </CardContent>
-          </Card>
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500">
+            <Building2 className="h-8 w-8 text-white" aria-hidden="true" />
+          </div>
+          <h3 className="mt-4 text-lg font-semibold">Get started by adding your first property</h3>
+          <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+            Create a property, then add vendors and tenants to track their insurance compliance.
+          </p>
+          <Button onClick={() => navigate('/properties')} className="mt-6">
+            <Plus className="mr-2 h-4 w-4" />
+            Create Property
+          </Button>
         </div>
       </div>
     );
@@ -421,11 +368,16 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
+      {/* Page Header with Quick Actions */}
       <PageHeader
         title="Dashboard"
         subtitle="Your compliance command center"
         actions={
           <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => navigate('/upload')}>
+              <Upload className="mr-1.5 h-3.5 w-3.5" />
+              Upload COI
+            </Button>
             <Button variant="outline" size="sm" onClick={() => navigate('/vendors/add')}>
               <Truck className="mr-1.5 h-3.5 w-3.5" />
               Add Vendor
@@ -438,73 +390,195 @@ export default function Dashboard() {
         }
       />
 
-      {/* Hero Numbers */}
-      <HeroNumbers
-        compliant={stats.compliant}
-        nonCompliant={stats.nonCompliant + stats.expired}
-        expiring={stats.expiring}
-        total={stats.total}
-        onFilter={setActiveFilter}
-      />
+      {/* Hero Stat Cards */}
+      <div className="grid gap-4 md:grid-cols-3">
+        <StatCard
+          label="Compliant"
+          count={stats.compliant}
+          subtitle={`of ${allEntities.length} total entities`}
+          icon={Shield}
+          accentBg="bg-emerald-50/50"
+          accentBorder="border-emerald-200"
+          accentText="text-emerald-700"
+          accentIconBg="bg-emerald-100"
+          accentIcon="text-emerald-600"
+          isActive={statFilter === 'compliant'}
+          onClick={() => handleStatClick('compliant')}
+        />
+        <StatCard
+          label="Non-Compliant"
+          count={stats.nonCompliant}
+          subtitle="need updated COI"
+          icon={ShieldAlert}
+          accentBg="bg-red-50/50"
+          accentBorder="border-red-200"
+          accentText="text-red-700"
+          accentIconBg="bg-red-100"
+          accentIcon="text-red-600"
+          isActive={statFilter === 'non_compliant'}
+          onClick={() => handleStatClick('non_compliant')}
+        />
+        <StatCard
+          label="Expiring Soon"
+          count={stats.expiringSoon}
+          subtitle="within 30 days"
+          icon={AlertTriangle}
+          accentBg="bg-amber-50/50"
+          accentBorder="border-amber-200"
+          accentText="text-amber-700"
+          accentIconBg="bg-amber-100"
+          accentIcon="text-amber-600"
+          isActive={statFilter === 'expiring_soon'}
+          onClick={() => handleStatClick('expiring_soon')}
+        />
+      </div>
 
-      {/* Alerts */}
-      <NeedsAttention
-        expired={stats.expired}
-        expiring={stats.expiring}
-        nonCompliantCount={stats.nonCompliant}
-      />
+      {/* Filters Row */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        {/* Search */}
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Search by name..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+          />
+        </div>
 
-      {/* Entity List */}
+        {/* Property dropdown */}
+        <Select value={propertyFilter} onValueChange={setPropertyFilter}>
+          <SelectTrigger className="w-full sm:w-[180px]">
+            <SelectValue placeholder="All Properties" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Properties</SelectItem>
+            {propertyList.map((p) => (
+              <SelectItem key={p.id} value={p.id}>
+                {p.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {/* Status multi-select (as filter chips) */}
+        <div className="flex flex-wrap gap-1.5">
+          {(
+            [
+              { value: 'compliant' as ComplianceStatus, label: 'Compliant' },
+              { value: 'non_compliant' as ComplianceStatus, label: 'Non-Compliant' },
+              { value: 'expiring_soon' as ComplianceStatus, label: 'Expiring' },
+              { value: 'expired' as ComplianceStatus, label: 'Expired' },
+              { value: 'pending' as ComplianceStatus, label: 'Pending' },
+            ] as const
+          ).map((s) => (
+            <button
+              key={s.value}
+              onClick={() => toggleStatusFilter(s.value)}
+              className={cn(
+                'shrink-0 rounded-full px-2.5 py-1 text-xs font-medium transition-colors border',
+                statusFilters.includes(s.value)
+                  ? 'bg-primary text-primary-foreground border-primary'
+                  : 'bg-background text-muted-foreground border-input hover:bg-accent'
+              )}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Type filter */}
+        <Select value={typeFilter} onValueChange={setTypeFilter}>
+          <SelectTrigger className="w-full sm:w-[140px]">
+            <SelectValue placeholder="All Types" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Types</SelectItem>
+            <SelectItem value="vendor">Vendors</SelectItem>
+            <SelectItem value="tenant">Tenants</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Entity Table */}
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-base">All Entities</CardTitle>
-            <span className="text-xs text-muted-foreground">{filteredEntities.length} shown</span>
-          </div>
-          {/* Filter Tabs */}
-          <div className="flex gap-1 overflow-x-auto pt-2">
-            {FILTERS.map((f) => (
-              <button
-                key={f.value}
-                onClick={() => setActiveFilter(f.value)}
-                className={cn(
-                  'shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-colors',
-                  activeFilter === f.value
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
-                )}
-              >
-                {f.label}
-                {f.value === 'non-compliant' && stats.nonCompliant > 0 && (
-                  <span className="ml-1 text-[10px]">({stats.nonCompliant})</span>
-                )}
-                {f.value === 'expiring' && stats.expiring > 0 && (
-                  <span className="ml-1 text-[10px]">({stats.expiring})</span>
-                )}
-                {f.value === 'expired' && stats.expired > 0 && (
-                  <span className="ml-1 text-[10px]">({stats.expired})</span>
-                )}
-              </button>
-            ))}
+            <span className="text-xs text-muted-foreground">
+              {filteredEntities.length} of {allEntities.length} shown
+            </span>
           </div>
         </CardHeader>
         <CardContent className="p-0">
           {filteredEntities.length === 0 ? (
             <div className="flex flex-col items-center gap-2 py-12 text-center">
-              <ShieldCheck className="h-8 w-8 text-muted-foreground/40" />
-              <p className="text-sm text-muted-foreground">No entities match this filter</p>
+              <Search className="h-8 w-8 text-muted-foreground/40" />
+              <p className="text-sm text-muted-foreground">No entities match your filters</p>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setStatFilter(null);
+                  setPropertyFilter('all');
+                  setStatusFilters([]);
+                  setTypeFilter('all');
+                  setSearchQuery('');
+                }}
+              >
+                Clear all filters
+              </Button>
             </div>
           ) : (
-            <div className="divide-y">
-              {filteredEntities.map((entity) => (
-                <EntityRow
-                  key={`${entity.type}-${entity.id}`}
-                  entity={entity}
-                  onView={() => handleViewEntity(entity)}
-                  onCopyLink={() => handleCopyPortalLink(entity)}
-                />
-              ))}
-            </div>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Property</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Expiration Date</TableHead>
+                  <TableHead>Last Updated</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredEntities.map((entity) => (
+                  <TableRow
+                    key={`${entity.type}-${entity.id}`}
+                    className="cursor-pointer"
+                    onClick={() =>
+                      navigate(entity.type === 'vendor' ? '/vendors' : '/tenants', {
+                        state: { openDetailId: entity.id },
+                      })
+                    }
+                  >
+                    <TableCell className="font-medium">{entity.name}</TableCell>
+                    <TableCell>
+                      <Badge variant="secondary" className="gap-1">
+                        {entity.type === 'vendor' ? (
+                          <Truck className="h-3 w-3" />
+                        ) : (
+                          <Users className="h-3 w-3" />
+                        )}
+                        {entity.type === 'vendor' ? 'Vendor' : 'Tenant'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {entity.propertyName ?? 'Unassigned'}
+                    </TableCell>
+                    <TableCell>
+                      <StatusBadge status={entity.status} />
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {entity.expirationDate ? formatDate(entity.expirationDate) : 'N/A'}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {entity.updatedAt ? formatRelativeDate(entity.updatedAt) : 'N/A'}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           )}
         </CardContent>
       </Card>

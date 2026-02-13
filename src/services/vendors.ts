@@ -43,9 +43,7 @@ export async function fetchVendors({
   const from = page * pageSize;
   const to = from + pageSize - 1;
 
-  const { data, error, count } = await query
-    .order('name')
-    .range(from, to);
+  const { data, error, count } = await query.order('name').range(from, to);
 
   if (error) throw error;
 
@@ -70,59 +68,54 @@ export async function fetchVendor(id: string): Promise<Vendor> {
 
 export async function createVendor(vendor: {
   name: string;
+  email?: string;
   property_id?: string;
-  contact_name?: string;
-  contact_email?: string;
-  contact_phone?: string;
 }): Promise<Vendor> {
   if (!isSupabaseConfigured) {
     throw new Error(
-      'Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your hosting platform\'s environment variables, then redeploy.'
+      "Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your hosting platform's environment variables, then redeploy."
     );
   }
 
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-  if (authError) {
-    console.error('Auth error:', authError);
-    throw new Error(`Authentication error: ${authError.message}. Please sign out and sign back in.`);
-  }
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+  if (authError) throw new Error(`Authentication error: ${authError.message}`);
   if (!user) throw new Error('Not authenticated — please sign in to continue.');
 
-  const insertPayload = { ...vendor, user_id: user.id, status: 'non-compliant' as const };
-  console.log('Creating vendor with payload:', JSON.stringify(insertPayload, null, 2));
+  // Generate upload_token for self-service portal
+  const upload_token = crypto.randomUUID();
 
   const { data, error } = await supabase
     .from('vendors')
-    .insert(insertPayload)
+    .insert({
+      name: vendor.name,
+      email: vendor.email || null,
+      contact_email: vendor.email || null, // legacy column
+      property_id: vendor.property_id || null,
+      user_id: user.id,
+      status: 'pending' as const,
+      upload_token,
+    })
     .select()
     .single();
 
   if (error) {
-    console.error('Supabase vendor insert error:', { code: error.code, message: error.message, details: error.details, hint: error.hint });
-
     if (error.code === '42P01') {
-      throw new Error('Database table "vendors" not found. Run the initial setup SQL in your Supabase SQL Editor.');
+      throw new Error('Database table "vendors" not found. Run the initial setup SQL.');
     }
     if (error.code === '42703') {
-      throw new Error(`Database column missing: ${error.message}. Run the latest migration in Supabase SQL Editor.`);
+      throw new Error(`Database column missing: ${error.message}. Run the latest migration.`);
     }
-    if (error.code === '42501' || error.message?.includes('row-level security') || error.message?.includes('policy')) {
-      throw new Error('Permission denied by RLS policy. Run the setup SQL in Supabase SQL Editor to configure policies.');
+    if (
+      error.code === '42501' ||
+      error.message?.includes('row-level security') ||
+      error.message?.includes('policy')
+    ) {
+      throw new Error('Permission denied by RLS policy. Check your RLS policies.');
     }
-    if (error.code === 'PGRST301' || error.message?.includes('JWT')) {
-      throw new Error('Session expired — please sign out and sign back in.');
-    }
-    if (error.code === 'PGRST116') {
-      throw new Error('Insert was blocked by row-level security. Check that RLS INSERT policy exists for the vendors table.');
-    }
-    if (error.code === '23503') {
-      throw new Error(`Foreign key error: ${error.message}. The selected property may not exist.`);
-    }
-    throw new Error(`Failed to create vendor: ${error.message} (code: ${error.code})`);
-  }
-
-  if (!data) {
-    throw new Error('Vendor insert returned no data. This usually means RLS is blocking the SELECT after INSERT. Check your RLS policies.');
+    throw new Error(`Failed to create vendor: ${error.message}`);
   }
 
   return data as Vendor;
@@ -131,7 +124,7 @@ export async function createVendor(vendor: {
 export async function updateVendor(id: string, updates: Partial<Vendor>): Promise<Vendor> {
   const { data, error } = await supabase
     .from('vendors')
-    .update(updates)
+    .update({ ...updates, updated_at: new Date().toISOString() })
     .eq('id', id)
     .select()
     .single();
@@ -141,14 +134,12 @@ export async function updateVendor(id: string, updates: Partial<Vendor>): Promis
 }
 
 export async function deleteVendor(id: string): Promise<void> {
-  // Soft-delete first to ensure record is hidden from queries immediately
   const { error: softError } = await supabase
     .from('vendors')
     .update({ deleted_at: new Date().toISOString() })
     .eq('id', id);
   if (softError) throw softError;
 
-  // Then attempt hard delete as cleanup
   await supabase.from('vendors').delete().eq('id', id);
 }
 

@@ -11,17 +11,16 @@ const LandingPage = lazy(() => import('@/pages/LandingPage'));
 const Dashboard = lazy(() => import('@/pages/Dashboard'));
 const Properties = lazy(() => import('@/pages/Properties'));
 const PropertyDetail = lazy(() => import('@/pages/PropertyDetail'));
+const PropertyForm = lazy(() => import('@/pages/PropertyForm'));
 const Vendors = lazy(() => import('@/pages/Vendors'));
 const AddVendor = lazy(() => import('@/pages/AddVendor'));
+const VendorDetail = lazy(() => import('@/pages/VendorDetail'));
 const Tenants = lazy(() => import('@/pages/Tenants'));
 const AddTenant = lazy(() => import('@/pages/AddTenant'));
+const TenantDetail = lazy(() => import('@/pages/TenantDetail'));
 const COIUpload = lazy(() => import('@/pages/COIUpload'));
-const Requirements = lazy(() => import('@/pages/Requirements'));
-const Reports = lazy(() => import('@/pages/Reports'));
 const SettingsPage = lazy(() => import('@/pages/Settings'));
-const BulkImport = lazy(() => import('@/pages/BulkImport'));
-const Onboarding = lazy(() => import('@/pages/Onboarding'));
-const VendorPortal = lazy(() => import('@/pages/VendorPortal'));
+const SelfServicePortal = lazy(() => import('@/pages/SelfServicePortal'));
 const Login = lazy(() => import('@/pages/Login'));
 const NotFound = lazy(() => import('@/pages/NotFound'));
 
@@ -80,19 +79,13 @@ function AppRoutes() {
           )
         }
       />
+
+      {/* Self-service portal — PUBLIC, no auth */}
       <Route
-        path="/vendor-portal"
+        path="/upload/:token"
         element={
           <Suspense fallback={<PageLoader />}>
-            <VendorPortal />
-          </Suspense>
-        }
-      />
-      <Route
-        path="/tenant-portal"
-        element={
-          <Suspense fallback={<PageLoader />}>
-            <VendorPortal />
+            <SelfServicePortal />
           </Suspense>
         }
       />
@@ -116,10 +109,26 @@ function AppRoutes() {
           }
         />
         <Route
+          path="/properties/new"
+          element={
+            <Suspense fallback={<PageLoader />}>
+              <PropertyForm />
+            </Suspense>
+          }
+        />
+        <Route
           path="/properties/:id"
           element={
             <Suspense fallback={<PageLoader />}>
               <PropertyDetail />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/properties/:id/edit"
+          element={
+            <Suspense fallback={<PageLoader />}>
+              <PropertyForm />
             </Suspense>
           }
         />
@@ -132,7 +141,7 @@ function AppRoutes() {
           }
         />
         <Route
-          path="/vendors/add"
+          path="/vendors/new"
           element={
             <Suspense fallback={<PageLoader />}>
               <AddVendor />
@@ -140,10 +149,14 @@ function AppRoutes() {
           }
         />
         <Route
-          path="/vendors/bulk-import"
+          path="/vendors/add"
+          element={<Navigate to="/vendors/new" replace />}
+        />
+        <Route
+          path="/vendors/:id"
           element={
             <Suspense fallback={<PageLoader />}>
-              <BulkImport />
+              <VendorDetail />
             </Suspense>
           }
         />
@@ -156,10 +169,22 @@ function AppRoutes() {
           }
         />
         <Route
-          path="/tenants/add"
+          path="/tenants/new"
           element={
             <Suspense fallback={<PageLoader />}>
               <AddTenant />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/tenants/add"
+          element={<Navigate to="/tenants/new" replace />}
+        />
+        <Route
+          path="/tenants/:id"
+          element={
+            <Suspense fallback={<PageLoader />}>
+              <TenantDetail />
             </Suspense>
           }
         />
@@ -172,34 +197,10 @@ function AppRoutes() {
           }
         />
         <Route
-          path="/requirements"
-          element={
-            <Suspense fallback={<PageLoader />}>
-              <Requirements />
-            </Suspense>
-          }
-        />
-        <Route
-          path="/reports"
-          element={
-            <Suspense fallback={<PageLoader />}>
-              <Reports />
-            </Suspense>
-          }
-        />
-        <Route
           path="/settings"
           element={
             <Suspense fallback={<PageLoader />}>
               <SettingsPage />
-            </Suspense>
-          }
-        />
-        <Route
-          path="/onboarding"
-          element={
-            <Suspense fallback={<PageLoader />}>
-              <Onboarding />
             </Suspense>
           }
         />

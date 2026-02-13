@@ -1,36 +1,51 @@
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  ArrowLeft, Loader2, Plus, Trash2, FileText,
-  Building2, Store, UtensilsCrossed,
-  Upload, LayoutTemplate, Edit3, type LucideIcon,
+  ArrowLeft,
+  Loader2,
+  Upload,
+  LayoutTemplate,
+  Edit3,
+  Building2,
+  Store,
+  UtensilsCrossed,
+  CheckCircle2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Switch } from '@/components/ui/switch';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from '@/components/ui/card';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { DocumentUploadZone } from '@/components/shared/DocumentUploadZone';
-import { ExtractedCoverageDisplay } from '@/components/shared/ExtractedCoverageDisplay';
 import { PropertySelector } from '@/components/shared/PropertySelector';
-import { ComplianceResults } from '@/components/shared/ComplianceResults';
-import { ConfidenceIndicator } from '@/components/shared/ConfidenceIndicator';
-import { extractCOI, extractLeaseRequirements, uploadCOIFile } from '@/services/ai-extraction';
-import { createTenant, updateTenant } from '@/services/tenants';
-import { fetchProperty } from '@/services/properties';
-import { compareCoverageToRequirements } from '@/services/compliance';
-import { TENANT_TEMPLATES, templateCoverageSummary, type TenantTemplate } from '@/constants/tenantTemplates';
-import type {
-  COIExtractionResult,
-  LeaseExtractionResult,
-  ComplianceResult,
-  CoverageRequirement,
-  RequirementSource,
-  ProfileCreationMethod,
-} from '@/types';
+import { createTenant, upsertTenantRequirements } from '@/services/tenants';
+import { fetchProperties } from '@/services/properties';
+import {
+  TENANT_TEMPLATES,
+  COVERAGE_AMOUNT_OPTIONS,
+  CANCELLATION_NOTICE_OPTIONS,
+  templateCoverageSummary,
+} from '@/constants/tenantTemplates';
+import type { TenantTemplate } from '@/constants/tenantTemplates';
 import { supabase } from '@/lib/supabase';
+import { formatCurrency } from '@/lib/utils';
+import type { Property, LeaseExtractedData } from '@/types';
 
 // ============================================
 // Types
@@ -38,102 +53,76 @@ import { supabase } from '@/lib/supabase';
 
 type RequirementPath = 'lease' | 'template' | 'manual';
 
-interface EditableRequirement {
-  id: string;
-  coverageType: string;
-  occurrenceLimit: string;
-  aggregateLimit: string;
-  required: boolean;
-  source: RequirementSource;
-  confidenceScore?: number;
-  sourceReference?: string;
+interface RequirementFormState {
+  general_liability_per_occurrence: number | null;
+  general_liability_aggregate: number | null;
+  auto_liability: number | null;
+  workers_comp_required: boolean;
+  employers_liability: number | null;
+  umbrella_liability: number | null;
+  property_insurance_required: boolean;
+  business_interruption_required: boolean;
+  liquor_liability: number | null;
+  waiver_of_subrogation_required: boolean;
+  cancellation_notice_days: number | null;
+  insurer_rating_minimum: string;
 }
 
-// ============================================
-// Helpers
-// ============================================
-
-const ICON_MAP: Record<string, LucideIcon> = {
-  Building2, Store, UtensilsCrossed,
+const ICON_MAP: Record<string, typeof Building2> = {
+  office: Building2,
+  retail: Store,
+  restaurant: UtensilsCrossed,
 };
 
-function createBlankRequirement(): EditableRequirement {
+function blankRequirements(): RequirementFormState {
   return {
-    id: crypto.randomUUID(),
-    coverageType: '',
-    occurrenceLimit: '',
-    aggregateLimit: '',
-    required: true,
-    source: 'manual',
+    general_liability_per_occurrence: null,
+    general_liability_aggregate: null,
+    auto_liability: null,
+    workers_comp_required: false,
+    employers_liability: null,
+    umbrella_liability: null,
+    property_insurance_required: false,
+    business_interruption_required: false,
+    liquor_liability: null,
+    waiver_of_subrogation_required: false,
+    cancellation_notice_days: null,
+    insurer_rating_minimum: '',
   };
 }
 
-function leaseResultToEditableRequirements(result: LeaseExtractionResult): EditableRequirement[] {
-  const reqs: EditableRequirement[] = [];
-  const r = result.requirements;
-
-  const addReq = (type: string, cov: CoverageRequirement | undefined) => {
-    if (!cov) return;
-    reqs.push({
-      id: crypto.randomUUID(),
-      coverageType: type,
-      occurrenceLimit: cov.occurrence_limit?.toString() ?? '',
-      aggregateLimit: cov.aggregate_limit?.toString() ?? '',
-      required: cov.required,
-      source: cov.source ?? 'lease_extracted',
-      confidenceScore: cov.confidence_score,
-      sourceReference: cov.source_reference,
-    });
+function templateToRequirements(t: TenantTemplate): RequirementFormState {
+  return {
+    general_liability_per_occurrence: t.general_liability_per_occurrence,
+    general_liability_aggregate: t.general_liability_aggregate,
+    auto_liability: t.auto_liability,
+    workers_comp_required: t.workers_comp_required,
+    employers_liability: t.employers_liability,
+    umbrella_liability: t.umbrella_liability,
+    property_insurance_required: t.property_insurance_required,
+    business_interruption_required: t.business_interruption_required,
+    liquor_liability: t.liquor_liability,
+    waiver_of_subrogation_required: t.waiver_of_subrogation_required,
+    cancellation_notice_days: null,
+    insurer_rating_minimum: t.insurer_rating_minimum ?? '',
   };
-
-  addReq('General Liability', r.general_liability);
-  addReq('Automobile Liability', r.automobile_liability);
-  addReq("Workers' Compensation", r.workers_compensation);
-  addReq('Umbrella / Excess', r.umbrella_excess);
-  addReq('Professional Liability', r.professional_liability);
-  addReq('Property Insurance', r.property_insurance);
-  addReq('Business Interruption', r.business_interruption);
-
-  return reqs;
 }
 
-function templateToEditableRequirements(t: TenantTemplate): EditableRequirement[] {
-  const reqs: EditableRequirement[] = [];
-  const src: RequirementSource = `template_${t.key}` as RequirementSource;
-
-  const add = (type: string, occ: number | null, agg?: number | null) => {
-    if (occ == null && agg == null) return;
-    reqs.push({
-      id: crypto.randomUUID(),
-      coverageType: type,
-      occurrenceLimit: occ?.toString() ?? '',
-      aggregateLimit: agg?.toString() ?? '',
-      required: true,
-      source: src,
-    });
+function leaseDataToRequirements(d: LeaseExtractedData): RequirementFormState {
+  return {
+    general_liability_per_occurrence: d.general_liability_per_occurrence,
+    general_liability_aggregate: d.general_liability_aggregate,
+    auto_liability: d.auto_liability,
+    workers_comp_required: d.workers_comp_required,
+    employers_liability: d.employers_liability,
+    umbrella_liability: d.umbrella_liability,
+    property_insurance_required: d.property_insurance_required,
+    business_interruption_required: d.business_interruption_required,
+    liquor_liability: d.liquor_liability,
+    waiver_of_subrogation_required: d.waiver_of_subrogation_required,
+    cancellation_notice_days: d.cancellation_notice_days,
+    insurer_rating_minimum: d.insurer_rating_minimum ?? '',
   };
-
-  add('General Liability', t.general_liability_per_occurrence, t.general_liability_aggregate);
-  add('Automobile Liability', t.auto_liability);
-  if (t.workers_comp_required) {
-    reqs.push({
-      id: crypto.randomUUID(),
-      coverageType: "Workers' Compensation",
-      occurrenceLimit: t.employers_liability?.toString() ?? '',
-      aggregateLimit: '',
-      required: true,
-      source: src,
-    });
-  }
-  add('Umbrella / Excess', t.umbrella_liability);
-  add('Professional Liability', t.professional_liability);
-  add('Property Insurance', t.property_insurance_amount);
-  add('Liquor Liability', t.liquor_liability);
-  add('Pollution Liability', t.pollution_liability);
-  add('Cyber Liability', t.cyber_liability);
-  add('Product Liability', t.product_liability);
-
-  return reqs;
 }
 
 // ============================================
@@ -145,156 +134,179 @@ export default function AddTenant() {
   const queryClient = useQueryClient();
 
   // Path selection
-  const [selectedPath, setSelectedPath] = useState<RequirementPath | null>(null);
-  const [selectedTemplate, setSelectedTemplate] = useState<TenantTemplate | null>(null);
+  const [selectedPath, setSelectedPath] = useState<RequirementPath | null>(
+    null
+  );
+  const [selectedTemplate, setSelectedTemplate] =
+    useState<TenantTemplate | null>(null);
 
   // Lease upload state
   const [leaseFile, setLeaseFile] = useState<File | null>(null);
   const [isExtractingLease, setIsExtractingLease] = useState(false);
-  const [leaseResult, setLeaseResult] = useState<LeaseExtractionResult | null>(null);
+  const [leaseExtracted, setLeaseExtracted] =
+    useState<LeaseExtractedData | null>(null);
   const [leaseError, setLeaseError] = useState<string | null>(null);
 
-  // COI upload state
+  // COI upload state (optional, at end of flow)
   const [coiFile, setCoiFile] = useState<File | null>(null);
-  const [isExtractingCOI, setIsExtractingCOI] = useState(false);
-  const [coiResult, setCoiResult] = useState<COIExtractionResult | null>(null);
-  const [coiError, setCoiError] = useState<string | null>(null);
 
-  // Editable requirements
-  const [requirements, setRequirements] = useState<EditableRequirement[]>([]);
+  // Requirement form
+  const [requirements, setRequirements] = useState<RequirementFormState>(
+    blankRequirements()
+  );
+  const [showLiquorLiability, setShowLiquorLiability] = useState(false);
 
-  // Form state
+  // Tenant info form
   const [tenantName, setTenantName] = useState('');
   const [tenantEmail, setTenantEmail] = useState('');
   const [propertyId, setPropertyId] = useState('');
+  const [unitSuite, setUnitSuite] = useState('');
 
   // Validation
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Submission
   const [isCreating, setIsCreating] = useState(false);
-  const [complianceResult, setComplianceResult] = useState<ComplianceResult | null>(null);
   const [createdSuccessfully, setCreatedSuccessfully] = useState(false);
-  const [hadCOI, setHadCOI] = useState(false);
 
-  // Derived
-  const hasRequirements = requirements.some((r) => r.coverageType.trim());
+  // Properties for auto-filling additional insured / certificate holder
+  const { data: properties } = useQuery({
+    queryKey: ['properties'],
+    queryFn: fetchProperties,
+  });
+
+  const selectedProperty = properties?.find(
+    (p: Property) => p.id === propertyId
+  );
+
+  // Whether the requirement form is ready to show
+  const showRequirementForm =
+    (selectedPath === 'lease' && leaseExtracted !== null) ||
+    (selectedPath === 'template' && selectedTemplate !== null) ||
+    selectedPath === 'manual';
+
+  // ---- Helpers ----
+
+  const updateReq = <K extends keyof RequirementFormState>(
+    field: K,
+    value: RequirementFormState[K]
+  ) => {
+    setRequirements((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const getSource = () => {
+    if (selectedPath === 'lease') return 'lease_extracted' as const;
+    if (selectedPath === 'template' && selectedTemplate)
+      return `template_${selectedTemplate.id}` as const;
+    return 'manual' as const;
+  };
 
   // ---- Path selection handlers ----
+
   const handleSelectPath = (path: RequirementPath) => {
     setSelectedPath(path);
     if (path === 'manual') {
-      setRequirements([createBlankRequirement()]);
+      setRequirements(blankRequirements());
     }
   };
 
   const handleSelectTemplate = (t: TenantTemplate) => {
     setSelectedTemplate(t);
-    setRequirements(templateToEditableRequirements(t));
+    const reqs = templateToRequirements(t);
+    setRequirements(reqs);
+    if (t.id === 'restaurant') {
+      setShowLiquorLiability(true);
+    }
   };
 
   const handleBackToPathSelection = () => {
     setSelectedPath(null);
     setSelectedTemplate(null);
-    setRequirements([]);
+    setRequirements(blankRequirements());
     setLeaseFile(null);
-    setLeaseResult(null);
+    setLeaseExtracted(null);
     setLeaseError(null);
+    setShowLiquorLiability(false);
   };
 
   // ---- Lease upload handler ----
+
   const handleLeaseUpload = useCallback(async (file: File) => {
     setLeaseFile(file);
     setLeaseError(null);
-    setLeaseResult(null);
+    setLeaseExtracted(null);
     setIsExtractingLease(true);
 
     try {
-      const result = await extractLeaseRequirements(file);
-      if (result.success) {
-        setLeaseResult(result);
-        const editableReqs = leaseResultToEditableRequirements(result);
-        setRequirements(editableReqs.length > 0 ? editableReqs : [createBlankRequirement()]);
+      // Convert file to base64
+      const arrayBuffer = await file.arrayBuffer();
+      const bytes = new Uint8Array(arrayBuffer);
+      let binary = '';
+      for (let i = 0; i < bytes.length; i++) {
+        binary += String.fromCharCode(bytes[i]!);
+      }
+      const file_base64 = btoa(binary);
 
-        if (result.tenant_name && !tenantName) setTenantName(result.tenant_name);
-
-        if (editableReqs.length === 0) {
-          setLeaseError(
-            "We didn't find any insurance requirements in this document. This might be the wrong section of the lease — try uploading just the insurance exhibit. Or you can enter requirements manually."
-          );
-        } else {
-          toast.success('Lease requirements extracted');
+      const { data, error } = await supabase.functions.invoke(
+        'extract-lease',
+        {
+          body: { file_base64, file_name: file.name },
         }
+      );
+
+      if (error) {
+        setLeaseError(
+          "We couldn't extract requirements from this document. Please check that it's a valid lease or insurance exhibit and try again."
+        );
+        return;
+      }
+
+      if (data && data.success && data.data) {
+        const extracted: LeaseExtractedData = data.data;
+        setLeaseExtracted(extracted);
+        const reqs = leaseDataToRequirements(extracted);
+        setRequirements(reqs);
+
+        // Show liquor liability if extracted
+        if (extracted.liquor_liability !== null) {
+          setShowLiquorLiability(true);
+        }
+
+        // Pre-fill tenant name from lease
+        if (extracted.tenant_name) {
+          setTenantName(extracted.tenant_name);
+        }
+
+        toast.success('Lease requirements extracted successfully');
       } else {
         setLeaseError(
-          result.error ?? "We couldn't extract requirements from this document. Please check that it's a valid lease or insurance exhibit and try again."
+          data?.error ??
+            "We couldn't find insurance requirements in this document. Try uploading just the insurance exhibit section."
         );
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : '';
-      if (msg.includes('too large') || msg.includes('413') || msg.includes('payload')) {
+      if (
+        msg.includes('too large') ||
+        msg.includes('413') ||
+        msg.includes('payload')
+      ) {
         setLeaseError(
           'This file is too large to process. Try uploading just the insurance exhibit or requirements section instead of the full lease.'
         );
       } else {
         setLeaseError(
-          msg || "We couldn't extract requirements from this document. Please check that it's a valid lease or insurance exhibit and try again."
+          msg ||
+            "We couldn't extract requirements from this document. Please check that it's a valid lease or insurance exhibit and try again."
         );
       }
     } finally {
       setIsExtractingLease(false);
     }
-  }, [tenantName]);
-
-  // ---- COI upload handler ----
-  const handleCOIUpload = useCallback(async (file: File) => {
-    setCoiFile(file);
-    setCoiError(null);
-    setCoiResult(null);
-    setIsExtractingCOI(true);
-
-    try {
-      const result = await extractCOI(file);
-      if (result.success) {
-        setCoiResult(result);
-        if (result.named_insured && !tenantName) {
-          setTenantName(result.named_insured);
-        }
-        toast.success('Certificate analyzed successfully');
-      } else {
-        setCoiError(
-          result.error ?? "We couldn't automatically extract data from this certificate. Please check that the file is a valid COI and try again, or contact support."
-        );
-      }
-    } catch {
-      setCoiError(
-        "We couldn't automatically extract data from this certificate. Please check that the file is a valid COI and try again, or contact support."
-      );
-    } finally {
-      setIsExtractingCOI(false);
-    }
-  }, [tenantName]);
-
-  // ---- Requirement editing ----
-  const updateRequirement = (id: string, field: keyof EditableRequirement, value: string | boolean) => {
-    setRequirements((prev) =>
-      prev.map((r) =>
-        r.id === id
-          ? { ...r, [field]: value, source: r.source !== 'manual' && field !== 'required' ? 'manual' as const : r.source }
-          : r
-      )
-    );
-  };
-
-  const removeRequirement = (id: string) => {
-    setRequirements((prev) => prev.filter((r) => r.id !== id));
-  };
-
-  const addRequirement = () => {
-    setRequirements((prev) => [...prev, createBlankRequirement()]);
-  };
+  }, []);
 
   // ---- Validation ----
+
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
 
@@ -304,250 +316,200 @@ export default function AddTenant() {
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(tenantEmail)) {
       newErrors.email = 'Please enter a valid email address';
     }
-    if (!propertyId) newErrors.property = 'Please assign this tenant to a property';
+    if (!propertyId) {
+      newErrors.property = 'Please assign this tenant to a property';
+    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  // ---- Determine creation method ----
-  const getCreationMethod = (): ProfileCreationMethod => {
-    if (selectedPath === 'lease' && leaseResult?.success) return 'lease_extracted';
-    if (selectedPath === 'template' && selectedTemplate) return `template_${selectedTemplate.key}` as ProfileCreationMethod;
-    return 'manual';
-  };
-
   // ---- Create tenant ----
+
   const handleCreate = useCallback(async () => {
     if (!validate()) return;
 
     setIsCreating(true);
     try {
+      // 1. Create tenant record
       const tenant = await createTenant({
         name: tenantName.trim(),
         email: tenantEmail.trim(),
         property_id: propertyId,
-        tenant_type: selectedTemplate?.key,
+        unit_suite: unitSuite.trim() || undefined,
+        tenant_type: selectedTemplate?.id,
+        lease_start_date: leaseExtracted?.lease_start_date ?? undefined,
+        lease_end_date: leaseExtracted?.lease_end_date ?? undefined,
       });
 
-      // Upload lease file to storage
-      if (leaseFile) {
+      // 2. Save requirements
+      const source = getSource();
+      const additionalInsured =
+        selectedProperty?.additional_insured_entities ?? [];
+
+      await upsertTenantRequirements(tenant.id, {
+        source: source as any,
+        general_liability_per_occurrence:
+          requirements.general_liability_per_occurrence,
+        general_liability_aggregate:
+          requirements.general_liability_aggregate,
+        auto_liability: requirements.auto_liability,
+        workers_comp_required: requirements.workers_comp_required,
+        employers_liability: requirements.employers_liability,
+        umbrella_liability: requirements.umbrella_liability,
+        property_insurance_required:
+          requirements.property_insurance_required,
+        business_interruption_required:
+          requirements.business_interruption_required,
+        liquor_liability: requirements.liquor_liability,
+        additional_insured_entities: additionalInsured,
+        waiver_of_subrogation_required:
+          requirements.waiver_of_subrogation_required,
+        cancellation_notice_days: requirements.cancellation_notice_days,
+        insurer_rating_minimum:
+          requirements.insurer_rating_minimum || null,
+      });
+
+      // 3. Upload COI file if provided
+      if (coiFile) {
         try {
-          const leaseFileName = `tenant/${tenant.id}/lease_${Date.now()}_${leaseFile.name}`;
+          const coiFileName = `tenant/${tenant.id}/coi_${Date.now()}_${coiFile.name}`;
           await supabase.storage
             .from('coi-documents')
-            .upload(leaseFileName, leaseFile, { upsert: true });
-
-          const { data: leaseUrlData } = supabase.storage
-            .from('coi-documents')
-            .getPublicUrl(leaseFileName);
-
-          await updateTenant(tenant.id, {
-            lease_document_path: leaseUrlData.publicUrl,
-          } as any);
+            .upload(coiFileName, coiFile, { upsert: true });
         } catch {
           // Storage might not be configured
         }
       }
 
-      // Save requirement profile
-      const validReqs = requirements.filter((r) => r.coverageType.trim());
-      if (validReqs.length > 0) {
-        try {
-          const reqProfile: Record<string, any> = {
-            entity_type: 'tenant',
-            entity_id: tenant.id,
-            building_id: propertyId,
-            creation_method: getCreationMethod(),
-          };
-
-          for (const req of validReqs) {
-            const lowerType = req.coverageType.toLowerCase();
-            let fieldKey = '';
-            if (lowerType.includes('general')) fieldKey = 'general_liability';
-            else if (lowerType.includes('auto')) fieldKey = 'automobile_liability';
-            else if (lowerType.includes('worker')) fieldKey = 'workers_compensation';
-            else if (lowerType.includes('umbrella') || lowerType.includes('excess')) fieldKey = 'umbrella_excess';
-            else if (lowerType.includes('professional') || lowerType.includes('e&o')) fieldKey = 'professional_liability';
-            else if (lowerType.includes('property')) fieldKey = 'property_insurance';
-            else if (lowerType.includes('business')) fieldKey = 'business_interruption';
-
-            if (fieldKey) {
-              reqProfile[fieldKey] = {
-                occurrence_limit: req.occurrenceLimit ? Number(req.occurrenceLimit) : undefined,
-                aggregate_limit: req.aggregateLimit ? Number(req.aggregateLimit) : undefined,
-                required: req.required,
-                source: req.source,
-                confidence_score: req.confidenceScore,
-                source_reference: req.sourceReference,
-              };
-            }
-          }
-
-          await supabase.from('requirement_profiles').insert(reqProfile);
-        } catch {
-          // Requirement profile table might not exist
-        }
-      }
-
-      // Handle COI if uploaded
-      const coiWasUploaded = !!(coiFile && coiResult?.success);
-      setHadCOI(coiWasUploaded);
-
-      if (coiWasUploaded && coiFile && coiResult) {
-        try {
-          await uploadCOIFile(coiFile, 'tenant', tenant.id);
-        } catch {
-          // Storage might not be configured
-        }
-
-        const now = new Date();
-        let insuranceStatus: 'compliant' | 'non-compliant' | 'expired' = 'non-compliant';
-        if (coiResult.expiration_date) {
-          insuranceStatus = new Date(coiResult.expiration_date) > now ? 'compliant' : 'expired';
-        }
-
-        await updateTenant(tenant.id, {
-          insurance_status: insuranceStatus,
-          coverage: coiResult.coverages,
-          endorsements: coiResult.endorsements ?? [],
-          certificate_holder_on_coi: coiResult.certificate_holder ?? '',
-          expiration_date: coiResult.expiration_date,
-        } as any);
-
-        // Run compliance comparison
-        try {
-          const templateCoverages: Record<string, any> = {};
-          for (const req of validReqs) {
-            const lowerType = req.coverageType.toLowerCase();
-            if (lowerType.includes('general') && req.occurrenceLimit) {
-              templateCoverages.general_liability_occurrence = Number(req.occurrenceLimit);
-            }
-            if (lowerType.includes('general') && req.aggregateLimit) {
-              templateCoverages.general_liability_aggregate = Number(req.aggregateLimit);
-            }
-            if (lowerType.includes('auto')) {
-              templateCoverages.automobile_liability_csl = Number(req.occurrenceLimit || req.aggregateLimit);
-            }
-            if (lowerType.includes('worker')) {
-              templateCoverages.workers_comp_statutory = true;
-            }
-            if (lowerType.includes('umbrella') || lowerType.includes('excess')) {
-              templateCoverages.umbrella_limit = Number(req.occurrenceLimit || req.aggregateLimit);
-            }
-            if (lowerType.includes('professional') || lowerType.includes('e&o')) {
-              templateCoverages.professional_liability_limit = Number(req.occurrenceLimit || req.aggregateLimit);
-            }
-            if (lowerType.includes('property')) {
-              templateCoverages.property_insurance_limit = Number(req.occurrenceLimit || req.aggregateLimit);
-            }
-          }
-
-          const template = {
-            id: '',
-            name: 'Requirements',
-            entity_type: 'tenant' as const,
-            user_id: '',
-            coverages: templateCoverages,
-            endorsements: {},
-            created_at: '',
-            updated_at: '',
-          };
-
-          // Fetch property data for endorsement/entity name checks
-          let propertyData = null;
-          if (propertyId) {
-            try {
-              propertyData = await fetchProperty(propertyId);
-            } catch {
-              // Non-critical
-            }
-          }
-          const compliance = compareCoverageToRequirements(
-            coiResult.coverages,
-            template,
-            { endorsements: coiResult.endorsements, property: propertyData, certificateHolder: coiResult.certificate_holder }
-          );
-          setComplianceResult(compliance);
-        } catch {
-          // Not critical
-        }
-      }
-
+      // 4. Invalidate queries and show success
       queryClient.invalidateQueries({ queryKey: ['tenants'] });
       queryClient.invalidateQueries({ queryKey: ['properties'] });
       setCreatedSuccessfully(true);
-      toast.success(coiWasUploaded ? 'Tenant created — compliance check complete' : 'Tenant created — awaiting COI upload');
+      toast.success('Tenant created successfully');
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to create tenant');
+      toast.error(
+        err instanceof Error ? err.message : 'Failed to create tenant'
+      );
     } finally {
       setIsCreating(false);
     }
-  }, [tenantName, tenantEmail, propertyId, leaseFile, leaseResult, coiFile, coiResult, requirements, selectedPath, selectedTemplate, queryClient]);
+  }, [
+    tenantName,
+    tenantEmail,
+    propertyId,
+    unitSuite,
+    selectedTemplate,
+    leaseExtracted,
+    requirements,
+    coiFile,
+    selectedProperty,
+    queryClient,
+  ]);
 
-  // ---- Reset everything ----
+  // ---- Reset ----
+
   const resetAll = () => {
     setCreatedSuccessfully(false);
     setSelectedPath(null);
     setSelectedTemplate(null);
+    setRequirements(blankRequirements());
     setLeaseFile(null);
-    setLeaseResult(null);
+    setLeaseExtracted(null);
     setLeaseError(null);
     setCoiFile(null);
-    setCoiResult(null);
-    setCoiError(null);
-    setRequirements([]);
     setTenantName('');
     setTenantEmail('');
     setPropertyId('');
-    setComplianceResult(null);
+    setUnitSuite('');
     setErrors({});
-    setHadCOI(false);
+    setShowLiquorLiability(false);
   };
+
+  // ============================================
+  // Coverage amount dropdown helper
+  // ============================================
+
+  const CoverageAmountSelect = ({
+    label,
+    value,
+    onChange,
+    id,
+  }: {
+    label: string;
+    value: number | null;
+    onChange: (v: number | null) => void;
+    id: string;
+  }) => (
+    <div className="space-y-2">
+      <Label htmlFor={id}>{label}</Label>
+      <Select
+        value={value !== null ? value.toString() : 'none'}
+        onValueChange={(v) => onChange(v === 'none' ? null : Number(v))}
+      >
+        <SelectTrigger id={id}>
+          <SelectValue placeholder="Select amount" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="none">Not Required</SelectItem>
+          {COVERAGE_AMOUNT_OPTIONS.map((amount) => (
+            <SelectItem key={amount} value={amount.toString()}>
+              {formatCurrency(amount)}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
 
   // ============================================
   // Success view
   // ============================================
+
   if (createdSuccessfully) {
     return (
       <div className="mx-auto max-w-3xl space-y-6">
         <PageHeader
           title="Tenant Created"
-          subtitle={hadCOI ? `${tenantName} has been added — compliance check complete` : `${tenantName} has been added — awaiting COI upload`}
+          subtitle={`${tenantName} has been added successfully`}
           actions={
-            <Button variant="outline" onClick={() => navigate('/tenants')}>
+            <Button
+              variant="outline"
+              onClick={() => navigate('/tenants')}
+            >
               <ArrowLeft className="mr-2 h-4 w-4" />
               Back to Tenants
             </Button>
           }
         />
 
-        {hadCOI && complianceResult ? (
-          <ComplianceResults result={complianceResult} />
-        ) : hadCOI ? (
-          <ComplianceResults
-            result={{ overall_status: 'non-compliant', compliance_percentage: 0, fields: [], expiring_within_30_days: 0, expired_count: 0 }}
-            noRequirementsMessage="Compliance results will be available once requirements are configured."
-          />
-        ) : (
-          <Card>
-            <CardContent className="flex items-center gap-3 p-6">
-              <FileText className="h-5 w-5 text-muted-foreground" />
-              <div>
-                <p className="text-sm font-medium">Pending COI Upload</p>
-                <p className="text-xs text-muted-foreground">
-                  Upload the tenant's COI from their detail page to run the compliance check.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        <Card>
+          <CardContent className="flex items-center gap-3 p-6">
+            <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+            <div>
+              <p className="text-sm font-medium">
+                Tenant and requirements saved
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Upload the tenant's COI from the tenant list to run a
+                compliance check.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
 
         <div className="flex gap-3">
-          <Button onClick={() => navigate('/tenants')} className="flex-1">
+          <Button
+            onClick={() => navigate('/tenants')}
+            className="flex-1"
+          >
             Go to Tenant List
           </Button>
-          <Button variant="outline" onClick={resetAll} className="flex-1">
+          <Button
+            variant="outline"
+            onClick={resetAll}
+            className="flex-1"
+          >
             Add Another Tenant
           </Button>
         </div>
@@ -558,52 +520,72 @@ export default function AddTenant() {
   // ============================================
   // Main form
   // ============================================
+
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <PageHeader
         title="Add New Tenant"
         actions={
-          <Button variant="ghost" size="sm" onClick={() => navigate('/tenants')}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate('/tenants')}
+          >
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back
           </Button>
         }
       />
 
-      {/* Step 1: Choose path */}
+      {/* ============================== */}
+      {/* Step 1: Choose path            */}
+      {/* ============================== */}
       {!selectedPath && (
         <div className="space-y-4">
           <div>
-            <h3 className="text-base font-semibold">How would you like to set up requirements?</h3>
-            <p className="text-sm text-muted-foreground">Choose how to define the insurance requirements for this tenant</p>
+            <h3 className="text-base font-semibold">
+              How would you like to set up requirements?
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              Choose how to define the insurance requirements for this
+              tenant
+            </p>
           </div>
           <div className="grid gap-4 md:grid-cols-3">
-            {([
-              {
-                id: 'lease' as const,
-                title: 'Upload Lease',
-                description: 'Upload a lease or insurance exhibit and let AI extract the requirements automatically.',
-                icon: Upload,
-                cta: 'Upload Lease',
-                primary: true,
-              },
-              {
-                id: 'template' as const,
-                title: 'Start from Template',
-                description: 'Pick a tenant type template as a starting point, then customize.',
-                icon: LayoutTemplate,
-                cta: 'Choose Template',
-                primary: false,
-              },
-              {
-                id: 'manual' as const,
-                title: 'Enter Manually',
-                description: 'Manually enter the insurance requirements for this tenant.',
-                icon: Edit3,
-                cta: 'Enter Manually',
-                primary: false,
-              },
-            ]).map((path) => (
+            {(
+              [
+                {
+                  id: 'lease' as const,
+                  title: 'Upload Lease',
+                  subtitle: 'Recommended',
+                  description:
+                    'Upload a lease or insurance exhibit and let AI extract the requirements automatically.',
+                  icon: Upload,
+                  cta: 'Upload Lease',
+                  primary: true,
+                },
+                {
+                  id: 'template' as const,
+                  title: 'Start from Template',
+                  subtitle: null,
+                  description:
+                    'Pick a tenant type template (Office, Retail, Restaurant) as a starting point.',
+                  icon: LayoutTemplate,
+                  cta: 'Choose Template',
+                  primary: false,
+                },
+                {
+                  id: 'manual' as const,
+                  title: 'Enter Manually',
+                  subtitle: null,
+                  description:
+                    'Manually enter the insurance requirements for this tenant.',
+                  icon: Edit3,
+                  cta: 'Enter Manually',
+                  primary: false,
+                },
+              ] as const
+            ).map((path) => (
               <Card
                 key={path.id}
                 className="hover:shadow-md cursor-pointer transition-shadow"
@@ -613,8 +595,17 @@ export default function AddTenant() {
                   <div className="rounded-full bg-primary/10 p-3">
                     <path.icon className="h-6 w-6 text-primary" />
                   </div>
-                  <h3 className="mt-4 text-base font-semibold">{path.title}</h3>
-                  <p className="mt-2 flex-1 text-sm text-muted-foreground">{path.description}</p>
+                  <h3 className="mt-4 text-base font-semibold">
+                    {path.title}
+                  </h3>
+                  {path.subtitle && (
+                    <span className="mt-1 text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                      {path.subtitle}
+                    </span>
+                  )}
+                  <p className="mt-2 flex-1 text-sm text-muted-foreground">
+                    {path.description}
+                  </p>
                   <Button
                     className="mt-4 w-full"
                     variant={path.primary ? 'default' : 'outline'}
@@ -632,54 +623,17 @@ export default function AddTenant() {
         </div>
       )}
 
-      {/* Step 2a: Template selection */}
-      {selectedPath === 'template' && !selectedTemplate && (
+      {/* ============================== */}
+      {/* Path A: Lease upload            */}
+      {/* ============================== */}
+      {selectedPath === 'lease' && !leaseExtracted && (
         <div className="space-y-4">
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={handleBackToPathSelection}>
-              <ArrowLeft className="mr-1 h-4 w-4" />
-              Back
-            </Button>
-            <div>
-              <h3 className="text-base font-semibold">Choose a Tenant Type</h3>
-              <p className="text-sm text-muted-foreground">Select a template as a starting point — you can customize after</p>
-            </div>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {TENANT_TEMPLATES.map((t) => {
-              const Icon = ICON_MAP[t.icon] ?? Building2;
-              return (
-                <Card
-                  key={t.key}
-                  className="hover:shadow-md cursor-pointer transition-shadow"
-                  onClick={() => handleSelectTemplate(t)}
-                >
-                  <CardContent className="p-4">
-                    <div className="flex items-start gap-3">
-                      <div className="rounded-lg bg-primary/10 p-2 shrink-0">
-                        <Icon className="h-5 w-5 text-primary" />
-                      </div>
-                      <div className="min-w-0">
-                        <h4 className="font-semibold text-sm">{t.name}</h4>
-                        <p className="text-xs text-muted-foreground mt-0.5">{t.description}</p>
-                        <p className="text-xs text-muted-foreground/70 mt-1.5 truncate">
-                          {templateCoverageSummary(t)}
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Step 2b: Lease upload */}
-      {selectedPath === 'lease' && (
-        <div className="space-y-4">
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={handleBackToPathSelection}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleBackToPathSelection}
+            >
               <ArrowLeft className="mr-1 h-4 w-4" />
               Back
             </Button>
@@ -698,13 +652,10 @@ export default function AddTenant() {
             uploadedFileSize={leaseFile?.size}
             onRemove={() => {
               setLeaseFile(null);
-              setLeaseResult(null);
+              setLeaseExtracted(null);
               setLeaseError(null);
-              setRequirements([]);
             }}
             error={leaseError ?? undefined}
-            success={!!leaseResult?.success}
-            successText={leaseResult?.success ? 'Requirements extracted — review below' : undefined}
           />
 
           {leaseError && (
@@ -724,7 +675,7 @@ export default function AddTenant() {
                 size="sm"
                 onClick={() => {
                   setSelectedPath('manual');
-                  setRequirements([createBlankRequirement()]);
+                  setRequirements(blankRequirements());
                   setLeaseError(null);
                 }}
               >
@@ -735,179 +686,403 @@ export default function AddTenant() {
         </div>
       )}
 
-      {/* Requirements review section (shown for all paths once requirements exist) */}
-      {selectedPath && hasRequirements && (
+      {/* Lease extracted confirmation */}
+      {selectedPath === 'lease' && leaseExtracted && (
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleBackToPathSelection}
+          >
+            <ArrowLeft className="mr-1 h-4 w-4" />
+            Back
+          </Button>
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+            <h3 className="text-base font-semibold">
+              Lease Requirements Extracted
+            </h3>
+          </div>
+        </div>
+      )}
+
+      {/* ============================== */}
+      {/* Path B: Template selection      */}
+      {/* ============================== */}
+      {selectedPath === 'template' && !selectedTemplate && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleBackToPathSelection}
+            >
+              <ArrowLeft className="mr-1 h-4 w-4" />
+              Back
+            </Button>
+            <div>
+              <h3 className="text-base font-semibold">
+                Choose a Tenant Type
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                Select a template as a starting point — you can customize
+                after
+              </p>
+            </div>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {TENANT_TEMPLATES.map((t) => {
+              const Icon = ICON_MAP[t.id] ?? Building2;
+              return (
+                <Card
+                  key={t.id}
+                  className="hover:shadow-md cursor-pointer transition-shadow"
+                  onClick={() => handleSelectTemplate(t)}
+                >
+                  <CardContent className="p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="rounded-lg bg-primary/10 p-2 shrink-0">
+                        <Icon className="h-5 w-5 text-primary" />
+                      </div>
+                      <div className="min-w-0">
+                        <h4 className="font-semibold text-sm">{t.name}</h4>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {t.description}
+                        </p>
+                        <p className="text-xs text-muted-foreground/70 mt-1.5 truncate">
+                          {templateCoverageSummary(t)}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Template selected confirmation */}
+      {selectedPath === 'template' && selectedTemplate && (
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleBackToPathSelection}
+          >
+            <ArrowLeft className="mr-1 h-4 w-4" />
+            Back
+          </Button>
+          <div className="flex items-center gap-2">
+            <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">
+              {selectedTemplate.name} Template
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Manual path back button */}
+      {selectedPath === 'manual' && (
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleBackToPathSelection}
+          >
+            <ArrowLeft className="mr-1 h-4 w-4" />
+            Back
+          </Button>
+          <h3 className="text-base font-semibold">
+            Enter Requirements Manually
+          </h3>
+        </div>
+      )}
+
+      {/* ============================== */}
+      {/* Requirement form               */}
+      {/* ============================== */}
+      {showRequirementForm && (
         <Card className="animate-in fade-in-0 slide-in-from-bottom-4 duration-500">
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle>Insurance Requirements</CardTitle>
                 <CardDescription>
-                  {selectedPath === 'lease' && leaseResult?.success
-                    ? 'Extracted from lease — edit if needed'
+                  {selectedPath === 'lease'
+                    ? 'Extracted from lease -- edit if needed'
                     : selectedPath === 'template' && selectedTemplate
-                      ? `Based on ${selectedTemplate.name} template — customize as needed`
-                      : 'Enter the insurance requirements'}
+                      ? `Based on ${selectedTemplate.name} template -- customize as needed`
+                      : 'Enter the insurance requirements for this tenant'}
                 </CardDescription>
               </div>
-              {selectedPath === 'template' && selectedTemplate && (
-                <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">
-                  {selectedTemplate.name}
-                </span>
-              )}
             </div>
           </CardHeader>
-          <CardContent className="space-y-3">
-            {requirements.map((req) => (
-              <div key={req.id} className="rounded-lg border bg-card p-4 space-y-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 grid gap-3 sm:grid-cols-3">
-                    <div className="space-y-1">
-                      <Label className="text-xs">Coverage Type</Label>
-                      <Input
-                        value={req.coverageType}
-                        onChange={(e) => updateRequirement(req.id, 'coverageType', e.target.value)}
-                        placeholder="e.g., General Liability"
-                        className="h-9"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">Per Occurrence Limit</Label>
-                      <Input
-                        value={req.occurrenceLimit}
-                        onChange={(e) => updateRequirement(req.id, 'occurrenceLimit', e.target.value)}
-                        placeholder="e.g., 1000000"
-                        className="h-9"
-                        type="number"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">Aggregate Limit</Label>
-                      <Input
-                        value={req.aggregateLimit}
-                        onChange={(e) => updateRequirement(req.id, 'aggregateLimit', e.target.value)}
-                        placeholder="e.g., 2000000"
-                        className="h-9"
-                        type="number"
-                      />
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 pt-5">
-                    {req.confidenceScore !== undefined && (
-                      <ConfidenceIndicator score={req.confidenceScore} />
-                    )}
-                    {req.sourceReference && (
-                      <span className="text-xs text-muted-foreground whitespace-nowrap">
-                        {req.sourceReference}
-                      </span>
-                    )}
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-destructive hover:text-destructive"
-                      onClick={() => removeRequirement(req.id)}
-                      type="button"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                </div>
-                {req.source === 'manual' && req.confidenceScore !== undefined && (
-                  <p className="text-xs text-muted-foreground italic">Edited from extracted value</p>
-                )}
+          <CardContent className="space-y-6">
+            {/* General Liability */}
+            <div>
+              <h4 className="text-sm font-semibold mb-3">
+                General Liability
+              </h4>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <CoverageAmountSelect
+                  label="Per Occurrence"
+                  value={requirements.general_liability_per_occurrence}
+                  onChange={(v) =>
+                    updateReq('general_liability_per_occurrence', v)
+                  }
+                  id="gl-per-occurrence"
+                />
+                <CoverageAmountSelect
+                  label="Aggregate"
+                  value={requirements.general_liability_aggregate}
+                  onChange={(v) =>
+                    updateReq('general_liability_aggregate', v)
+                  }
+                  id="gl-aggregate"
+                />
               </div>
-            ))}
-
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={addRequirement}
-              type="button"
-              className="w-full"
-            >
-              <Plus className="mr-1.5 h-3.5 w-3.5" />
-              Add Requirement
-            </Button>
-            {errors.requirements && (
-              <p className="text-sm text-destructive">{errors.requirements}</p>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Manual path — empty state prompting first requirement */}
-      {selectedPath === 'manual' && !hasRequirements && (
-        <Card>
-          <CardContent className="p-6 text-center space-y-3">
-            <p className="text-sm text-muted-foreground">No requirements added yet</p>
-            <Button variant="outline" size="sm" onClick={() => setRequirements([createBlankRequirement()])}>
-              <Plus className="mr-1.5 h-3.5 w-3.5" />
-              Add First Requirement
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* COI upload — shown once a path has been selected */}
-      {selectedPath && (
-        <div className="space-y-4">
-          <DocumentUploadZone
-            label="Upload Tenant's Certificate of Insurance"
-            helperText="Upload the tenant's current COI to check it against the requirements. You can skip this and upload later."
-            onUpload={handleCOIUpload}
-            isProcessing={isExtractingCOI}
-            processingText="Analyzing certificate..."
-            uploadedFileName={coiFile?.name}
-            uploadedFileSize={coiFile?.size}
-            onRemove={() => {
-              setCoiFile(null);
-              setCoiResult(null);
-              setCoiError(null);
-            }}
-            error={coiError ?? undefined}
-            success={!!coiResult?.success}
-            successText={coiResult?.success ? 'Certificate analyzed — review below' : undefined}
-          />
-
-          {coiError && (
-            <div className="flex justify-center">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setCoiError(null);
-                  setCoiFile(null);
-                }}
-              >
-                Try Again
-              </Button>
             </div>
-          )}
-        </div>
+
+            {/* Auto Liability */}
+            <CoverageAmountSelect
+              label="Auto Liability"
+              value={requirements.auto_liability}
+              onChange={(v) => updateReq('auto_liability', v)}
+              id="auto-liability"
+            />
+
+            {/* Workers Comp */}
+            <div className="flex items-center justify-between rounded-lg border p-4">
+              <div>
+                <Label htmlFor="workers-comp" className="text-sm font-medium">
+                  Workers' Compensation
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Statutory limits required
+                </p>
+              </div>
+              <Switch
+                id="workers-comp"
+                checked={requirements.workers_comp_required}
+                onCheckedChange={(checked) =>
+                  updateReq('workers_comp_required', checked)
+                }
+              />
+            </div>
+
+            {/* Employers' Liability -- shown when WC is on */}
+            {requirements.workers_comp_required && (
+              <CoverageAmountSelect
+                label="Employers' Liability"
+                value={requirements.employers_liability}
+                onChange={(v) => updateReq('employers_liability', v)}
+                id="employers-liability"
+              />
+            )}
+
+            {/* Umbrella */}
+            <CoverageAmountSelect
+              label="Umbrella / Excess Liability"
+              value={requirements.umbrella_liability}
+              onChange={(v) => updateReq('umbrella_liability', v)}
+              id="umbrella-liability"
+            />
+
+            {/* Property Insurance */}
+            <div className="flex items-center justify-between rounded-lg border p-4">
+              <div>
+                <Label
+                  htmlFor="property-insurance"
+                  className="text-sm font-medium"
+                >
+                  Property Insurance Required
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Tenant must carry property insurance for their contents
+                </p>
+              </div>
+              <Switch
+                id="property-insurance"
+                checked={requirements.property_insurance_required}
+                onCheckedChange={(checked) =>
+                  updateReq('property_insurance_required', checked)
+                }
+              />
+            </div>
+
+            {/* Business Interruption */}
+            <div className="flex items-center justify-between rounded-lg border p-4">
+              <div>
+                <Label
+                  htmlFor="business-interruption"
+                  className="text-sm font-medium"
+                >
+                  Business Interruption Required
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Tenant must carry business interruption insurance
+                </p>
+              </div>
+              <Switch
+                id="business-interruption"
+                checked={requirements.business_interruption_required}
+                onCheckedChange={(checked) =>
+                  updateReq('business_interruption_required', checked)
+                }
+              />
+            </div>
+
+            {/* Liquor Liability -- shown for restaurant template or if extracted */}
+            {(showLiquorLiability ||
+              selectedTemplate?.id === 'restaurant' ||
+              requirements.liquor_liability !== null) && (
+              <CoverageAmountSelect
+                label="Liquor Liability"
+                value={requirements.liquor_liability}
+                onChange={(v) => updateReq('liquor_liability', v)}
+                id="liquor-liability"
+              />
+            )}
+
+            {/* Waiver of Subrogation */}
+            <div className="flex items-center justify-between rounded-lg border p-4">
+              <div>
+                <Label
+                  htmlFor="waiver-of-sub"
+                  className="text-sm font-medium"
+                >
+                  Waiver of Subrogation
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Tenant's policies must include waiver of subrogation in
+                  favor of landlord
+                </p>
+              </div>
+              <Switch
+                id="waiver-of-sub"
+                checked={requirements.waiver_of_subrogation_required}
+                onCheckedChange={(checked) =>
+                  updateReq('waiver_of_subrogation_required', checked)
+                }
+              />
+            </div>
+
+            {/* Cancellation Notice Days */}
+            <div className="space-y-2">
+              <Label htmlFor="cancellation-days">
+                Cancellation Notice Days
+              </Label>
+              <Select
+                value={
+                  requirements.cancellation_notice_days !== null
+                    ? requirements.cancellation_notice_days.toString()
+                    : 'none'
+                }
+                onValueChange={(v) =>
+                  updateReq(
+                    'cancellation_notice_days',
+                    v === 'none' ? null : Number(v)
+                  )
+                }
+              >
+                <SelectTrigger id="cancellation-days">
+                  <SelectValue placeholder="Select days" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Not Required</SelectItem>
+                  {CANCELLATION_NOTICE_OPTIONS.map((days) => (
+                    <SelectItem key={days} value={days.toString()}>
+                      {days} days
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Insurer Rating Minimum */}
+            <div className="space-y-2">
+              <Label htmlFor="insurer-rating">
+                Insurer Rating Minimum
+              </Label>
+              <Input
+                id="insurer-rating"
+                value={requirements.insurer_rating_minimum}
+                onChange={(e) =>
+                  updateReq('insurer_rating_minimum', e.target.value)
+                }
+                placeholder="e.g., A.M. Best A VII"
+              />
+              <p className="text-xs text-muted-foreground">
+                Minimum acceptable insurer financial strength rating
+              </p>
+            </div>
+
+            {/* Additional insured info from property */}
+            {selectedProperty &&
+              selectedProperty.additional_insured_entities.length > 0 && (
+                <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
+                  <p className="text-sm font-medium">
+                    Additional Insured (from property)
+                  </p>
+                  <ul className="mt-1 space-y-0.5">
+                    {selectedProperty.additional_insured_entities.map(
+                      (entity, i) => (
+                        <li
+                          key={i}
+                          className="text-xs text-muted-foreground"
+                        >
+                          {entity}
+                        </li>
+                      )
+                    )}
+                  </ul>
+                </div>
+              )}
+
+            {selectedProperty &&
+              selectedProperty.certificate_holder_name && (
+                <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
+                  <p className="text-sm font-medium">
+                    Certificate Holder (from property)
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {selectedProperty.certificate_holder_name}
+                  </p>
+                </div>
+              )}
+          </CardContent>
+        </Card>
       )}
 
-      {/* Extracted COI coverages (read-only) */}
-      {coiResult?.success && (
-        <ExtractedCoverageDisplay
-          coverages={coiResult.coverages}
-          carrier={coiResult.carrier}
-          policyNumber={coiResult.policy_number}
-          effectiveDate={coiResult.effective_date}
-          expirationDate={coiResult.expiration_date}
-          overallConfidence={coiResult.confidence_score}
-          title="Tenant's Coverage"
-          description="These are the coverages found on the uploaded certificate."
+      {/* ============================== */}
+      {/* Optional COI upload             */}
+      {/* ============================== */}
+      {showRequirementForm && (
+        <DocumentUploadZone
+          label="Upload Tenant's Certificate of Insurance (Optional)"
+          helperText="Upload the tenant's current COI now, or skip and upload later from the tenant list."
+          onUpload={(file) => {
+            setCoiFile(file);
+            toast.success('COI attached -- it will be uploaded when you save.');
+          }}
+          uploadedFileName={coiFile?.name}
+          uploadedFileSize={coiFile?.size}
+          onRemove={() => setCoiFile(null)}
+          success={!!coiFile}
+          successText={coiFile ? 'COI attached' : undefined}
         />
       )}
 
-      {/* Tenant info — shown once a path has been selected */}
-      {selectedPath && (
-        <Card>
+      {/* ============================== */}
+      {/* Tenant information              */}
+      {/* ============================== */}
+      {showRequirementForm && (
+        <Card className="animate-in fade-in-0 slide-in-from-bottom-4 duration-500">
           <CardHeader>
             <CardTitle>Tenant Information</CardTitle>
             <CardDescription>
-              {(leaseResult?.tenant_name || coiResult?.named_insured)
-                ? 'Pre-filled from uploaded documents — edit if needed'
+              {leaseExtracted?.tenant_name
+                ? 'Pre-filled from lease -- edit if needed'
                 : 'Enter the tenant details'}
             </CardDescription>
           </CardHeader>
@@ -921,11 +1096,14 @@ export default function AddTenant() {
                 value={tenantName}
                 onChange={(e) => {
                   setTenantName(e.target.value);
-                  if (errors.name) setErrors((prev) => ({ ...prev, name: '' }));
+                  if (errors.name)
+                    setErrors((prev) => ({ ...prev, name: '' }));
                 }}
                 placeholder="Tenant name"
               />
-              {errors.name && <p className="text-sm text-destructive">{errors.name}</p>}
+              {errors.name && (
+                <p className="text-sm text-destructive">{errors.name}</p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -938,11 +1116,16 @@ export default function AddTenant() {
                 value={tenantEmail}
                 onChange={(e) => {
                   setTenantEmail(e.target.value);
-                  if (errors.email) setErrors((prev) => ({ ...prev, email: '' }));
+                  if (errors.email)
+                    setErrors((prev) => ({ ...prev, email: '' }));
                 }}
                 placeholder="tenant@example.com"
               />
-              {errors.email && <p className="text-sm text-destructive">{errors.email}</p>}
+              {errors.email && (
+                <p className="text-sm text-destructive">
+                  {errors.email}
+                </p>
+              )}
               <p className="text-xs text-muted-foreground">
                 Used for compliance notifications and COI update requests
               </p>
@@ -952,20 +1135,38 @@ export default function AddTenant() {
               value={propertyId}
               onChange={(v) => {
                 setPropertyId(v);
-                if (errors.property) setErrors((prev) => ({ ...prev, property: '' }));
+                if (errors.property)
+                  setErrors((prev) => ({ ...prev, property: '' }));
               }}
               required
               error={errors.property}
             />
+
+            <div className="space-y-2">
+              <Label htmlFor="unit-suite">Unit / Suite</Label>
+              <Input
+                id="unit-suite"
+                value={unitSuite}
+                onChange={(e) => setUnitSuite(e.target.value)}
+                placeholder="e.g., Suite 200, Unit 3B"
+              />
+            </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Create button */}
-      {selectedPath && (
+      {/* ============================== */}
+      {/* Create button                   */}
+      {/* ============================== */}
+      {showRequirementForm && (
         <Button
           onClick={handleCreate}
-          disabled={isCreating || !tenantName.trim() || !tenantEmail.trim() || !propertyId}
+          disabled={
+            isCreating ||
+            !tenantName.trim() ||
+            !tenantEmail.trim() ||
+            !propertyId
+          }
           className="w-full h-12 text-base"
         >
           {isCreating ? (

@@ -83,7 +83,7 @@ export default function Onboarding() {
       } else if (currentStep === 2) {
         await createProperty({
           name: propertyName.trim(),
-          address: propertyAddress.trim(),
+          address_street: propertyAddress.trim(),
           certificate_holder_name: certHolderName.trim() || companyName.trim() || undefined,
           additional_insured_entities: additionalInsured.trim()
             ? [additionalInsured.trim()]

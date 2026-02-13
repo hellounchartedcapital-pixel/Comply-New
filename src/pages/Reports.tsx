@@ -52,16 +52,16 @@ function computeStats(vendors: Vendor[], tenants: Tenant[], filter: 'all' | 'ven
   if (filter === 'all' || filter === 'vendors') {
     for (const v of vendors) {
       if (v.status === 'compliant') compliant++;
-      else if (v.status === 'expiring') expiring++;
+      else if (v.status === 'expiring_soon') expiring++;
       else if (v.status === 'expired') expired++;
       else nonCompliant++;
     }
   }
   if (filter === 'all' || filter === 'tenants') {
     for (const t of tenants) {
-      if (t.insurance_status === 'compliant') compliant++;
-      else if (t.insurance_status === 'expiring') expiring++;
-      else if (t.insurance_status === 'expired') expired++;
+      if (t.status === 'compliant') compliant++;
+      else if (t.status === 'expiring_soon') expiring++;
+      else if (t.status === 'expired') expired++;
       else nonCompliant++;
     }
   }
@@ -87,7 +87,7 @@ function exportCSV(vendors: Vendor[], tenants: Tenant[]) {
       'Tenant',
       t.name,
       t.property?.name ?? 'Unassigned',
-      t.insurance_status,
+      t.insurance_status ?? t.status ?? 'pending',
       t.lease_end ?? 'N/A',
     ]);
   }

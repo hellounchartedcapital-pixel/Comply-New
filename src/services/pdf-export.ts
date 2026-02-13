@@ -127,8 +127,8 @@ export function exportComplianceReport({ property, vendors, tenants, companyName
       head: [['Name', 'Unit', 'Status', 'Lease End']],
       body: tenants.map((t) => [
         t.name,
-        t.unit ?? 'N/A',
-        statusLabel(t.insurance_status),
+        t.unit_suite ?? t.unit ?? 'N/A',
+        statusLabel(t.insurance_status ?? t.status),
         t.lease_end ? new Date(t.lease_end).toLocaleDateString('en-US') : 'N/A',
       ]),
       styles: { fontSize: 9 },

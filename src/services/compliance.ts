@@ -496,39 +496,37 @@ export function compareCoverageToRequirements(
     property: options?.property,
   });
 
-  // Convert line items to legacy ComplianceField format
-  const fields: ComplianceField[] = unified.line_items.map((item) => {
+  // Convert line items to ComplianceItem format
+  const items: ComplianceField[] = unified.line_items.map((item) => {
     const statusMap: Record<LineItemStatus, ComplianceField['status']> = {
-      pass: 'compliant',
-      fail: 'non-compliant',
-      missing: 'non-compliant',
+      pass: 'pass',
+      fail: 'fail',
+      missing: 'not_found',
       expiring: 'expiring',
       expired: 'expired',
     };
 
-    // Parse values back to numeric where possible
-    const parseVal = (s: string): number | string | null => {
-      if (s === 'Missing') return null;
-      const stripped = s.replace(/[$,]/g, '');
-      const num = Number(stripped);
-      return !isNaN(num) && stripped.length > 0 ? num : s;
-    };
-
     return {
-      field_name: item.display_name,
-      required_value: parseVal(item.required_value),
-      actual_value: parseVal(item.actual_value),
+      field: item.field,
+      display_name: item.display_name,
+      required: item.required_value,
+      actual: item.actual_value === 'Missing' ? null : item.actual_value,
       status: statusMap[item.status],
-      expiration_date: item.expiration_date,
+      reason: item.reason,
     };
   });
 
+  // Determine earliest expiration from line items
+  const expirationDates = unified.line_items
+    .map((i) => i.expiration_date)
+    .filter((d): d is string => !!d)
+    .sort();
+  const earliest_expiration = expirationDates[0] ?? null;
+
   return {
-    overall_status: unified.overall_status,
-    compliance_percentage: unified.compliance_percentage,
-    fields,
-    expiring_within_30_days: unified.expiring_within_30_days,
-    expired_count: unified.expired_count,
+    overall_status: unified.overall_status === 'non-compliant' ? 'non_compliant' : unified.overall_status === 'expiring' ? 'non_compliant' : unified.overall_status,
+    earliest_expiration,
+    items,
   };
 }
 
@@ -536,21 +534,12 @@ export function compareCoverageToRequirements(
 // UTILITY FUNCTIONS
 // ============================================
 
-export function getComplianceGaps(fields: ComplianceField[]): string[] {
-  return fields
-    .filter((f) => f.status !== 'compliant' && f.status !== 'not-required')
-    .map((f) => {
-      const required =
-        typeof f.required_value === 'number'
-          ? formatCurrency(f.required_value)
-          : String(f.required_value ?? 'Required');
-      const actual =
-        f.actual_value === null
-          ? 'Missing'
-          : typeof f.actual_value === 'number'
-            ? formatCurrency(f.actual_value)
-            : String(f.actual_value);
-      return `${f.field_name}: Required ${required}, Found ${actual}`;
+export function getComplianceGaps(items: ComplianceField[]): string[] {
+  return items
+    .filter((i) => i.status !== 'pass' && i.status !== 'expiring')
+    .map((i) => {
+      const actual = i.actual ?? 'Missing';
+      return `${i.display_name}: Required ${i.required}, Found ${actual}`;
     });
 }
 
@@ -561,11 +550,11 @@ export function getComplianceGapsFromLineItems(items: ComplianceLineItem[]): str
 }
 
 export function generateComplianceInsight(result: ComplianceResult): string {
-  if (result.fields.length === 0) {
+  if (result.items.length === 0) {
     return 'No requirements have been configured yet. Set up requirements on the Requirements page to enable compliance checking.';
   }
 
-  const { overall_status, fields, expired_count, expiring_within_30_days } = result;
+  const { overall_status, items } = result;
 
   if (overall_status === 'compliant') {
     return 'This entity is fully compliant. All coverages meet or exceed the required minimums.';
@@ -573,31 +562,23 @@ export function generateComplianceInsight(result: ComplianceResult): string {
 
   const parts: string[] = [];
 
-  if (overall_status === 'expired') {
-    parts.push(`${expired_count} coverage${expired_count > 1 ? 's have' : ' has'} expired`);
+  const expiredItems = items.filter((i) => i.status === 'expired');
+  if (overall_status === 'expired' && expiredItems.length > 0) {
+    parts.push(`${expiredItems.length} coverage${expiredItems.length > 1 ? 's have' : ' has'} expired`);
   }
 
-  const nonCompliant = fields.filter((f) => f.status === 'non-compliant');
-  for (const f of nonCompliant) {
-    if (f.actual_value === null) {
-      parts.push(`${f.field_name} coverage is missing entirely`);
+  const failedItems = items.filter((i) => i.status === 'fail' || i.status === 'not_found');
+  for (const item of failedItems) {
+    if (item.actual === null) {
+      parts.push(`${item.display_name} coverage is missing entirely`);
     } else {
-      const actual = typeof f.actual_value === 'number' ? formatCurrency(f.actual_value) : String(f.actual_value);
-      const required = typeof f.required_value === 'number' ? formatCurrency(f.required_value) : String(f.required_value);
-      parts.push(`${f.field_name} limit (${actual}) is below the required minimum (${required})`);
+      parts.push(`${item.display_name} limit (${item.actual}) is below the required minimum (${item.required})`);
     }
   }
 
-  if (overall_status === 'expiring' && expiring_within_30_days > 0) {
-    const expiringFields = fields.filter((f) => f.expiration_date).filter((f) => {
-      const d = new Date(f.expiration_date!);
-      const now = new Date();
-      return d > now && d < new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-    });
-    for (const f of expiringFields) {
-      const dateStr = new Date(f.expiration_date!).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-      parts.push(`${f.field_name} expires ${dateStr}`);
-    }
+  const expiringItems = items.filter((i) => i.status === 'expiring');
+  for (const item of expiringItems) {
+    parts.push(`${item.display_name} is expiring soon`);
   }
 
   if (parts.length === 0) {
@@ -606,7 +587,6 @@ export function generateComplianceInsight(result: ComplianceResult): string {
 
   const statusLabel =
     overall_status === 'expired' ? 'has expired coverage' :
-    overall_status === 'expiring' ? 'has coverage expiring soon' :
     'is non-compliant';
 
   return `This entity ${statusLabel}: ${parts.join('. ')}.`;

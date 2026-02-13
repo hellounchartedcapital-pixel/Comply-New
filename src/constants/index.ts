@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   Clock,
   Minus,
+  HelpCircle,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -11,6 +12,7 @@ export const COVERAGE_TYPES = [
   { key: 'general_liability', label: 'General Liability' },
   { key: 'automobile_liability', label: 'Automobile Liability' },
   { key: 'workers_compensation', label: "Workers' Compensation" },
+  { key: 'employers_liability', label: "Employers' Liability" },
   { key: 'umbrella_excess', label: 'Umbrella / Excess' },
   { key: 'professional_liability', label: 'Professional Liability / E&O' },
   { key: 'property_insurance', label: 'Property Insurance' },
@@ -37,6 +39,15 @@ export const STATUS_CONFIG: Record<string, StatusConfig> = {
     borderColor: 'border-success/30',
     icon: CheckCircle2,
   },
+  non_compliant: {
+    label: 'Non-Compliant',
+    color: 'hsl(0, 84%, 60%)',
+    bgColor: 'bg-destructive/15',
+    textColor: 'text-destructive',
+    borderColor: 'border-destructive/30',
+    icon: XCircle,
+  },
+  // Legacy status name
   'non-compliant': {
     label: 'Non-Compliant',
     color: 'hsl(0, 84%, 60%)',
@@ -45,6 +56,15 @@ export const STATUS_CONFIG: Record<string, StatusConfig> = {
     borderColor: 'border-destructive/30',
     icon: XCircle,
   },
+  expiring_soon: {
+    label: 'Expiring Soon',
+    color: 'hsl(38, 92%, 50%)',
+    bgColor: 'bg-warning/15',
+    textColor: 'text-warning',
+    borderColor: 'border-warning/30',
+    icon: AlertTriangle,
+  },
+  // Legacy status name
   expiring: {
     label: 'Expiring Soon',
     color: 'hsl(38, 92%, 50%)',
@@ -60,6 +80,14 @@ export const STATUS_CONFIG: Record<string, StatusConfig> = {
     textColor: 'text-destructive',
     borderColor: 'border-destructive/30',
     icon: Clock,
+  },
+  pending: {
+    label: 'Pending',
+    color: 'hsl(220, 14%, 46%)',
+    bgColor: 'bg-muted',
+    textColor: 'text-muted-foreground',
+    borderColor: 'border-border',
+    icon: HelpCircle,
   },
   'not-required': {
     label: 'Not Required',
@@ -91,6 +119,21 @@ export const SOURCE_CONFIG: Record<string, { label: string; color: string; bgCol
     label: 'Manual',
     color: 'text-gray-700',
     bgColor: 'bg-gray-100',
+  },
+  template_office: {
+    label: 'Office Template',
+    color: 'text-blue-700',
+    bgColor: 'bg-blue-100',
+  },
+  template_retail: {
+    label: 'Retail Template',
+    color: 'text-blue-700',
+    bgColor: 'bg-blue-100',
+  },
+  template_restaurant: {
+    label: 'Restaurant Template',
+    color: 'text-orange-700',
+    bgColor: 'bg-orange-100',
   },
 };
 

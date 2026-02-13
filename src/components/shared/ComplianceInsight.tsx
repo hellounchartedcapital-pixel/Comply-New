@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle2, XCircle, Clock } from 'lucide-react';
+import { CheckCircle2, XCircle, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ComplianceResult } from '@/types';
 import { generateComplianceInsight } from '@/services/compliance';
@@ -10,14 +10,13 @@ interface ComplianceInsightProps {
 
 const STATUS_STYLES = {
   compliant: { bg: 'bg-green-50 border-green-200', text: 'text-green-800', icon: CheckCircle2 },
-  'non-compliant': { bg: 'bg-red-50 border-red-200', text: 'text-red-800', icon: XCircle },
-  expiring: { bg: 'bg-yellow-50 border-yellow-200', text: 'text-yellow-800', icon: AlertTriangle },
+  non_compliant: { bg: 'bg-red-50 border-red-200', text: 'text-red-800', icon: XCircle },
   expired: { bg: 'bg-red-50 border-red-200', text: 'text-red-800', icon: Clock },
 } as const;
 
 export function ComplianceInsight({ result, className }: ComplianceInsightProps) {
   const insight = generateComplianceInsight(result);
-  const style = STATUS_STYLES[result.overall_status] ?? STATUS_STYLES['non-compliant'];
+  const style = STATUS_STYLES[result.overall_status] ?? STATUS_STYLES['non_compliant'];
   const Icon = style.icon;
 
   return (

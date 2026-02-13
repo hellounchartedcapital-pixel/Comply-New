@@ -1,8 +1,7 @@
 import { CheckCircle2, XCircle, AlertTriangle, Clock, Info } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { formatCurrency } from '@/lib/utils';
-import type { ComplianceResult, ComplianceField } from '@/types';
+import type { ComplianceResult, ComplianceItem } from '@/types';
 import { cn } from '@/lib/utils';
 
 interface ComplianceResultsProps {
@@ -18,7 +17,7 @@ export function ComplianceResults({
   noRequirementsMessage,
   className,
 }: ComplianceResultsProps) {
-  if (result.fields.length === 0 && noRequirementsMessage) {
+  if (result.items.length === 0 && noRequirementsMessage) {
     return (
       <Card className={className}>
         <CardContent className="flex items-start gap-3 p-6">
@@ -38,12 +37,16 @@ export function ComplianceResults({
 
   const statusConfig = {
     compliant: { label: 'Compliant', icon: CheckCircle2, variant: 'success' as const, color: 'text-success' },
-    'non-compliant': { label: 'Non-Compliant', icon: XCircle, variant: 'danger' as const, color: 'text-destructive' },
-    expiring: { label: 'Expiring Soon', icon: AlertTriangle, variant: 'warning' as const, color: 'text-warning' },
+    non_compliant: { label: 'Non-Compliant', icon: XCircle, variant: 'danger' as const, color: 'text-destructive' },
     expired: { label: 'Expired', icon: Clock, variant: 'danger' as const, color: 'text-destructive' },
   };
 
   const overallConfig = statusConfig[result.overall_status];
+
+  // Compute compliance percentage from items
+  const totalItems = result.items.length;
+  const passItems = result.items.filter(i => i.status === 'pass' || i.status === 'expiring').length;
+  const compliancePercentage = totalItems > 0 ? Math.round((passItems / totalItems) * 100) : 0;
 
   return (
     <Card className={className}>
@@ -52,7 +55,7 @@ export function ComplianceResults({
           <div>
             <CardTitle>Compliance Results</CardTitle>
             <CardDescription className="mt-1">
-              {result.compliance_percentage}% compliant — {result.fields.filter(f => f.status === 'compliant').length} of {result.fields.length} requirements met
+              {compliancePercentage}% compliant — {result.items.filter(f => f.status === 'pass').length} of {result.items.length} requirements met
             </CardDescription>
           </div>
           <Badge variant={overallConfig.variant} className="gap-1.5 px-3 py-1">
@@ -66,59 +69,52 @@ export function ComplianceResults({
           <div
             className={cn(
               'h-full rounded-full transition-all',
-              result.compliance_percentage === 100
+              compliancePercentage === 100
                 ? 'bg-success'
-                : result.compliance_percentage >= 50
+                : compliancePercentage >= 50
                   ? 'bg-warning'
                   : 'bg-destructive'
             )}
-            style={{ width: `${result.compliance_percentage}%` }}
+            style={{ width: `${compliancePercentage}%` }}
           />
         </div>
       </CardHeader>
       <CardContent className="space-y-2">
-        {result.fields.map((field, i) => (
-          <ComplianceFieldRow key={i} field={field} />
+        {result.items.map((item, i) => (
+          <ComplianceItemRow key={i} item={item} />
         ))}
       </CardContent>
     </Card>
   );
 }
 
-function ComplianceFieldRow({ field }: { field: ComplianceField }) {
+function ComplianceItemRow({ item }: { item: ComplianceItem }) {
   const iconMap = {
-    compliant: { icon: CheckCircle2, color: 'text-success' },
-    'non-compliant': { icon: XCircle, color: 'text-destructive' },
+    pass: { icon: CheckCircle2, color: 'text-success' },
+    fail: { icon: XCircle, color: 'text-destructive' },
+    not_found: { icon: XCircle, color: 'text-destructive' },
     expiring: { icon: AlertTriangle, color: 'text-warning' },
     expired: { icon: Clock, color: 'text-destructive' },
-    'not-required': { icon: CheckCircle2, color: 'text-muted-foreground' },
   };
 
-  const config = iconMap[field.status];
+  const config = iconMap[item.status];
   const Icon = config.icon;
-
-  const formatValue = (val: number | boolean | string | null) => {
-    if (val === null) return 'Missing';
-    if (typeof val === 'number') return formatCurrency(val);
-    if (typeof val === 'boolean') return val ? 'Yes' : 'No';
-    return String(val);
-  };
 
   return (
     <div className="flex items-center justify-between rounded-lg bg-secondary/50 px-4 py-3">
       <div className="flex items-center gap-3">
         <Icon className={cn('h-4 w-4 flex-shrink-0', config.color)} />
         <div>
-          <p className="text-sm font-medium">{field.field_name}</p>
+          <p className="text-sm font-medium">{item.display_name}</p>
           <div className="flex gap-3 text-xs text-muted-foreground">
-            <span>Required: {formatValue(field.required_value)}</span>
-            <span>Found: {formatValue(field.actual_value)}</span>
+            <span>Required: {item.required}</span>
+            <span>Found: {item.actual ?? 'Missing'}</span>
           </div>
         </div>
       </div>
-      {field.expiration_date && (
-        <span className="text-xs text-muted-foreground">
-          Exp: {new Date(field.expiration_date).toLocaleDateString()}
+      {item.reason && (
+        <span className="text-xs text-muted-foreground max-w-[200px] text-right">
+          {item.status === 'expiring' ? 'Expiring soon' : item.status === 'expired' ? 'Expired' : ''}
         </span>
       )}
     </div>
