@@ -54,15 +54,15 @@
 
 @layer utilities {
   .gradient-primary {
-    background: linear-gradient(135deg, hsl(160, 82%, 39%), hsl(175, 84%, 32%));
+    background: linear-gradient(135deg, #73E2A7, #5CC98E);
   }
 
   .gradient-primary-hover {
-    background: linear-gradient(135deg, hsl(160, 82%, 35%), hsl(175, 84%, 28%));
+    background: linear-gradient(135deg, #5CC98E, #4BBF7F);
   }
 
   .text-gradient-primary {
-    background: linear-gradient(135deg, hsl(160, 82%, 39%), hsl(175, 84%, 32%));
+    background: linear-gradient(135deg, #73E2A7, #5CC98E);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;

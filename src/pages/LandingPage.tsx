@@ -2,33 +2,56 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Menu, X, Check,
-  Zap, Bell, Users, FileText, Sparkles,
-  Truck, ArrowRight,
   Mail, User, MessageSquare, Send, Loader2,
   CheckCircle, AlertCircle, ChevronDown,
-  Globe, Upload, BarChart3,
+  Sparkles, Clock, FileText, Link2, Building2,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { DashboardPreview } from '@/components/landing/DashboardPreview';
 
 /* ------------------------------------------------------------------ */
-/*  Scroll-triggered fade-in hook                                      */
+/*  Design tokens (scoped to landing page)                              */
 /* ------------------------------------------------------------------ */
-function useInView(threshold = 0.15) {
+const C = {
+  green: '#73E2A7',
+  greenDark: '#5CC98E',
+  greenDim: 'rgba(115, 226, 167, 0.10)',
+  greenBorder: 'rgba(115, 226, 167, 0.20)',
+  bg: '#FFFFFF',
+  bgSection: '#F8F9FB',
+  bgCard: '#FFFFFF',
+  border: '#EBEBEF',
+  borderLight: '#F0F0F4',
+  text: '#111114',
+  textSecondary: '#6B6B76',
+  textTertiary: '#9D9DA7',
+  radius: 14,
+  radiusSm: 10,
+  radiusXs: 8,
+  shadowSm: '0 1px 2px rgba(0,0,0,0.04)',
+  shadowMd: '0 4px 16px rgba(0,0,0,0.05)',
+  shadowLg: '0 12px 48px rgba(0,0,0,0.07)',
+};
+
+const FONT = "'DM Sans', sans-serif";
+const FONT_MONO = "'Space Mono', monospace";
+
+/* ------------------------------------------------------------------ */
+/*  Scroll-triggered fade-in                                            */
+/* ------------------------------------------------------------------ */
+function useInView(threshold = 0.1) {
   const ref = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
-
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
     const observer = new IntersectionObserver(
       (entries) => { if (entries[0]?.isIntersecting) setVisible(true); },
-      { threshold }
+      { threshold, rootMargin: '0px 0px -40px 0px' }
     );
     observer.observe(el);
     return () => observer.disconnect();
   }, [threshold]);
-
   return { ref, visible };
 }
 
@@ -40,7 +63,7 @@ function FadeIn({ children, className = '', delay = 0 }: { children: React.React
       className={className}
       style={{
         opacity: visible ? 1 : 0,
-        transform: visible ? 'translateY(0)' : 'translateY(24px)',
+        transform: visible ? 'translateY(0)' : 'translateY(20px)',
         transition: `opacity 0.6s ease ${delay}s, transform 0.6s ease ${delay}s`,
       }}
     >
@@ -50,7 +73,7 @@ function FadeIn({ children, className = '', delay = 0 }: { children: React.React
 }
 
 /* ------------------------------------------------------------------ */
-/*  Contact Form Modal (preserved from existing build)                 */
+/*  Contact Modal (preserved from existing build)                       */
 /* ------------------------------------------------------------------ */
 function ContactModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const [formData, setFormData] = useState({ name: '', email: '', message: '' });
@@ -62,7 +85,6 @@ function ContactModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => voi
     e.preventDefault();
     setSending(true);
     setError(null);
-
     try {
       const { data, error: fnError } = await supabase.functions.invoke('send-contact', {
         body: { name: formData.name, email: formData.email, message: formData.message },
@@ -70,7 +92,6 @@ function ContactModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => voi
       if (fnError) throw fnError;
       if (data && !(data as { success?: boolean }).success)
         throw new Error((data as { error?: string }).error || 'Failed to send message');
-
       setSent(true);
       setFormData({ name: '', email: '', message: '' });
     } catch {
@@ -80,85 +101,77 @@ function ContactModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => voi
     }
   };
 
-  const handleClose = () => {
-    setSent(false);
-    setError(null);
-    onClose();
-  };
-
+  const handleClose = () => { setSent(false); setError(null); onClose(); };
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden">
-        <div className="bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 p-6 text-white">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
-                <Mail className="w-6 h-6" />
-              </div>
-              <div>
-                <h2 className="text-xl font-bold">Get in Touch</h2>
-                <p className="text-emerald-100 text-sm">We&rsquo;d love to hear from you</p>
-              </div>
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" style={{ fontFamily: FONT }}>
+      <div style={{ background: '#fff', borderRadius: 16, maxWidth: 480, width: '100%', boxShadow: C.shadowLg, overflow: 'hidden' }}>
+        <div style={{ background: C.text, padding: '20px 24px', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Mail size={20} />
             </div>
-            <button onClick={handleClose} className="p-2 hover:bg-white/20 rounded-lg transition-colors">
-              <X className="w-5 h-5" />
-            </button>
+            <div>
+              <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>Get in Touch</h2>
+              <p style={{ fontSize: 13, opacity: 0.7, margin: 0 }}>We&rsquo;d love to hear from you</p>
+            </div>
           </div>
+          <button onClick={handleClose} style={{ padding: 8, borderRadius: 8, background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer' }}>
+            <X size={20} />
+          </button>
         </div>
-
-        <div className="p-6">
+        <div style={{ padding: 24 }}>
           {sent ? (
-            <div className="text-center py-8">
-              <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <CheckCircle className="w-8 h-8 text-emerald-600" />
+            <div style={{ textAlign: 'center', padding: '32px 0' }}>
+              <div style={{ width: 56, height: 56, borderRadius: '50%', background: C.greenDim, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+                <CheckCircle size={28} color={C.greenDark} />
               </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">Message Sent!</h3>
-              <p className="text-gray-600 mb-6">Thank you for reaching out. We&rsquo;ll get back to you within 24 hours.</p>
-              <button onClick={handleClose} className="px-6 py-3 bg-emerald-500 text-white rounded-xl font-semibold hover:bg-emerald-600 transition-colors">
-                Close
-              </button>
+              <h3 style={{ fontSize: 18, fontWeight: 700, color: C.text, marginBottom: 8 }}>Message Sent!</h3>
+              <p style={{ fontSize: 14, color: C.textSecondary, marginBottom: 24 }}>Thank you for reaching out. We&rsquo;ll get back to you within 24 hours.</p>
+              <button onClick={handleClose} style={{ padding: '10px 24px', background: C.text, color: '#fff', border: 'none', borderRadius: 10, fontWeight: 600, cursor: 'pointer', fontSize: 14 }}>Close</button>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               {error && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
-                  <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
-                  <p className="text-sm text-red-700">{error}</p>
+                <div style={{ padding: 12, background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, display: 'flex', gap: 8, alignItems: 'start' }}>
+                  <AlertCircle size={18} color="#EF4444" style={{ flexShrink: 0, marginTop: 1 }} />
+                  <p style={{ fontSize: 13, color: '#B91C1C', margin: 0 }}>{error}</p>
                 </div>
               )}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: C.text, marginBottom: 6 }}>Name</label>
+                <div style={{ position: 'relative' }}>
+                  <User size={18} color={C.textTertiary} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
                   <input type="text" required value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent" placeholder="Your name" />
+                    placeholder="Your name"
+                    style={{ width: '100%', padding: '10px 12px 10px 40px', border: `1px solid ${C.border}`, borderRadius: C.radiusSm, fontSize: 14, fontFamily: FONT, outline: 'none', boxSizing: 'border-box' }} />
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: C.text, marginBottom: 6 }}>Email</label>
+                <div style={{ position: 'relative' }}>
+                  <Mail size={18} color={C.textTertiary} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
                   <input type="email" required value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent" placeholder="you@example.com" />
+                    placeholder="you@example.com"
+                    style={{ width: '100%', padding: '10px 12px 10px 40px', border: `1px solid ${C.border}`, borderRadius: C.radiusSm, fontSize: 14, fontFamily: FONT, outline: 'none', boxSizing: 'border-box' }} />
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Message</label>
-                <div className="relative">
-                  <MessageSquare className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: C.text, marginBottom: 6 }}>Message</label>
+                <div style={{ position: 'relative' }}>
+                  <MessageSquare size={18} color={C.textTertiary} style={{ position: 'absolute', left: 12, top: 12 }} />
                   <textarea required rows={4} value={formData.message} onChange={(e) => setFormData({ ...formData, message: e.target.value })}
-                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent resize-none" placeholder="How can we help you?" />
+                    placeholder="How can we help you?"
+                    style={{ width: '100%', padding: '10px 12px 10px 40px', border: `1px solid ${C.border}`, borderRadius: C.radiusSm, fontSize: 14, fontFamily: FONT, outline: 'none', resize: 'none', boxSizing: 'border-box' }} />
                 </div>
               </div>
               <button type="submit" disabled={sending}
-                className="w-full py-3 bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 text-white rounded-xl font-semibold hover:shadow-lg hover:shadow-emerald-500/25 transition-all flex items-center justify-center gap-2 disabled:opacity-50">
-                {sending ? (<><Loader2 className="w-5 h-5 animate-spin" /><span>Sending...</span></>) : (<><Send className="w-5 h-5" /><span>Send Message</span></>)}
+                style={{ width: '100%', padding: '12px 0', background: C.text, color: '#fff', border: 'none', borderRadius: C.radiusSm, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontSize: 14, fontFamily: FONT, opacity: sending ? 0.6 : 1 }}>
+                {sending ? <><Loader2 size={18} className="animate-spin" /><span>Sending...</span></> : <><Send size={18} /><span>Send Message</span></>}
               </button>
-              <p className="text-center text-sm text-gray-500">
-                Or email us directly at{' '}
-                <a href="mailto:contact@smartcoi.io" className="text-emerald-600 hover:underline">contact@smartcoi.io</a>
+              <p style={{ textAlign: 'center', fontSize: 13, color: C.textSecondary }}>
+                Or email us directly at <a href="mailto:contact@smartcoi.io" style={{ color: C.greenDark }}>contact@smartcoi.io</a>
               </p>
             </form>
           )}
@@ -169,132 +182,100 @@ function ContactModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => voi
 }
 
 /* ------------------------------------------------------------------ */
-/*  Data                                                               */
+/*  Section Label                                                       */
 /* ------------------------------------------------------------------ */
-const navLinks = [
-  { href: '#features', label: 'Features' },
-  { href: '#pricing', label: 'Pricing' },
-  { href: '#about', label: 'About' },
-];
+function SectionLabel({ children }: { children: string }) {
+  return (
+    <span style={{
+      fontFamily: FONT_MONO, fontSize: 12, fontWeight: 400, textTransform: 'uppercase' as const,
+      letterSpacing: '0.1em', color: C.greenDark,
+    }}>
+      {children}
+    </span>
+  );
+}
 
-const painPoints = [
-  {
-    icon: FileText,
-    title: 'Manually ensuring compliance is a nightmare',
-    description: 'Cross-referencing every COI against your requirements by hand is tedious, error-prone, and eats up hours every week.',
-  },
-  {
-    icon: AlertCircle,
-    title: 'Lapsed vendor coverage = massive liability',
-    description: 'A single expired vendor certificate can expose property owners to millions in uninsured risk. Manual tracking guarantees blind spots.',
-  },
-  {
-    icon: Users,
-    title: 'Tenant COIs are even harder',
-    description: 'Insurance requirements are buried in lease language that varies per tenant. Nobody has time to cross-reference every lease against every COI.',
-  },
-];
+/* ------------------------------------------------------------------ */
+/*  Feature icons (minimalistic SVG strokes)                            */
+/* ------------------------------------------------------------------ */
+const featureIcons = [Sparkles, Send, Link2, FileText, Clock, Building2];
 
+/* ------------------------------------------------------------------ */
+/*  Data                                                                */
+/* ------------------------------------------------------------------ */
 const features = [
   {
-    icon: Sparkles,
-    title: 'AI-Powered COI Extraction',
-    description: 'Upload a certificate PDF and let AI extract carrier info, coverage types, limits, and expiration dates in seconds — not hours.',
-    span: 'lg:col-span-2',
+    title: 'AI-Powered Extraction',
+    description: 'Drop a COI PDF. Our AI reads the document, extracts every coverage type, limit, expiration date, and named insured — and checks compliance in seconds.',
   },
   {
-    icon: Truck,
-    title: 'Vendor Compliance',
-    description: 'Set requirements per building, upload vendor COIs, get instant compliance status. Choose from pre-built templates for construction, landscaping, healthcare, and more — or create your own.',
-    span: '',
+    title: 'Automated Follow-Up',
+    description: 'Non-compliant or expiring? SmartCOI emails the vendor or tenant automatically with a link to upload their updated COI. Follow-ups until resolved.',
   },
   {
-    icon: Users,
-    title: 'Tenant COI Tracking',
-    description: 'Upload a lease and let AI extract insurance requirements automatically. The only platform that handles lease-driven tenant compliance — not just vendors.',
-    span: '',
+    title: 'Self-Service Portal',
+    description: 'Vendors and tenants click one link, upload their certificate, and get instant feedback. Compliant? Done. Issues? They see exactly what to fix.',
   },
   {
-    icon: Globe,
-    title: 'Self-Service Portals',
-    description: 'Give vendors and tenants each a secure link to upload their own COIs. They see exactly what coverage is required and can submit updated certificates — no more back-and-forth emails.',
-    span: '',
+    title: 'Tenant Lease Extraction',
+    description: 'Upload a lease and SmartCOI extracts the specific insurance requirements — coverage types, limits, named insured. No more reading 50-page leases.',
   },
   {
-    icon: Upload,
-    title: 'Bulk COI Import',
-    description: 'Upload multiple COIs at once and let AI extract data from every file simultaneously. Create vendors in batch — no more processing certificates one at a time.',
-    span: '',
+    title: 'Expiration Tracking',
+    description: 'Automatic alerts at 30 days, 7 days, and on expiration. Your vendors and tenants get reminded. You get notified. Nothing slips through.',
   },
   {
-    icon: Bell,
-    title: 'Recurring Follow-Up Emails',
-    description: 'Automatically send follow-up emails to vendors and tenants at 30, 14, and 0 days before certificates expire — and again when coverage is non-compliant. No manual chasing required.',
-    span: '',
+    title: 'Multi-Property Support',
+    description: 'Manage certificates across your entire portfolio from one dashboard. Each property has its own requirements, vendors, and tenants.',
   },
-  {
-    icon: BarChart3,
-    title: 'Compliance Dashboard & Reports',
-    description: 'See your entire portfolio\'s compliance status at a glance. Filter by property, vendor, tenant, or status. Export compliance reports as CSV or PDF in one click.',
-    span: 'lg:col-span-2',
-  },
+];
+
+const steps = [
+  { num: '01', title: 'Add your property', desc: 'Enter your property details and the names that should appear as Additional Insured and Certificate Holder on every COI.' },
+  { num: '02', title: 'Upload certificates', desc: 'Drop a vendor COI or tenant lease. AI extracts the data, checks compliance, and flags any issues — instantly.' },
+  { num: '03', title: 'Let SmartCOI handle it', desc: 'Non-compliant? Expiring? SmartCOI emails them automatically with a link to upload their updated certificate.' },
 ];
 
 const pricingTiers = [
   {
-    name: 'Free',
-    price: 'Free',
-    period: 'forever',
-    description: 'Perfect for getting started',
-    capacity: 'Up to 10 vendors & tenants',
-    features: ['AI-powered COI extraction', 'Smart lease analysis', 'Compliance dashboard', 'Expiration alerts', 'Vendor & tenant self-service portals'],
-    cta: 'Get Started Free',
-    popular: false,
+    name: 'Free', price: '$0', period: 'forever',
+    certs: 'Up to 25 certificates', cta: 'Get started', popular: false,
+    features: ['AI certificate extraction', 'Compliance checking', 'Automated email follow-ups', 'Self-service upload portal', 'Tenant lease extraction'],
   },
   {
-    name: 'Starter',
-    price: '$79',
-    period: '/month',
-    description: 'For small property managers',
-    capacity: 'Up to 50 vendors & tenants',
-    features: ['Everything in Free', 'Multi-property management', 'Bulk COI import', 'CSV & PDF report export', 'Recurring follow-up emails'],
-    cta: 'Start Free Trial',
-    popular: false,
+    name: 'Starter', price: '$79', period: '/month',
+    certs: 'Up to 50 certificates', cta: 'Start free trial', popular: false,
+    features: ['Everything in Free', 'Expiration tracking & alerts', 'Multi-property support', 'Priority support'],
   },
   {
-    name: 'Professional',
-    price: '$149',
-    period: '/month',
-    description: 'For growing portfolios',
-    capacity: 'Up to 100 vendors & tenants',
-    features: ['Everything in Starter', 'Activity history & audit log', 'Custom requirement templates', 'Priority support'],
-    cta: 'Start Free Trial',
-    popular: true,
+    name: 'Professional', price: '$149', period: '/month',
+    certs: 'Up to 150 certificates', cta: 'Start free trial', popular: true,
+    features: ['Everything in Starter', 'Unlimited properties', 'Advanced compliance reports', 'Team access'],
   },
   {
-    name: 'Enterprise',
-    price: '$299',
-    period: '/month',
-    description: 'For large-scale operations',
-    capacity: 'Up to 500 vendors & tenants',
-    features: ['Everything in Professional', 'Unlimited properties', 'Custom integrations', 'SSO & advanced security', 'Dedicated account manager'],
-    cta: 'Contact Sales',
-    popular: false,
+    name: 'Enterprise', price: '$299', period: '/month',
+    certs: 'Unlimited certificates', cta: 'Get in touch', popular: false,
+    features: ['Everything in Professional', 'Dedicated account manager', 'Custom integrations', 'SLA & onboarding'],
   },
+];
+
+const problemCards = [
+  { number: '10+', line1: 'hours/week spent on manual', line2: 'COI tracking and follow-ups' },
+  { number: '73%', line1: 'of certificates have at least one', line2: 'compliance issue on first submission' },
+  { number: '1', line1: 'missed expiration is all it takes', line2: 'to create serious liability exposure' },
 ];
 
 const faqs = [
-  { question: 'How does the AI extraction work?', answer: 'Upload a PDF or image of any Certificate of Insurance or lease document. Our AI reads and extracts all policy information — carrier, coverage types, limits, endorsements, and expiration dates — in seconds.' },
-  { question: 'How does lease analysis work for tenants?', answer: 'Upload your tenant\'s lease document and SmartCOI automatically extracts all insurance requirements specified in the lease. When the tenant uploads their COI, we compare it against these requirements automatically.' },
-  { question: 'What are the self-service portals?', answer: 'Both vendors and tenants get their own secure portal link where they can see exactly what coverage is required and upload their COI directly. SmartCOI checks it against your requirements instantly — no back-and-forth emails needed.' },
-  { question: 'Can I manage multiple properties?', answer: 'Yes! SmartCOI supports multi-property management. Set unique insurance requirements per property, use pre-built templates for common vendor types, and track compliance across your entire portfolio from one dashboard.' },
-  { question: 'What happens when a vendor or tenant is non-compliant?', answer: 'SmartCOI identifies exactly which coverages are missing or below your required limits. It automatically sends recurring follow-up emails at 30, 14, and 0 days before expiration, and both vendors and tenants can use their self-service portals to upload updated certificates.' },
-  { question: 'Is there really a free plan?', answer: 'Yes! Our Free plan is free forever and includes up to 10 vendors and tenants with full AI extraction, lease analysis, and self-service portals for both vendors and tenants. No credit card required to get started.' },
-  { question: 'Is my data secure?', answer: 'All documents are encrypted at rest and in transit. We use enterprise-grade security powered by Supabase and never share your data with third parties. Your certificates and leases are stored securely in the cloud.' },
+  { q: 'What types of documents can SmartCOI read?', a: 'SmartCOI\u2019s AI extracts data from standard ACORD certificate of insurance PDFs as well as tenant lease agreements. It reads coverage types, limits, expiration dates, named insured parties, and endorsement requirements like additional insured and waiver of subrogation.' },
+  { q: 'How is SmartCOI different from other COI trackers?', a: 'Most COI trackers only check vendor certificates against standardized building requirements. SmartCOI also extracts insurance requirements directly from tenant lease PDFs \u2014 so you can check tenant COIs against the specific terms in their lease. No other platform does this.' },
+  { q: 'Do my vendors or tenants need an account?', a: 'No. When a certificate needs updating, SmartCOI sends an email with a unique upload link. They click it, upload their COI, and get instant feedback on compliance \u2014 no login, no account creation, no friction.' },
+  { q: 'How long does setup take?', a: 'Under 5 minutes. Add your property, set your requirements (or upload a lease and let AI do it), and start uploading certificates. You\u2019ll see compliance results immediately.' },
+  { q: 'What happens when a certificate expires?', a: 'SmartCOI sends automatic reminders at 30 days, 7 days, and on expiration. Vendors and tenants receive an email with a link to upload their renewed certificate. Follow-ups continue until the updated certificate is submitted.' },
+  { q: 'Can I try SmartCOI for free?', a: 'Yes. The Free plan supports up to 25 certificates with all features included \u2014 AI extraction, compliance checking, automated emails, and the self-service portal. No credit card required.' },
 ];
 
 /* ------------------------------------------------------------------ */
-/*  Main Page Component                                                */
+/*  Main Page Component                                                 */
 /* ------------------------------------------------------------------ */
 export default function LandingPage() {
   const navigate = useNavigate();
@@ -304,7 +285,7 @@ export default function LandingPage() {
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
   useEffect(() => {
-    const handleScroll = () => setIsScrolled(window.scrollY > 10);
+    const handleScroll = () => setIsScrolled(window.scrollY > 40);
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
@@ -319,85 +300,81 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white overflow-x-hidden font-sans">
+    <div style={{ fontFamily: FONT, color: C.text, background: C.bg, overflowX: 'hidden' }} className="min-h-screen">
+
       {/* ============================================================ */}
       {/*  1. NAVBAR                                                    */}
       {/* ============================================================ */}
       <nav
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-          isScrolled
-            ? 'bg-white/90 backdrop-blur-xl border-b border-gray-200/80 shadow-sm'
-            : 'bg-transparent'
-        }`}
+        style={{
+          position: 'fixed', top: 0, left: 0, right: 0, zIndex: 50,
+          backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
+          background: 'rgba(255,255,255,0.7)',
+          borderBottom: isScrolled ? `1px solid ${C.border}` : '1px solid transparent',
+          boxShadow: isScrolled ? C.shadowSm : 'none',
+          transition: 'border-color 0.3s, box-shadow 0.3s',
+        }}
       >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16 sm:h-[72px]">
+        <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 24px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 64 }}>
             {/* Logo */}
-            <div className="flex items-center gap-2.5">
-              <img src="/logo-icon.svg" alt="SmartCOI" className="h-9 w-9" />
-              <span className="text-xl font-bold text-gray-900">
-                Smart<span className="bg-gradient-to-r from-emerald-600 to-teal-500 bg-clip-text text-transparent">COI</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <img src="/logo-icon.svg" alt="SmartCOI" style={{ height: 32, width: 32 }} />
+              <span style={{ fontSize: 18, fontWeight: 700, color: C.text }}>
+                Smart<span style={{ color: C.greenDark }}>COI</span>
               </span>
             </div>
 
-            {/* Desktop Nav */}
-            <div className="hidden md:flex items-center gap-1">
-              {navLinks.map((link) => (
+            {/* Center nav — desktop */}
+            <div className="hidden md:flex" style={{ alignItems: 'center', gap: 4 }}>
+              {[{ href: '#features', label: 'Features' }, { href: '#pricing', label: 'Pricing' }, { href: '#faq', label: 'FAQs' }].map((link) => (
                 <button
                   key={link.href}
                   onClick={() => smoothScroll(link.href)}
-                  className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-100/60 transition-colors"
+                  style={{ padding: '6px 16px', fontSize: 14, fontWeight: 500, color: C.textSecondary, background: 'none', border: 'none', borderRadius: 8, cursor: 'pointer', fontFamily: FONT }}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = C.text; e.currentTarget.style.background = '#F8F9FB'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = C.textSecondary; e.currentTarget.style.background = 'none'; }}
                 >
                   {link.label}
                 </button>
               ))}
             </div>
 
-            {/* Desktop CTAs */}
-            <div className="hidden md:flex items-center gap-3">
-              <button
-                onClick={goToLogin}
-                className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
-              >
-                Login
+            {/* Right actions — desktop */}
+            <div className="hidden md:flex" style={{ alignItems: 'center', gap: 12 }}>
+              <button onClick={goToLogin} style={{ padding: '6px 16px', fontSize: 14, fontWeight: 500, color: C.textSecondary, background: 'none', border: 'none', cursor: 'pointer', fontFamily: FONT }}>
+                Sign In
               </button>
-              <button
-                onClick={goToSignup}
-                className="h-10 px-5 bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 text-white rounded-lg text-sm font-semibold shadow-lg shadow-emerald-500/25 hover:shadow-xl hover:shadow-emerald-500/35 hover:-translate-y-0.5 transition-all duration-200"
-              >
+              <button onClick={goToSignup} style={{
+                padding: '8px 20px', fontSize: 14, fontWeight: 600, color: '#fff', background: C.text,
+                border: 'none', borderRadius: C.radiusXs, cursor: 'pointer', fontFamily: FONT,
+              }}>
                 Get Started
               </button>
             </div>
 
             {/* Mobile hamburger */}
-            <button className="md:hidden p-2 text-gray-700" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
+            <button className="md:hidden" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} style={{ padding: 8, background: 'none', border: 'none', color: C.text, cursor: 'pointer' }}>
               {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
             </button>
           </div>
 
-          {/* Mobile Menu */}
+          {/* Mobile menu */}
           {isMobileMenuOpen && (
-            <div className="md:hidden pb-4 border-t border-gray-100 pt-3">
-              <div className="flex flex-col gap-1">
-                {navLinks.map((link) => (
-                  <button
-                    key={link.href}
-                    onClick={() => smoothScroll(link.href)}
-                    className="text-left px-3 py-2.5 text-gray-600 font-medium hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors"
-                  >
+            <div className="md:hidden" style={{ paddingBottom: 16, borderTop: `1px solid ${C.borderLight}`, paddingTop: 12 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {[{ href: '#features', label: 'Features' }, { href: '#pricing', label: 'Pricing' }, { href: '#faq', label: 'FAQs' }].map((link) => (
+                  <button key={link.href} onClick={() => smoothScroll(link.href)}
+                    style={{ textAlign: 'left', padding: '10px 12px', fontSize: 15, fontWeight: 500, color: C.textSecondary, background: 'none', border: 'none', borderRadius: 8, cursor: 'pointer', fontFamily: FONT }}>
                     {link.label}
                   </button>
                 ))}
-                <button
-                  onClick={() => { goToLogin(); setIsMobileMenuOpen(false); }}
-                  className="text-left px-3 py-2.5 text-gray-600 font-medium hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors"
-                >
-                  Login
+                <button onClick={() => { goToLogin(); setIsMobileMenuOpen(false); }}
+                  style={{ textAlign: 'left', padding: '10px 12px', fontSize: 15, fontWeight: 500, color: C.textSecondary, background: 'none', border: 'none', borderRadius: 8, cursor: 'pointer', fontFamily: FONT }}>
+                  Sign In
                 </button>
-                <button
-                  onClick={() => { goToSignup(); setIsMobileMenuOpen(false); }}
-                  className="mt-2 w-full h-11 bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 text-white rounded-lg font-semibold"
-                >
+                <button onClick={() => { goToSignup(); setIsMobileMenuOpen(false); }}
+                  style={{ marginTop: 8, padding: '12px 0', background: C.text, color: '#fff', border: 'none', borderRadius: C.radiusXs, fontWeight: 600, cursor: 'pointer', fontFamily: FONT, fontSize: 15 }}>
                   Get Started
                 </button>
               </div>
@@ -409,155 +386,154 @@ export default function LandingPage() {
       {/* ============================================================ */}
       {/*  2. HERO SECTION                                              */}
       {/* ============================================================ */}
-      <section className="relative pt-28 sm:pt-36 pb-20 sm:pb-28 px-4 sm:px-6 overflow-hidden">
-        {/* Background orbs */}
-        <div className="absolute top-0 right-0 w-[900px] h-[900px] bg-gradient-to-bl from-emerald-500/8 via-teal-400/5 to-transparent rounded-full blur-3xl -translate-y-1/3 translate-x-1/4 pointer-events-none" />
-        <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-gradient-to-tr from-teal-500/8 to-transparent rounded-full blur-3xl translate-y-1/2 -translate-x-1/4 pointer-events-none" />
-        <div className="absolute top-1/2 left-1/2 w-[400px] h-[400px] bg-gradient-to-br from-emerald-400/5 to-transparent rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2 pointer-events-none" />
+      <section style={{ position: 'relative', paddingTop: 140, paddingBottom: 80 }} className="px-4 sm:px-6">
+        {/* Green radial glow */}
+        <div style={{
+          position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+          width: 800, height: 800,
+          background: 'radial-gradient(circle, rgba(115,226,167,0.10) 0%, transparent 70%)',
+          pointerEvents: 'none',
+        }} />
 
-        <div className="max-w-7xl mx-auto relative z-10">
-          <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
-            {/* Copy */}
-            <div className="text-center lg:text-left">
-              <FadeIn>
-                <div className="inline-flex items-center gap-2 bg-white/80 backdrop-blur-sm border border-gray-200/80 rounded-full px-4 py-2 mb-6 shadow-sm">
-                  <Zap className="w-4 h-4 text-emerald-500" />
-                  <span className="text-sm text-gray-600">
-                    <span className="bg-gradient-to-r from-emerald-600 to-teal-500 bg-clip-text text-transparent font-semibold">AI-Powered</span> COI Tracking
-                  </span>
-                </div>
-              </FadeIn>
-
-              <FadeIn delay={0.05}>
-                <h1 className="text-4xl sm:text-5xl lg:text-[3.5rem] xl:text-6xl font-extrabold leading-[1.1] tracking-tight mb-6 text-gray-900">
-                  Stop wasting hours on{' '}
-                  <span className="bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 bg-clip-text text-transparent">COI compliance</span>
-                </h1>
-              </FadeIn>
-
-              <FadeIn delay={0.1}>
-                <p className="text-lg sm:text-xl text-gray-600 leading-relaxed mb-8 max-w-xl mx-auto lg:mx-0">
-                  Track insurance compliance for all your vendors and tenants in one
-                  dashboard. Upload COIs in bulk, let vendors self-serve through their
-                  own portal, and get notified before certificates expire.
-                </p>
-              </FadeIn>
-
-              <FadeIn delay={0.15}>
-                <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start mb-10">
-                  <button
-                    onClick={goToSignup}
-                    className="group h-12 px-8 bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 text-white rounded-xl font-semibold text-base shadow-lg shadow-emerald-500/25 hover:shadow-xl hover:shadow-emerald-500/35 hover:-translate-y-0.5 transition-all duration-200 flex items-center justify-center gap-2"
-                  >
-                    Start Free Trial
-                    <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-                  </button>
-                  <button
-                    onClick={() => setShowContactModal(true)}
-                    className="h-12 px-8 bg-white text-gray-900 border-2 border-gray-200 rounded-xl font-semibold text-base hover:border-emerald-400 hover:text-emerald-600 transition-all duration-200"
-                  >
-                    Book a Demo
-                  </button>
-                </div>
-              </FadeIn>
-
-              <FadeIn delay={0.2}>
-                <div className="flex flex-wrap gap-x-8 gap-y-3 justify-center lg:justify-start">
-                  <div className="flex flex-col">
-                    <span className="text-3xl sm:text-4xl font-extrabold bg-gradient-to-r from-emerald-600 to-teal-500 bg-clip-text text-transparent">99%</span>
-                    <span className="text-sm text-gray-500">Extraction accuracy</span>
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-3xl sm:text-4xl font-extrabold bg-gradient-to-r from-emerald-600 to-teal-500 bg-clip-text text-transparent">10+ hrs</span>
-                    <span className="text-sm text-gray-500">Saved per week</span>
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-3xl sm:text-4xl font-extrabold bg-gradient-to-r from-emerald-600 to-teal-500 bg-clip-text text-transparent">30 sec</span>
-                    <span className="text-sm text-gray-500">Per COI extraction</span>
-                  </div>
-                </div>
-              </FadeIn>
+        <div style={{ maxWidth: 960, margin: '0 auto', position: 'relative', zIndex: 1, textAlign: 'center' }}>
+          {/* Badge */}
+          <FadeIn>
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: 8,
+              background: C.greenDim, border: `1px solid ${C.greenBorder}`,
+              borderRadius: 100, padding: '6px 16px', marginBottom: 24,
+            }}>
+              <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: C.greenDark, animation: 'pulse 2s ease-in-out infinite' }} />
+              <span style={{ fontSize: 13, fontWeight: 500, color: C.greenDark }}>AI-Powered COI Compliance</span>
             </div>
+          </FadeIn>
 
-            {/* Dashboard Preview */}
-            <FadeIn delay={0.15} className="flex justify-center lg:justify-end">
-              <div className="w-full max-w-md lg:max-w-[580px] xl:max-w-[640px]">
-                <DashboardPreview />
-              </div>
-            </FadeIn>
-          </div>
+          {/* Headline */}
+          <FadeIn delay={0.05}>
+            <h1 style={{ fontSize: 'clamp(36px, 5vw, 60px)', fontWeight: 800, lineHeight: 1.1, letterSpacing: '-0.02em', marginBottom: 20, color: C.text }}>
+              Insurance compliance{' '}
+              <br className="hidden sm:block" />
+              <span style={{ color: C.greenDark }}>on autopilot.</span>
+            </h1>
+          </FadeIn>
+
+          {/* Subheadline */}
+          <FadeIn delay={0.1}>
+            <p style={{ fontSize: 'clamp(16px, 2vw, 18px)', lineHeight: 1.6, color: C.textSecondary, maxWidth: 640, margin: '0 auto 32px' }}>
+              Upload a COI or tenant lease. SmartCOI extracts the data, checks compliance against your requirements, and follows up automatically. Built for commercial property managers.
+            </p>
+          </FadeIn>
+
+          {/* Buttons */}
+          <FadeIn delay={0.15}>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center" style={{ marginBottom: 48 }}>
+              <button onClick={goToSignup} style={{
+                padding: '12px 28px', fontSize: 15, fontWeight: 600, color: '#fff', background: C.text,
+                border: 'none', borderRadius: C.radiusXs, cursor: 'pointer', fontFamily: FONT,
+              }}>
+                Start free trial &rarr;
+              </button>
+              <button onClick={() => setShowContactModal(true)} style={{
+                padding: '12px 28px', fontSize: 15, fontWeight: 600, color: C.text, background: 'transparent',
+                border: `1px solid ${C.border}`, borderRadius: C.radiusXs, cursor: 'pointer', fontFamily: FONT,
+              }}>
+                Schedule demo
+              </button>
+            </div>
+          </FadeIn>
+
+          {/* Dashboard preview */}
+          <FadeIn delay={0.2}>
+            <div style={{ maxWidth: 880, margin: '0 auto' }}>
+              <DashboardPreview />
+            </div>
+          </FadeIn>
         </div>
       </section>
 
       {/* ============================================================ */}
       {/*  3. PROBLEM SECTION                                           */}
       {/* ============================================================ */}
-      <section className="py-20 sm:py-24 px-4 sm:px-6 bg-gray-50/80">
-        <div className="max-w-7xl mx-auto">
+      <section style={{ background: C.bg, padding: '80px 0' }} className="px-4 sm:px-6">
+        <div style={{ maxWidth: 960, margin: '0 auto', textAlign: 'center' }}>
           <FadeIn>
-            <div className="text-center max-w-2xl mx-auto mb-14">
-              <span className="inline-block text-sm font-semibold text-emerald-600 uppercase tracking-wider mb-3">The problem</span>
-              <h2 className="text-3xl sm:text-4xl font-extrabold text-gray-900 mb-4">
-                COI tracking is broken
-              </h2>
-              <p className="text-lg text-gray-600">
-                Property managers spend hours every week chasing down certificates, cross-referencing spreadsheets, and hoping nothing slips through the cracks.
-              </p>
-            </div>
+            <SectionLabel>THE PROBLEM</SectionLabel>
+            <h2 style={{ fontSize: 'clamp(26px, 3.5vw, 36px)', fontWeight: 800, color: C.text, marginTop: 12, marginBottom: 12 }}>
+              COI tracking shouldn&rsquo;t be this painful
+            </h2>
+            <p style={{ fontSize: 16, lineHeight: 1.6, color: C.textSecondary, maxWidth: 560, margin: '0 auto 48px' }}>
+              You&rsquo;re spending hours every week on something that should take minutes. Manual tracking creates real risk.
+            </p>
           </FadeIn>
 
-          <div className="grid sm:grid-cols-3 gap-6 max-w-5xl mx-auto">
-            {painPoints.map((point, i) => {
-              const Icon = point.icon;
-              return (
-                <FadeIn key={i} delay={i * 0.1}>
-                  <div className="bg-white rounded-2xl p-7 border border-gray-200/80 shadow-sm h-full">
-                    <div className="w-11 h-11 rounded-xl bg-red-50 flex items-center justify-center mb-4">
-                      <Icon className="w-5 h-5 text-red-500" />
-                    </div>
-                    <h3 className="text-lg font-bold text-gray-900 mb-2">{point.title}</h3>
-                    <p className="text-gray-600 text-sm leading-relaxed">{point.description}</p>
-                  </div>
-                </FadeIn>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* ============================================================ */}
-      {/*  4. FEATURES — BENTO GRID                                     */}
-      {/* ============================================================ */}
-      <section id="features" className="py-20 sm:py-24 px-4 sm:px-6 bg-white">
-        <div className="max-w-7xl mx-auto">
-          <FadeIn>
-            <div className="text-center max-w-2xl mx-auto mb-14">
-              <span className="inline-block text-sm font-semibold text-emerald-600 uppercase tracking-wider mb-3">Features</span>
-              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-gray-900 mb-4">
-                Everything you need to manage COIs
-              </h2>
-              <p className="text-lg text-gray-600">
-                Powerful tools designed specifically for property managers who are tired of manual compliance tracking.
-              </p>
-            </div>
-          </FadeIn>
-
-          {/* Bento grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 max-w-6xl mx-auto">
-            {features.map((feature, i) => {
-              const Icon = feature.icon;
-              return (
-                <FadeIn
-                  key={i}
-                  delay={i * 0.08}
-                  className={feature.span}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5" style={{ maxWidth: 960 }}>
+            {problemCards.map((card, i) => (
+              <FadeIn key={i} delay={i * 0.1}>
+                <div
+                  style={{
+                    background: C.bgSection, border: `1px solid ${C.border}`, borderRadius: C.radius,
+                    padding: 32, textAlign: 'center', transition: 'border-color 0.2s',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = C.greenBorder.replace('0.20', '0.50'); }}
+                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = C.border; }}
                 >
-                  <div className="group relative bg-gray-50 hover:bg-white rounded-2xl p-8 border border-gray-200/60 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-gray-200/50 hover:border-gray-300/80 h-full">
-                    <div className="w-12 h-12 bg-gradient-to-br from-emerald-600 to-teal-500 rounded-xl flex items-center justify-center mb-5 shadow-lg shadow-emerald-500/20 transition-transform duration-300 group-hover:scale-110">
-                      <Icon className="w-6 h-6 text-white" />
+                  <div style={{ fontSize: 40, fontWeight: 800, color: C.greenDark, marginBottom: 8 }}>{card.number}</div>
+                  <p style={{ fontSize: 14, color: C.textSecondary, lineHeight: 1.5 }}>
+                    {card.line1}<br />{card.line2}
+                  </p>
+                </div>
+              </FadeIn>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ============================================================ */}
+      {/*  4. FEATURES — EVEN 3×2 GRID                                  */}
+      {/* ============================================================ */}
+      <section id="features" style={{ background: C.bgSection, padding: '80px 0' }} className="px-4 sm:px-6">
+        <div style={{ maxWidth: 960, margin: '0 auto', textAlign: 'center' }}>
+          <FadeIn>
+            <SectionLabel>FEATURES</SectionLabel>
+            <h2 style={{ fontSize: 'clamp(26px, 3.5vw, 36px)', fontWeight: 800, color: C.text, marginTop: 12, marginBottom: 12 }}>
+              Everything you need. Nothing you don&rsquo;t.
+            </h2>
+            <p style={{ fontSize: 16, lineHeight: 1.6, color: C.textSecondary, maxWidth: 560, margin: '0 auto 48px' }}>
+              Upload a certificate and let SmartCOI handle the rest — from extraction to compliance to follow-up.
+            </p>
+          </FadeIn>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3" style={{ gap: 14 }}>
+            {features.map((feature, i) => {
+              const Icon = featureIcons[i] ?? Sparkles;
+              return (
+                <FadeIn key={i} delay={i * 0.07}>
+                  <div
+                    style={{
+                      background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: C.radius,
+                      padding: 28, textAlign: 'left', height: '100%',
+                      transition: 'border-color 0.2s, box-shadow 0.2s, transform 0.2s',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = C.greenBorder.replace('0.20', '0.50');
+                      e.currentTarget.style.boxShadow = C.shadowMd;
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = C.border;
+                      e.currentTarget.style.boxShadow = 'none';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                    }}
+                  >
+                    <div style={{
+                      width: 40, height: 40, borderRadius: C.radiusSm,
+                      background: C.greenDim, border: `1px solid ${C.greenBorder}`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16,
+                    }}>
+                      <Icon size={20} color={C.greenDark} strokeWidth={1.8} />
                     </div>
-                    <h3 className="text-xl font-bold text-gray-900 mb-3">{feature.title}</h3>
-                    <p className="text-gray-600 leading-relaxed">{feature.description}</p>
+                    <h3 style={{ fontSize: 16, fontWeight: 700, color: C.text, marginBottom: 8 }}>{feature.title}</h3>
+                    <p style={{ fontSize: 14, lineHeight: 1.6, color: C.textSecondary, margin: 0 }}>{feature.description}</p>
                   </div>
                 </FadeIn>
               );
@@ -567,118 +543,112 @@ export default function LandingPage() {
       </section>
 
       {/* ============================================================ */}
-      {/*  5. PRICING SECTION                                           */}
+      {/*  5. HOW IT WORKS                                              */}
       {/* ============================================================ */}
-      <section id="pricing" className="py-20 sm:py-24 px-4 sm:px-6 bg-gray-50/80">
-        <div className="max-w-7xl mx-auto">
+      <section style={{ background: C.bg, padding: '80px 0' }} className="px-4 sm:px-6">
+        <div style={{ maxWidth: 960, margin: '0 auto', textAlign: 'center' }}>
           <FadeIn>
-            <div className="text-center max-w-2xl mx-auto mb-14">
-              <span className="inline-block text-sm font-semibold text-emerald-600 uppercase tracking-wider mb-3">Pricing</span>
-              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-gray-900 mb-4">
-                Simple, transparent pricing
-              </h2>
-              <p className="text-lg text-gray-600">Start free, upgrade as you grow. No hidden fees.</p>
-            </div>
+            <SectionLabel>HOW IT WORKS</SectionLabel>
+            <h2 style={{ fontSize: 'clamp(26px, 3.5vw, 36px)', fontWeight: 800, color: C.text, marginTop: 12, marginBottom: 12 }}>
+              Three steps. Zero headaches.
+            </h2>
+            <p style={{ fontSize: 16, lineHeight: 1.6, color: C.textSecondary, maxWidth: 480, margin: '0 auto 48px' }}>
+              From setup to full compliance tracking in under 5 minutes.
+            </p>
           </FadeIn>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto items-start">
+          <div className="grid grid-cols-1 md:grid-cols-3" style={{ gap: 32 }}>
+            {steps.map((step, i) => (
+              <FadeIn key={i} delay={i * 0.1}>
+                <div style={{ textAlign: 'left' }}>
+                  <div style={{ fontFamily: FONT_MONO, fontSize: 44, fontWeight: 700, color: 'rgba(115,226,167,0.25)', marginBottom: 12 }}>
+                    {step.num}
+                  </div>
+                  <h3 style={{ fontSize: 17, fontWeight: 700, color: C.text, marginBottom: 8 }}>{step.title}</h3>
+                  <p style={{ fontSize: 14, lineHeight: 1.6, color: C.textSecondary, margin: 0 }}>{step.desc}</p>
+                </div>
+              </FadeIn>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ============================================================ */}
+      {/*  6. PRICING                                                   */}
+      {/* ============================================================ */}
+      <section id="pricing" style={{ background: C.bgSection, padding: '80px 0' }} className="px-4 sm:px-6">
+        <div style={{ maxWidth: 1040, margin: '0 auto', textAlign: 'center' }}>
+          <FadeIn>
+            <SectionLabel>PRICING</SectionLabel>
+            <h2 style={{ fontSize: 'clamp(26px, 3.5vw, 36px)', fontWeight: 800, color: C.text, marginTop: 12, marginBottom: 12 }}>
+              Simple, upfront pricing
+            </h2>
+            <p style={{ fontSize: 16, lineHeight: 1.6, color: C.textSecondary, maxWidth: 560, margin: '0 auto 48px' }}>
+              All features included on every plan. Only difference is certificate count. No long contracts, no surprise fees.
+            </p>
+          </FadeIn>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4" style={{ gap: 14, alignItems: 'start' }}>
             {pricingTiers.map((tier, i) => (
               <FadeIn key={i} delay={i * 0.1}>
                 <div
-                  className={`relative bg-white rounded-2xl overflow-hidden transition-all duration-300 hover:-translate-y-1 ${
-                    tier.popular
-                      ? 'border-2 border-emerald-500 shadow-2xl shadow-emerald-500/10 md:scale-[1.03]'
-                      : 'border border-gray-200 shadow-lg'
-                  }`}
+                  style={{
+                    position: 'relative',
+                    background: C.bgCard, borderRadius: C.radius,
+                    border: tier.popular ? `2px solid ${C.greenDark}` : `1px solid ${C.border}`,
+                    boxShadow: tier.popular ? `0 0 0 4px ${C.greenDim}` : 'none',
+                    padding: '30px 22px', textAlign: 'left',
+                    maxWidth: tier.popular ? undefined : undefined,
+                  }}
                 >
                   {tier.popular && (
-                    <div className="h-1 bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500" />
+                    <div style={{
+                      position: 'absolute', top: -11, left: '50%', transform: 'translateX(-50%)',
+                      background: C.greenDark, color: '#fff', fontSize: 11, fontWeight: 700,
+                      textTransform: 'uppercase' as const, padding: '3px 14px', borderRadius: 100,
+                      letterSpacing: '0.02em', whiteSpace: 'nowrap',
+                    }}>
+                      Most Popular
+                    </div>
                   )}
 
-                  <div className="p-7">
-                    <div className="flex items-center justify-between mb-1">
-                      <h3 className="text-xl font-bold text-gray-900">{tier.name}</h3>
-                      {tier.popular && (
-                        <span className="text-[11px] font-semibold bg-gradient-to-r from-emerald-600 to-teal-500 text-white px-3 py-1 rounded-full">
-                          Most Popular
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-sm text-gray-500 mb-5">{tier.description}</p>
-
-                    <div className="flex items-baseline gap-1 mb-1">
-                      <span className={`text-4xl font-extrabold ${tier.popular ? 'bg-gradient-to-r from-emerald-600 to-teal-500 bg-clip-text text-transparent' : 'text-gray-900'}`}>
-                        {tier.price}
-                      </span>
-                      {tier.period && <span className="text-gray-500 text-sm">{tier.period}</span>}
-                    </div>
-                    <p className="text-sm text-emerald-600 font-semibold mb-6">{tier.capacity}</p>
-
-                    <ul className="space-y-3 mb-8">
-                      {tier.features.map((feat, fi) => (
-                        <li key={fi} className="flex items-start gap-2.5">
-                          <Check className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
-                          <span className="text-sm text-gray-600">{feat}</span>
-                        </li>
-                      ))}
-                    </ul>
-
-                    <button
-                      onClick={tier.cta === 'Contact Sales' ? () => setShowContactModal(true) : goToSignup}
-                      className={`w-full h-12 rounded-xl font-semibold transition-all duration-200 ${
-                        tier.popular
-                          ? 'bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/25 hover:shadow-xl hover:shadow-emerald-500/35 hover:-translate-y-0.5'
-                          : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
-                      }`}
-                    >
-                      {tier.cta}
-                    </button>
+                  <h3 style={{ fontSize: 18, fontWeight: 700, color: C.text, marginBottom: 4 }}>{tier.name}</h3>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: 4 }}>
+                    <span style={{ fontSize: 36, fontWeight: 800, color: C.text }}>{tier.price}</span>
+                    <span style={{ fontSize: 14, color: C.textSecondary }}>{tier.period}</span>
                   </div>
-                </div>
-              </FadeIn>
-            ))}
-          </div>
-        </div>
-      </section>
 
-      {/* ============================================================ */}
-      {/*  FAQ SECTION (About)                                          */}
-      {/* ============================================================ */}
-      <section id="about" className="py-20 sm:py-24 px-4 sm:px-6 bg-white">
-        <div className="max-w-3xl mx-auto">
-          <FadeIn>
-            <div className="text-center mb-14">
-              <span className="inline-block text-sm font-semibold text-emerald-600 uppercase tracking-wider mb-3">FAQ</span>
-              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-gray-900 mb-4">
-                Frequently asked questions
-              </h2>
-              <p className="text-lg text-gray-600">Everything you need to know about SmartCOI.</p>
-            </div>
-          </FadeIn>
-
-          <div className="space-y-3">
-            {faqs.map((faq, i) => (
-              <FadeIn key={i} delay={i * 0.05}>
-                <div
-                  className="bg-gray-50 hover:bg-gray-100/80 rounded-2xl border border-gray-200/80 transition-all duration-200 overflow-hidden cursor-pointer"
-                  onClick={() => setOpenFaq(openFaq === i ? null : i)}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setOpenFaq(openFaq === i ? null : i); }}
-                >
-                  <div className="flex items-center justify-between p-6">
-                    <h3 className="text-base font-semibold text-gray-900 pr-4">{faq.question}</h3>
-                    <ChevronDown className={`w-5 h-5 text-gray-400 flex-shrink-0 transition-transform duration-200 ${openFaq === i ? 'rotate-180' : ''}`} />
+                  {/* Cert count pill */}
+                  <div style={{
+                    display: 'inline-block', background: C.greenDim, color: C.greenDark,
+                    fontSize: 12, fontWeight: 600, padding: '4px 12px', borderRadius: 100, marginBottom: 20,
+                  }}>
+                    {tier.certs}
                   </div>
-                  <div
-                    className="overflow-hidden transition-all duration-300"
+
+                  {/* Features */}
+                  <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 24px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {tier.features.map((feat, fi) => (
+                      <li key={fi} style={{ display: 'flex', alignItems: 'start', gap: 8 }}>
+                        <Check size={16} color={C.greenDark} style={{ flexShrink: 0, marginTop: 2 }} />
+                        <span style={{ fontSize: 14, color: C.textSecondary }}>{feat}</span>
+                      </li>
+                    ))}
+                  </ul>
+
+                  {/* CTA */}
+                  <button
+                    onClick={tier.cta === 'Get in touch' ? () => setShowContactModal(true) : goToSignup}
                     style={{
-                      maxHeight: openFaq === i ? 200 : 0,
-                      opacity: openFaq === i ? 1 : 0,
+                      width: '100%', padding: '10px 0', fontSize: 14, fontWeight: 600, borderRadius: C.radiusXs,
+                      cursor: 'pointer', fontFamily: FONT, border: tier.popular ? 'none' : `1px solid ${C.border}`,
+                      background: tier.popular ? C.text : 'transparent',
+                      color: tier.popular ? '#fff' : C.text,
+                      transition: 'background 0.2s',
                     }}
                   >
-                    <p className="px-6 pb-6 text-gray-600 leading-relaxed">{faq.answer}</p>
-                  </div>
+                    {tier.cta} &rarr;
+                  </button>
                 </div>
               </FadeIn>
             ))}
@@ -687,94 +657,171 @@ export default function LandingPage() {
       </section>
 
       {/* ============================================================ */}
-      {/*  6. CTA SECTION                                               */}
+      {/*  7. TESTIMONIAL                                               */}
       {/* ============================================================ */}
-      <section className="relative py-24 sm:py-28 px-4 sm:px-6 overflow-hidden" style={{ backgroundColor: 'hsl(222, 47%, 11%)' }}>
-        {/* Subtle gradient orbs */}
-        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-emerald-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 pointer-events-none" />
-        <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-teal-500/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/3 pointer-events-none" />
-
+      <section style={{ background: C.bg, padding: '80px 0' }} className="px-4 sm:px-6">
         <FadeIn>
-          <div className="max-w-3xl mx-auto text-center relative z-10">
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-white mb-5">
-              Stop chasing certificates.{' '}
-              <span className="bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">Start tracking compliance.</span>
-            </h2>
-            <p className="text-lg sm:text-xl text-gray-400 mb-10 max-w-2xl mx-auto">
-              Join property managers who have already saved thousands of hours with SmartCOI. Get started in under two minutes.
+          <div style={{ maxWidth: 660, margin: '0 auto', textAlign: 'center' }}>
+            <div style={{ fontSize: 56, color: C.green, opacity: 0.35, lineHeight: 1, marginBottom: 16 }}>&ldquo;</div>
+            <p style={{ fontSize: 21, fontWeight: 500, fontStyle: 'italic', lineHeight: 1.5, color: C.text, marginBottom: 24 }}>
+              We used to spend 10+ hours a week manually checking COIs against lease requirements. SmartCOI cut that to minutes. The lease extraction alone saved us from hiring another compliance coordinator.
             </p>
-            <button
-              onClick={goToSignup}
-              className="group h-14 px-10 bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 text-white rounded-xl font-semibold text-lg shadow-lg shadow-emerald-500/25 hover:shadow-xl hover:shadow-emerald-500/40 hover:-translate-y-0.5 transition-all duration-200 inline-flex items-center gap-2"
-            >
-              Get Started Free
-              <ArrowRight className="w-5 h-5 group-hover:translate-x-0.5 transition-transform" />
-            </button>
-            <p className="text-sm text-gray-500 mt-4">No credit card required</p>
+            <p style={{ fontSize: 14, color: C.textSecondary }}>
+              <strong>Property Manager</strong> &middot; Commercial Real Estate
+            </p>
           </div>
         </FadeIn>
       </section>
 
       {/* ============================================================ */}
-      {/*  7. FOOTER                                                    */}
+      {/*  8. FAQ                                                       */}
       {/* ============================================================ */}
-      <footer className="py-16 px-4 sm:px-6 bg-gray-950">
-        <div className="max-w-7xl mx-auto">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-8 mb-12">
+      <section id="faq" style={{ background: C.bgSection, padding: '80px 0' }} className="px-4 sm:px-6">
+        <div style={{ maxWidth: 660, margin: '0 auto', textAlign: 'center' }}>
+          <FadeIn>
+            <SectionLabel>FAQ</SectionLabel>
+            <h2 style={{ fontSize: 'clamp(26px, 3.5vw, 36px)', fontWeight: 800, color: C.text, marginTop: 12, marginBottom: 40 }}>
+              Frequently Asked Questions
+            </h2>
+          </FadeIn>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, textAlign: 'left' }}>
+            {faqs.map((faq, i) => (
+              <FadeIn key={i} delay={i * 0.05}>
+                <div
+                  style={{
+                    background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: C.radiusSm,
+                    overflow: 'hidden', cursor: 'pointer',
+                  }}
+                  onClick={() => setOpenFaq(openFaq === i ? null : i)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setOpenFaq(openFaq === i ? null : i); }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px' }}>
+                    <h3 style={{ fontSize: 15, fontWeight: 600, color: C.text, margin: 0, paddingRight: 16 }}>{faq.q}</h3>
+                    <ChevronDown
+                      size={18}
+                      color={C.textTertiary}
+                      style={{
+                        flexShrink: 0,
+                        transition: 'transform 0.2s',
+                        transform: openFaq === i ? 'rotate(180deg)' : 'rotate(0deg)',
+                      }}
+                    />
+                  </div>
+                  <div
+                    style={{
+                      maxHeight: openFaq === i ? 200 : 0,
+                      opacity: openFaq === i ? 1 : 0,
+                      overflow: 'hidden',
+                      transition: 'max-height 0.3s ease, opacity 0.3s ease',
+                    }}
+                  >
+                    <p style={{ padding: '0 20px 16px', fontSize: 14, lineHeight: 1.65, color: C.textSecondary, margin: 0 }}>{faq.a}</p>
+                  </div>
+                </div>
+              </FadeIn>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ============================================================ */}
+      {/*  9. FINAL CTA                                                 */}
+      {/* ============================================================ */}
+      <section style={{ position: 'relative', background: C.bg, padding: '96px 0' }} className="px-4 sm:px-6">
+        {/* Green radial glow */}
+        <div style={{
+          position: 'absolute', bottom: 0, left: '50%', transform: 'translateX(-50%)',
+          width: 800, height: 600,
+          background: 'radial-gradient(circle, rgba(115,226,167,0.10) 0%, transparent 70%)',
+          pointerEvents: 'none',
+        }} />
+
+        <FadeIn>
+          <div style={{ maxWidth: 560, margin: '0 auto', textAlign: 'center', position: 'relative', zIndex: 1 }}>
+            <h2 style={{ fontSize: 'clamp(26px, 3.5vw, 36px)', fontWeight: 800, color: C.text, marginBottom: 16, lineHeight: 1.2 }}>
+              Ready to stop chasing<br />certificates?
+            </h2>
+            <p style={{ fontSize: 16, lineHeight: 1.6, color: C.textSecondary, marginBottom: 32 }}>
+              Join property managers who&rsquo;ve replaced spreadsheets and manual follow-ups with SmartCOI.
+            </p>
+            <button onClick={goToSignup} style={{
+              padding: '12px 28px', fontSize: 15, fontWeight: 600, color: '#fff', background: C.text,
+              border: 'none', borderRadius: C.radiusXs, cursor: 'pointer', fontFamily: FONT,
+            }}>
+              Start free trial &rarr;
+            </button>
+          </div>
+        </FadeIn>
+      </section>
+
+      {/* ============================================================ */}
+      {/*  10. FOOTER                                                   */}
+      {/* ============================================================ */}
+      <footer style={{ background: C.bgSection, borderTop: `1px solid ${C.border}` }}>
+        <div style={{ maxWidth: 960, margin: '0 auto', padding: '48px 24px' }}>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-8" style={{ marginBottom: 32 }}>
             {/* Brand */}
-            <div className="col-span-2 sm:col-span-1">
-              <div className="flex items-center gap-2.5 mb-4">
-                <img src="/logo-icon.svg" alt="SmartCOI" className="h-8 w-8" />
-                <span className="text-lg font-bold text-white">
-                  Smart<span className="bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">COI</span>
+            <div className="col-span-2 sm:col-span-1" style={{ maxWidth: 240 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                <img src="/logo-icon.svg" alt="SmartCOI" style={{ height: 22, width: 22 }} />
+                <span style={{ fontSize: 16, fontWeight: 700, color: C.text }}>
+                  Smart<span style={{ color: C.greenDark }}>COI</span>
                 </span>
               </div>
-              <p className="text-sm text-gray-500 leading-relaxed">
-                AI-powered COI compliance tracking for commercial property managers.
+              <p style={{ fontSize: 13, lineHeight: 1.5, color: C.textTertiary }}>
+                AI-powered certificate of insurance tracking for commercial property managers.
               </p>
             </div>
 
             {/* Product */}
             <div>
-              <h4 className="text-sm font-semibold text-white mb-4">Product</h4>
-              <ul className="space-y-2.5">
-                <li><button onClick={() => smoothScroll('#features')} className="text-sm text-gray-500 hover:text-white transition-colors">Features</button></li>
-                <li><button onClick={() => smoothScroll('#pricing')} className="text-sm text-gray-500 hover:text-white transition-colors">Pricing</button></li>
-                <li><button onClick={goToLogin} className="text-sm text-gray-500 hover:text-white transition-colors">Dashboard</button></li>
+              <h4 style={{ fontSize: 12, fontWeight: 600, textTransform: 'uppercase' as const, letterSpacing: '0.08em', color: C.textTertiary, marginBottom: 12 }}>Product</h4>
+              <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <li><button onClick={() => smoothScroll('#features')} style={{ fontSize: 14, color: C.textSecondary, background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: FONT }}>Features</button></li>
+                <li><button onClick={() => smoothScroll('#pricing')} style={{ fontSize: 14, color: C.textSecondary, background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: FONT }}>Pricing</button></li>
+                <li><button onClick={() => smoothScroll('#faq')} style={{ fontSize: 14, color: C.textSecondary, background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: FONT }}>FAQ</button></li>
               </ul>
             </div>
 
             {/* Company */}
             <div>
-              <h4 className="text-sm font-semibold text-white mb-4">Company</h4>
-              <ul className="space-y-2.5">
-                <li><button onClick={() => smoothScroll('#about')} className="text-sm text-gray-500 hover:text-white transition-colors">About</button></li>
-                <li><button onClick={() => setShowContactModal(true)} className="text-sm text-gray-500 hover:text-white transition-colors">Contact</button></li>
+              <h4 style={{ fontSize: 12, fontWeight: 600, textTransform: 'uppercase' as const, letterSpacing: '0.08em', color: C.textTertiary, marginBottom: 12 }}>Company</h4>
+              <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <li><a href="#" style={{ fontSize: 14, color: C.textSecondary, textDecoration: 'none' }}>About</a></li>
+                <li><a href="#" style={{ fontSize: 14, color: C.textSecondary, textDecoration: 'none' }}>Blog</a></li>
+                <li><button onClick={() => setShowContactModal(true)} style={{ fontSize: 14, color: C.textSecondary, background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: FONT }}>Contact</button></li>
               </ul>
             </div>
 
             {/* Legal */}
             <div>
-              <h4 className="text-sm font-semibold text-white mb-4">Legal</h4>
-              <ul className="space-y-2.5">
-                {/* UPDATE: Replace # with real URLs when privacy/terms pages exist */}
-                <li><a href="#" className="text-sm text-gray-500 hover:text-white transition-colors">Privacy Policy</a></li>
-                <li><a href="#" className="text-sm text-gray-500 hover:text-white transition-colors">Terms of Service</a></li>
+              <h4 style={{ fontSize: 12, fontWeight: 600, textTransform: 'uppercase' as const, letterSpacing: '0.08em', color: C.textTertiary, marginBottom: 12 }}>Legal</h4>
+              <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <li><a href="#" style={{ fontSize: 14, color: C.textSecondary, textDecoration: 'none' }}>Privacy Policy</a></li>
+                <li><a href="#" style={{ fontSize: 14, color: C.textSecondary, textDecoration: 'none' }}>Terms of Service</a></li>
               </ul>
             </div>
           </div>
 
-          {/* Bottom bar */}
-          <div className="pt-8 border-t border-gray-800 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <p className="text-sm text-gray-600">
-              &copy; {new Date().getFullYear()} SmartCOI. All rights reserved.
+          {/* Bottom */}
+          <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 20 }}>
+            <p style={{ fontSize: 12, color: C.textTertiary, margin: 0 }}>
+              &copy; 2026 SmartCOI. All rights reserved.
             </p>
-            <a href="mailto:contact@smartcoi.io" className="text-sm text-gray-600 hover:text-white transition-colors">
-              contact@smartcoi.io
-            </a>
           </div>
         </div>
       </footer>
+
+      {/* Pulse animation keyframes */}
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.4; }
+        }
+      `}</style>
 
       {/* Contact Modal */}
       <ContactModal isOpen={showContactModal} onClose={() => setShowContactModal(false)} />

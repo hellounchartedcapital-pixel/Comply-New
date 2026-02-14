@@ -1,222 +1,115 @@
-import {
-  LayoutDashboard,
-  Building2,
-  Truck,
-  Users,
-  ClipboardCheck,
-  BarChart3,
-  Settings,
-  Search,
-  Bell,
-  FileText,
-  CheckCircle2,
-  AlertTriangle,
-} from 'lucide-react';
-
 /* -------------------------------------------------------------------------- */
-/*  Static mini-replica of the real SmartCOI dashboard (non-interactive)       */
+/*  Static dashboard preview mockup for the landing page hero                  */
 /* -------------------------------------------------------------------------- */
 
-const sidebarNav = [
-  { label: 'Dashboard', icon: LayoutDashboard, active: true },
-  { label: 'Properties', icon: Building2 },
-  { label: 'Vendors', icon: Truck },
-  { label: 'Tenants', icon: Users },
-  { label: 'Requirements', icon: ClipboardCheck },
-  { label: 'Reports', icon: BarChart3 },
-  { label: 'Settings', icon: Settings },
+const sidebarItems = [
+  { label: 'Dashboard', active: true },
+  { label: 'Properties' },
+  { label: 'Vendors' },
+  { label: 'Tenants' },
+  { label: 'Certificates' },
 ];
 
 const statCards = [
-  { title: 'Total Certificates', value: '284', icon: FileText, subtitle: '196 vendors, 88 tenants', color: 'text-emerald-600' },
-  { title: 'Compliant', value: '94%', icon: CheckCircle2, subtitle: '267 of 284', color: 'text-emerald-600' },
-  { title: 'Expiring in 30 Days', value: '12', icon: AlertTriangle, subtitle: 'Requires attention', color: 'text-amber-600' },
-  { title: 'Action Items', value: '7', icon: AlertTriangle, subtitle: 'Requires follow-up', color: 'text-red-600' },
+  { label: 'Total Certs', value: '127', color: '#111114' },
+  { label: 'Compliant', value: '98', color: '#73E2A7' },
+  { label: 'Issues', value: '18', color: '#E5534B' },
+  { label: 'Expiring Soon', value: '11', color: '#E5A500' },
 ];
 
-const actionItems = [
-  { name: 'Apex Cleaning Services', type: 'Vendor', property: 'Sunrise Tower', status: 'expired', statusLabel: 'Expired', statusColor: 'bg-red-100 text-red-700' },
-  { name: 'Metro Electric Co.', type: 'Vendor', property: 'Harbor Plaza', status: 'non-compliant', statusLabel: 'Non-Compliant', statusColor: 'bg-orange-100 text-orange-700' },
-  { name: 'Sarah Johnson', type: 'Tenant', property: 'Lakeview Apartments', status: 'expiring', statusLabel: 'Expiring', statusColor: 'bg-amber-100 text-amber-700' },
-  { name: 'ABC Plumbing', type: 'Vendor', property: 'Sunrise Tower', status: 'non-compliant', statusLabel: 'Non-Compliant', statusColor: 'bg-orange-100 text-orange-700' },
+const tableRows = [
+  { name: 'Apex Plumbing Co.', property: 'Riverfront Plaza', expires: 'Mar 15, 2026', coverage: '$2M GL', status: 'Compliant', statusBg: 'rgba(115,226,167,0.15)', statusColor: '#5CC98E' },
+  { name: 'Metro Electric LLC', property: 'Summit Tower', expires: 'Feb 28, 2026', coverage: '$1M GL', status: 'Expiring', statusBg: 'rgba(229,165,0,0.15)', statusColor: '#E5A500' },
+  { name: 'Bright Bean Coffee', property: 'Riverfront Plaza', expires: 'Jun 01, 2026', coverage: '$500K GL', status: 'Non-Compliant', statusBg: 'rgba(229,83,75,0.12)', statusColor: '#E5534B' },
+  { name: 'AllStar HVAC', property: 'Eastgate Office Park', expires: 'Sep 12, 2026', coverage: '$2M GL', status: 'Compliant', statusBg: 'rgba(115,226,167,0.15)', statusColor: '#5CC98E' },
 ];
 
-/* Donut chart SVG — matches the real dashboard's PieChart */
-function MiniDonut() {
-  const total = 284;
-  const segments = [
-    { value: 267, color: '#10b981', label: 'Compliant' },
-    { value: 12, color: '#f59e0b', label: 'Expiring' },
-    { value: 5, color: '#ef4444', label: 'Non-Compliant' },
-  ];
-  const circumference = 2 * Math.PI * 40;
-  let offset = 0;
-
-  return (
-    <div className="flex items-center gap-3">
-      <div className="relative flex-shrink-0">
-        <svg width="80" height="80" viewBox="0 0 100 100" className="transform -rotate-90">
-          {segments.map((seg, i) => {
-            const dash = (seg.value / total) * circumference;
-            const el = (
-              <circle
-                key={i}
-                cx="50"
-                cy="50"
-                r="40"
-                fill="none"
-                stroke={seg.color}
-                strokeWidth="12"
-                strokeDasharray={`${dash} ${circumference - dash}`}
-                strokeDashoffset={-offset}
-                strokeLinecap="round"
-              />
-            );
-            offset += dash;
-            return el;
-          })}
-        </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-base font-bold text-emerald-600">94%</span>
-          <span className="text-[7px] text-gray-500">Compliant</span>
-        </div>
-      </div>
-      <div className="space-y-1 min-w-0">
-        {segments.map((seg, i) => (
-          <div key={i} className="flex items-center gap-1">
-            <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: seg.color }} />
-            <span className="text-[7px] text-gray-600 truncate">{seg.value} {seg.label}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
+/* Sidebar icon paths (simple stroke icons) */
+function SidebarIcon({ index, active }: { index: number; active?: boolean }) {
+  const color = active ? '#fff' : '#6B6B76';
+  const paths: Record<number, JSX.Element> = {
+    0: <><rect x="3" y="3" width="7" height="7" rx="1" stroke={color} strokeWidth="1.5" fill="none" /><rect x="14" y="3" width="7" height="7" rx="1" stroke={color} strokeWidth="1.5" fill="none" /><rect x="3" y="14" width="7" height="7" rx="1" stroke={color} strokeWidth="1.5" fill="none" /><rect x="14" y="14" width="7" height="7" rx="1" stroke={color} strokeWidth="1.5" fill="none" /></>,
+    1: <><rect x="3" y="3" width="18" height="18" rx="2" stroke={color} strokeWidth="1.5" fill="none" /><path d="M3 9h18M9 9v12" stroke={color} strokeWidth="1.5" /></>,
+    2: <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" stroke={color} strokeWidth="1.5" fill="none" /><circle cx="9" cy="7" r="4" stroke={color} strokeWidth="1.5" fill="none" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" stroke={color} strokeWidth="1.5" fill="none" /><path d="M16 3.13a4 4 0 0 1 0 7.75" stroke={color} strokeWidth="1.5" fill="none" /></>,
+    3: <><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke={color} strokeWidth="1.5" fill="none" /><circle cx="9" cy="7" r="4" stroke={color} strokeWidth="1.5" fill="none" /></>,
+    4: <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" stroke={color} strokeWidth="1.5" fill="none" /><path d="M14 2v6h6" stroke={color} strokeWidth="1.5" /><path d="M9 15l2 2 4-4" stroke={color} strokeWidth="1.5" fill="none" /></>,
+  };
+  return <svg width="16" height="16" viewBox="0 0 24 24" fill="none">{paths[index]}</svg>;
 }
 
 export function DashboardPreview() {
   return (
     <div
-      className="rounded-2xl shadow-2xl border border-gray-200/80 overflow-hidden bg-white select-none pointer-events-none"
-      style={{ transformOrigin: 'top center' }}
+      className="select-none pointer-events-none w-full"
+      style={{ borderRadius: 16, boxShadow: '0 12px 48px rgba(0,0,0,0.07)', border: '1px solid #EBEBEF', overflow: 'hidden', background: '#fff' }}
       aria-hidden="true"
     >
-      <div className="flex" style={{ minHeight: 340 }}>
-        {/* Sidebar */}
-        <div className="w-[52px] flex-shrink-0 flex flex-col" style={{ backgroundColor: 'hsl(222, 47%, 11%)' }}>
-          {/* Logo */}
-          <div className="h-10 flex items-center justify-center border-b" style={{ borderColor: 'hsl(215, 28%, 20%)' }}>
-            <img src="/logo-icon.svg" alt="" className="h-5 w-5" />
-          </div>
-          {/* Nav */}
-          <nav className="flex-1 py-2 px-1.5 space-y-0.5">
-            {sidebarNav.map((item) => {
-              const Icon = item.icon;
-              return (
-                <div
-                  key={item.label}
-                  className={`flex items-center justify-center rounded-md p-1.5 ${
-                    item.active
-                      ? 'bg-gradient-to-r from-emerald-600 to-teal-500'
-                      : ''
-                  }`}
-                >
-                  <Icon className={`h-3.5 w-3.5 ${item.active ? 'text-white' : 'text-gray-500'}`} />
-                </div>
-              );
-            })}
-          </nav>
+      {/* macOS title bar */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 14px', background: '#F8F9FB', borderBottom: '1px solid #EBEBEF' }}>
+        <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#E5534B' }} />
+        <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#E5A500' }} />
+        <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#73E2A7' }} />
+      </div>
+
+      {/* Body */}
+      <div style={{ display: 'flex', minHeight: 280 }}>
+        {/* Sidebar — hidden on mobile */}
+        <div className="hidden md:flex" style={{ width: 48, background: '#111114', flexDirection: 'column', padding: '10px 6px', gap: 2, flexShrink: 0 }}>
+          {sidebarItems.map((item, i) => (
+            <div
+              key={item.label}
+              title={item.label}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                padding: 6, borderRadius: 6,
+                background: item.active ? '#73E2A7' : 'transparent',
+              }}
+            >
+              <SidebarIcon index={i} active={item.active} />
+            </div>
+          ))}
         </div>
 
-        {/* Main content */}
-        <div className="flex-1 flex flex-col min-w-0">
-          {/* Top bar */}
-          <div className="h-10 flex items-center justify-between px-3 border-b border-gray-200 bg-white flex-shrink-0">
-            <div className="flex items-center gap-2 flex-1">
-              <div className="flex items-center gap-1.5 bg-gray-100 rounded-md px-2 py-1 flex-1 max-w-[160px]">
-                <Search className="h-2.5 w-2.5 text-gray-400" />
-                <span className="text-[8px] text-gray-400">Search...</span>
+        {/* Main */}
+        <div style={{ flex: 1, padding: 14, background: '#F8F9FB', overflow: 'hidden' }}>
+          {/* Stat cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 12 }}>
+            {statCards.map((c) => (
+              <div key={c.label} style={{ background: '#fff', borderRadius: 8, padding: '8px 10px', border: '1px solid #EBEBEF' }}>
+                <div style={{ fontSize: 8, color: '#6B6B76', marginBottom: 2, fontFamily: "'DM Sans', sans-serif" }}>{c.label}</div>
+                <div style={{ fontSize: 18, fontWeight: 700, color: c.color, fontFamily: "'DM Sans', sans-serif" }}>{c.value}</div>
               </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="relative">
-                <Bell className="h-3 w-3 text-gray-400" />
-                <div className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-red-500 rounded-full" />
-              </div>
-              <div className="w-5 h-5 rounded-full bg-gradient-to-r from-emerald-600 to-teal-500 flex items-center justify-center">
-                <span className="text-[7px] font-bold text-white">JD</span>
-              </div>
-            </div>
+            ))}
           </div>
 
-          {/* Dashboard content */}
-          <div className="flex-1 p-3 bg-gray-50/80 overflow-hidden">
-            {/* Page header */}
-            <div className="mb-2.5">
-              <p className="text-[11px] font-bold text-gray-900">Dashboard</p>
-              <p className="text-[7px] text-gray-500">Overview of your insurance compliance status</p>
-            </div>
-
-            {/* Stat cards */}
-            <div className="grid grid-cols-4 gap-1.5 mb-2.5">
-              {statCards.map((card) => {
-                const Icon = card.icon;
-                return (
-                  <div key={card.title} className="bg-white rounded-lg p-2 border border-gray-200 shadow-sm">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <p className="text-[7px] text-gray-500 mb-0.5">{card.title}</p>
-                        <p className={`text-sm font-bold ${card.color}`}>{card.value}</p>
-                        <p className="text-[6px] text-gray-400 mt-0.5">{card.subtitle}</p>
-                      </div>
-                      <div className="w-5 h-5 rounded-md bg-emerald-50 flex items-center justify-center flex-shrink-0">
-                        <Icon className="h-2.5 w-2.5 text-emerald-600" />
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Charts + Action Items row */}
-            <div className="grid grid-cols-3 gap-2">
-              {/* Compliance Overview */}
-              <div className="bg-white rounded-lg p-2.5 border border-gray-200 shadow-sm overflow-hidden">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-[9px] font-bold text-gray-900">Compliance Overview</p>
-                  <div className="flex gap-0.5">
-                    <span className="text-[7px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-medium">All</span>
-                    <span className="text-[7px] px-1.5 py-0.5 rounded text-gray-400">Vendors</span>
-                    <span className="text-[7px] px-1.5 py-0.5 rounded text-gray-400">Tenants</span>
-                  </div>
-                </div>
-                <MiniDonut />
-              </div>
-
-              {/* Action Items */}
-              <div className="col-span-2 bg-white rounded-lg p-2.5 border border-gray-200 shadow-sm">
-                <p className="text-[9px] font-bold text-gray-900 mb-2">Action Items</p>
-                <div className="space-y-1.5">
-                  {actionItems.map((item, i) => (
-                    <div key={i} className="flex items-center gap-2 rounded-md bg-gray-50 p-1.5">
-                      <div className="w-5 h-5 rounded-md bg-emerald-50 flex items-center justify-center flex-shrink-0">
-                        {item.type === 'Vendor' ? (
-                          <Truck className="h-2.5 w-2.5 text-emerald-600" />
-                        ) : (
-                          <Users className="h-2.5 w-2.5 text-emerald-600" />
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[8px] font-medium text-gray-900 truncate">{item.name}</p>
-                        <p className="text-[7px] text-gray-500">{item.property} &middot; {item.type}</p>
-                      </div>
-                      <span className={`text-[7px] font-medium px-1.5 py-0.5 rounded-full flex-shrink-0 ${item.statusColor}`}>
-                        {item.statusLabel}
+          {/* Table */}
+          <div style={{ background: '#fff', borderRadius: 8, border: '1px solid #EBEBEF', overflow: 'hidden' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: "'DM Sans', sans-serif" }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid #EBEBEF' }}>
+                  <th style={{ textAlign: 'left', padding: '6px 10px', fontSize: 8, fontWeight: 600, color: '#6B6B76' }}>Vendor / Tenant</th>
+                  <th className="hidden sm:table-cell" style={{ textAlign: 'left', padding: '6px 10px', fontSize: 8, fontWeight: 600, color: '#6B6B76' }}>Property</th>
+                  <th className="hidden lg:table-cell" style={{ textAlign: 'left', padding: '6px 10px', fontSize: 8, fontWeight: 600, color: '#6B6B76' }}>Expires</th>
+                  <th className="hidden sm:table-cell" style={{ textAlign: 'left', padding: '6px 10px', fontSize: 8, fontWeight: 600, color: '#6B6B76' }}>Coverage</th>
+                  <th style={{ textAlign: 'left', padding: '6px 10px', fontSize: 8, fontWeight: 600, color: '#6B6B76' }}>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tableRows.map((r, i) => (
+                  <tr key={i} style={{ borderBottom: i < tableRows.length - 1 ? '1px solid #F0F0F4' : 'none' }}>
+                    <td style={{ padding: '6px 10px', fontSize: 9, fontWeight: 500, color: '#111114' }}>{r.name}</td>
+                    <td className="hidden sm:table-cell" style={{ padding: '6px 10px', fontSize: 9, color: '#6B6B76' }}>{r.property}</td>
+                    <td className="hidden lg:table-cell" style={{ padding: '6px 10px', fontSize: 9, color: '#6B6B76' }}>{r.expires}</td>
+                    <td className="hidden sm:table-cell" style={{ padding: '6px 10px', fontSize: 9, color: '#6B6B76' }}>{r.coverage}</td>
+                    <td style={{ padding: '6px 10px' }}>
+                      <span style={{ display: 'inline-block', fontSize: 8, fontWeight: 600, padding: '2px 8px', borderRadius: 100, background: r.statusBg, color: r.statusColor }}>
+                        {r.status}
                       </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
