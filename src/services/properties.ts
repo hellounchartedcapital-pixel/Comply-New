@@ -80,30 +80,50 @@ export async function createProperty(property: {
   } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
 
-  const { data, error } = await supabase
+  // Build address string for legacy 'address' column
+  const addressStr = [property.address_street, property.address_city, property.address_state, property.address_zip]
+    .filter(Boolean)
+    .join(', ') || null;
+
+  // Base payload with columns guaranteed to exist
+  const basePayload: Record<string, unknown> = {
+    user_id: user.id,
+    name: property.name,
+    address: addressStr,
+  };
+
+  // Full payload with new columns from the migration
+  const fullPayload: Record<string, unknown> = {
+    ...basePayload,
+    address_street: property.address_street || null,
+    address_city: property.address_city || null,
+    address_state: property.address_state || null,
+    address_zip: property.address_zip || null,
+    additional_insured_entities: property.additional_insured_entities?.filter(Boolean) ?? [],
+    certificate_holder_name: property.certificate_holder_name || null,
+    certificate_holder_address_line1: property.certificate_holder_address_line1 || null,
+    certificate_holder_address_line2: property.certificate_holder_address_line2 || null,
+    certificate_holder_city: property.certificate_holder_city || null,
+    certificate_holder_state: property.certificate_holder_state || null,
+    certificate_holder_zip: property.certificate_holder_zip || null,
+    loss_payee_entities: property.loss_payee_entities?.filter(Boolean) ?? [],
+  };
+
+  // First attempt: include new columns
+  let { data, error } = await supabase
     .from('properties')
-    .insert({
-      user_id: user.id,
-      name: property.name,
-      address_street: property.address_street || null,
-      address_city: property.address_city || null,
-      address_state: property.address_state || null,
-      address_zip: property.address_zip || null,
-      // Also set legacy 'address' for backward compat
-      address: [property.address_street, property.address_city, property.address_state, property.address_zip]
-        .filter(Boolean)
-        .join(', ') || null,
-      additional_insured_entities: property.additional_insured_entities?.filter(Boolean) ?? [],
-      certificate_holder_name: property.certificate_holder_name || null,
-      certificate_holder_address_line1: property.certificate_holder_address_line1 || null,
-      certificate_holder_address_line2: property.certificate_holder_address_line2 || null,
-      certificate_holder_city: property.certificate_holder_city || null,
-      certificate_holder_state: property.certificate_holder_state || null,
-      certificate_holder_zip: property.certificate_holder_zip || null,
-      loss_payee_entities: property.loss_payee_entities?.filter(Boolean) ?? [],
-    })
+    .insert(fullPayload)
     .select()
     .single();
+
+  // If it fails because of missing columns, retry with only the base columns
+  if (error && (error.message?.includes('column') || error.code === '42703')) {
+    ({ data, error } = await supabase
+      .from('properties')
+      .insert(basePayload)
+      .select()
+      .single());
+  }
 
   if (error) throw error;
   return data as Property;
@@ -142,6 +162,10 @@ export async function fetchVendorRequirements(
     .eq('property_id', propertyId)
     .maybeSingle();
 
+  // Table may not exist if migration hasn't been applied
+  if (error && (error.code === '42P01' || error.message?.includes('relation'))) {
+    return null;
+  }
   if (error) throw error;
   return data as VendorRequirements | null;
 }

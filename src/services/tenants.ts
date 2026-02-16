@@ -81,27 +81,43 @@ export async function createTenant(tenant: {
   } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
 
-  // Generate upload_token for self-service portal
+  // Build insert payload with only columns guaranteed to exist.
+  // The migration adding new columns may not have been applied yet.
   const upload_token = crypto.randomUUID();
+  const basePayload: Record<string, unknown> = {
+    name: tenant.name,
+    property_id: tenant.property_id || null,
+    unit: tenant.unit_suite || null,
+    user_id: user.id,
+    insurance_status: 'pending',
+  };
 
-  const { data, error } = await supabase
+  // First attempt: include new columns
+  const fullPayload: Record<string, unknown> = {
+    ...basePayload,
+    email: tenant.email || null,
+    unit_suite: tenant.unit_suite || null,
+    tenant_type: tenant.tenant_type || null,
+    lease_start_date: tenant.lease_start_date || null,
+    lease_end_date: tenant.lease_end_date || null,
+    status: 'pending',
+    upload_token,
+  };
+
+  let { data, error } = await supabase
     .from('tenants')
-    .insert({
-      name: tenant.name,
-      email: tenant.email || null,
-      property_id: tenant.property_id || null,
-      unit_suite: tenant.unit_suite || null,
-      unit: tenant.unit_suite || null, // legacy column
-      tenant_type: tenant.tenant_type || null,
-      lease_start_date: tenant.lease_start_date || null,
-      lease_end_date: tenant.lease_end_date || null,
-      user_id: user.id,
-      status: 'pending' as const,
-      insurance_status: 'pending' as const, // legacy column
-      upload_token,
-    })
+    .insert(fullPayload)
     .select()
     .single();
+
+  // If it fails because of missing columns, retry with only the base columns
+  if (error && (error.message?.includes('column') || error.code === '42703')) {
+    ({ data, error } = await supabase
+      .from('tenants')
+      .insert(basePayload)
+      .select()
+      .single());
+  }
 
   if (error) throw new Error(error.message);
   return data as Tenant;
@@ -152,6 +168,10 @@ export async function fetchTenantRequirements(
     .eq('tenant_id', tenantId)
     .maybeSingle();
 
+  // Table may not exist if migration hasn't been applied
+  if (error && (error.code === '42P01' || error.message?.includes('relation'))) {
+    return null;
+  }
   if (error) throw error;
   return data as TenantRequirements | null;
 }

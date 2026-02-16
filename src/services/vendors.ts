@@ -84,22 +84,33 @@ export async function createVendor(vendor: {
   if (authError) throw new Error(`Authentication error: ${authError.message}`);
   if (!user) throw new Error('Not authenticated — please sign in to continue.');
 
-  // Generate upload_token for self-service portal
+  // Build insert payload with only columns that exist in the current schema.
+  // The migration adding `email` and `upload_token` may not have been applied yet,
+  // so we start with guaranteed columns and attempt to include new ones gracefully.
   const upload_token = crypto.randomUUID();
+  const insertPayload: Record<string, unknown> = {
+    name: vendor.name,
+    contact_email: vendor.email || null,
+    property_id: vendor.property_id || null,
+    user_id: user.id,
+    status: 'pending',
+  };
 
-  const { data, error } = await supabase
+  // First attempt: include new columns (email, upload_token)
+  let { data, error } = await supabase
     .from('vendors')
-    .insert({
-      name: vendor.name,
-      email: vendor.email || null,
-      contact_email: vendor.email || null, // legacy column
-      property_id: vendor.property_id || null,
-      user_id: user.id,
-      status: 'pending' as const,
-      upload_token,
-    })
+    .insert({ ...insertPayload, email: vendor.email || null, upload_token })
     .select()
     .single();
+
+  // If it fails because of missing columns, retry with only the base columns
+  if (error && (error.message?.includes("column") || error.code === '42703')) {
+    ({ data, error } = await supabase
+      .from('vendors')
+      .insert(insertPayload)
+      .select()
+      .single());
+  }
 
   if (error) {
     if (error.code === '42P01') {
