@@ -1,0 +1,153 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* ================================================
+       SmartCOI Design System — CSS Custom Properties
+       ================================================ */
+
+    /* --- Brand: Emerald (#73E2A7) --- */
+    --brand: 150 67% 67%;
+    --brand-dark: 150 52% 54%;
+    --brand-light: 150 62% 80%;
+    --brand-lightest: 150 72% 94%;
+
+    /* --- Slate neutral palette --- */
+    --slate-950: 222 47% 11%;
+    --slate-700: 215 28% 27%;
+    --slate-500: 215 16% 47%;
+    --slate-400: 215 20% 65%;
+    --slate-300: 213 27% 84%;
+    --slate-200: 214 32% 91%;
+    --slate-100: 210 40% 96%;
+    --slate-50: 210 40% 98%;
+
+    /* --- Semantic status colors --- */
+    --status-compliant: 150 67% 67%;
+    --status-expiring: 43 96% 56%;
+    --status-non-compliant: 0 94% 71%;
+    --status-expired: 0 84% 60%;
+    --status-pending: 215 20% 65%;
+    --status-under-review: 213 94% 68%;
+
+    /* --- shadcn/ui theme tokens --- */
+    --background: 210 40% 98%;
+    --foreground: 222 47% 11%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+
+    --primary: 150 67% 67%;
+    --primary-foreground: 222 47% 11%;
+
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222 47% 11%;
+
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;
+
+    --accent: 150 72% 94%;
+    --accent-foreground: 150 52% 30%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 150 67% 67%;
+
+    --radius: 0.5rem;
+
+    /* --- Sidebar tokens --- */
+    --sidebar-background: 222 47% 11%;
+    --sidebar-foreground: 215 20% 65%;
+    --sidebar-primary: 150 67% 67%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 215 28% 17%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 215 28% 20%;
+    --sidebar-ring: 150 67% 67%;
+
+    /* --- Chart tokens --- */
+    --chart-1: 150 67% 67%;
+    --chart-2: 213 94% 68%;
+    --chart-3: 43 96% 56%;
+    --chart-4: 0 94% 71%;
+    --chart-5: 215 20% 65%;
+  }
+
+  .dark {
+    --background: 222 47% 11%;
+    --foreground: 210 40% 98%;
+
+    --card: 222 47% 14%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222 47% 14%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 150 52% 54%;
+    --primary-foreground: 222 47% 11%;
+
+    --secondary: 215 28% 17%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 215 28% 17%;
+    --muted-foreground: 215 20% 65%;
+
+    --accent: 215 28% 17%;
+    --accent-foreground: 150 67% 67%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 215 28% 20%;
+    --input: 215 28% 20%;
+    --ring: 150 52% 54%;
+
+    --sidebar-background: 222 47% 8%;
+    --sidebar-foreground: 215 20% 65%;
+    --sidebar-primary: 150 52% 54%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 215 28% 14%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 215 28% 17%;
+    --sidebar-ring: 150 52% 54%;
+
+    --chart-1: 150 52% 54%;
+    --chart-2: 213 94% 68%;
+    --chart-3: 43 96% 56%;
+    --chart-4: 0 94% 71%;
+    --chart-5: 215 20% 65%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+}
+
+@layer utilities {
+  .gradient-primary {
+    background: linear-gradient(135deg, #73E2A7, #4CC78A);
+  }
+
+  .gradient-primary-hover {
+    background: linear-gradient(135deg, #4CC78A, #3BB87A);
+  }
+
+  .text-gradient-primary {
+    background: linear-gradient(135deg, #73E2A7, #4CC78A);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+}

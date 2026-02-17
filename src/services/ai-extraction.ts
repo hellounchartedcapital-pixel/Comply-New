@@ -21,7 +21,7 @@ export async function extractCOI(file: File): Promise<COIExtractionResult> {
 
   const pdfBase64 = await fileToBase64(file);
 
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const response = await fetch(`${supabaseUrl}/functions/v1/extract-coi`, {
     method: 'POST',
     headers: {
@@ -53,7 +53,8 @@ export async function extractCOI(file: File): Promise<COIExtractionResult> {
   return mapRawToCOIResult(raw);
 }
 
-function mapRawToCOIResult(raw: any): COIExtractionResult {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mapRawToCOIResult(raw: Record<string, any>): COIExtractionResult {
   const coverages: ExtractedCoverage[] = [];
 
   // General Liability
@@ -162,7 +163,7 @@ export async function extractLeaseRequirements(file: File): Promise<LeaseExtract
     );
   }
 
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const response = await fetch(`${supabaseUrl}/functions/v1/extract-lease-requirements`, {
     method: 'POST',
     headers: {
@@ -195,7 +196,8 @@ export async function extractLeaseRequirements(file: File): Promise<LeaseExtract
   return mapRawToLeaseResult(result.data);
 }
 
-function mapRawToLeaseResult(raw: any): LeaseExtractionResult {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mapRawToLeaseResult(raw: Record<string, any>): LeaseExtractionResult {
   // Each AI-extracted field is { value, confidence, lease_ref }
   // We flatten to just the values for LeaseExtractedData
   const v = (key: string) => raw[key]?.value ?? null;
