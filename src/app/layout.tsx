@@ -2,7 +2,10 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'SmartCOI',
+  title: {
+    default: 'SmartCOI',
+    template: '%s | SmartCOI',
+  },
   description:
     'AI-powered COI compliance tracking for commercial property managers',
   icons: {
