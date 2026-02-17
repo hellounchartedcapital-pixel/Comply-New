@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { StepOrgSetup, type OrgSetupData } from '@/components/onboarding/step-org-setup';
@@ -28,61 +28,110 @@ export default function OnboardingSetupPage() {
   const [propertyData, setPropertyData] = useState<PropertyData | null>(null);
   const [propertyId, setPropertyId] = useState<string | null>(null);
 
-  // Load the current user's org ID on mount
-  const loadUserOrg = useCallback(async () => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      router.push('/login');
-      return;
-    }
+  // Store auth user ID for creating org/profile when missing
+  const authUserIdRef = useRef<string | null>(null);
+  const authEmailRef = useRef<string | null>(null);
+  const authNameRef = useRef<string | null>(null);
 
-    const { data: profile } = await supabase
-      .from('users')
-      .select('organization_id')
-      .eq('id', user.id)
-      .single();
+  // Load the current user's org ID on mount (run once)
+  const didLoad = useRef(false);
+  useEffect(() => {
+    if (didLoad.current) return;
+    didLoad.current = true;
 
-    if (profile?.organization_id) {
-      setOrgId(profile.organization_id);
-
-      // Check if onboarding is already completed
-      const { data: org } = await supabase
-        .from('organizations')
-        .select('name, settings')
-        .eq('id', profile.organization_id)
-        .single();
-
-      if (org?.settings?.onboarding_completed) {
-        router.push('/dashboard');
+    async function loadUserOrg() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        router.push('/login');
         return;
       }
 
-      // Pre-fill company name if already set
-      if (org?.name && !org.name.endsWith("'s Organization")) {
-        setOrgData((prev) => ({ ...prev, companyName: org.name }));
+      authUserIdRef.current = user.id;
+      authEmailRef.current = user.email ?? '';
+      authNameRef.current = user.user_metadata?.full_name ?? '';
+
+      const { data: profile } = await supabase
+        .from('users')
+        .select('organization_id')
+        .eq('id', user.id)
+        .single();
+
+      if (profile?.organization_id) {
+        setOrgId(profile.organization_id);
+
+        // Check if onboarding is already completed
+        const { data: org } = await supabase
+          .from('organizations')
+          .select('name, settings')
+          .eq('id', profile.organization_id)
+          .single();
+
+        if (org?.settings?.onboarding_completed) {
+          router.push('/dashboard');
+          return;
+        }
+
+        // Pre-fill company name if already set
+        if (org?.name && !org.name.endsWith("'s Organization")) {
+          setOrgData((prev) => ({ ...prev, companyName: org.name }));
+        }
       }
     }
+
+    loadUserOrg();
   }, [supabase, router]);
 
-  useEffect(() => {
-    loadUserOrg();
-  }, [loadUserOrg]);
+  // Helper: ensure org and user profile exist, return orgId
+  async function ensureOrgAndProfile(companyName: string): Promise<string> {
+    // If we already have an orgId, just return it
+    if (orgId) return orgId;
+
+    const userId = authUserIdRef.current;
+    if (!userId) throw new Error('Not authenticated. Please refresh and try again.');
+
+    // Create organization
+    const { data: newOrg, error: orgError } = await supabase
+      .from('organizations')
+      .insert({ name: companyName })
+      .select('id')
+      .single();
+
+    if (orgError) throw new Error(`Failed to create organization: ${orgError.message}`);
+
+    const newOrgId = newOrg.id;
+
+    // Create user profile linking auth user to organization
+    const { error: userError } = await supabase.from('users').insert({
+      id: userId,
+      organization_id: newOrgId,
+      email: authEmailRef.current ?? '',
+      full_name: authNameRef.current ?? '',
+      role: 'manager',
+    });
+
+    if (userError) throw new Error(`Failed to create user profile: ${userError.message}`);
+
+    setOrgId(newOrgId);
+    return newOrgId;
+  }
 
   // Step 1: Save org name + default entities
   async function handleOrgSetupNext(data: OrgSetupData) {
-    if (!orgId) return;
     setSaving(true);
     setError(null);
     setOrgData(data);
 
     try {
-      // Update organization name
+      // Ensure the org and user profile exist (creates them if missing)
+      const currentOrgId = await ensureOrgAndProfile(data.companyName);
+
+      // Update organization name (in case it was pre-existing)
       const { error: orgError } = await supabase
         .from('organizations')
         .update({ name: data.companyName })
-        .eq('id', orgId);
+        .eq('id', currentOrgId);
 
       if (orgError) throw orgError;
 
@@ -90,7 +139,7 @@ export default function OnboardingSetupPage() {
       await supabase
         .from('organization_default_entities')
         .delete()
-        .eq('organization_id', orgId);
+        .eq('organization_id', currentOrgId);
 
       const entitiesToInsert: {
         organization_id: string;
@@ -101,7 +150,7 @@ export default function OnboardingSetupPage() {
 
       if (data.certificateHolder && data.certificateHolder.entity_name) {
         entitiesToInsert.push({
-          organization_id: orgId,
+          organization_id: currentOrgId,
           entity_name: data.certificateHolder.entity_name,
           entity_address: data.certificateHolder.entity_address,
           entity_type: 'certificate_holder',
@@ -111,7 +160,7 @@ export default function OnboardingSetupPage() {
       for (const ai of data.additionalInsured) {
         if (ai.entity_name.trim()) {
           entitiesToInsert.push({
-            organization_id: orgId,
+            organization_id: currentOrgId,
             entity_name: ai.entity_name,
             entity_address: ai.entity_address,
             entity_type: 'additional_insured',
@@ -136,7 +185,10 @@ export default function OnboardingSetupPage() {
 
   // Step 2: Save property + property entities
   async function handlePropertyNext(data: PropertyData) {
-    if (!orgId) return;
+    if (!orgId) {
+      setError('Organization not set up. Please go back to Step 1.');
+      return;
+    }
     setSaving(true);
     setError(null);
     setPropertyData(data);
@@ -188,7 +240,10 @@ export default function OnboardingSetupPage() {
 
   // Step 3: Duplicate selected system templates into org templates
   async function handleTemplatesNext(selected: SelectedTemplate[]) {
-    if (!orgId) return;
+    if (!orgId) {
+      setError('Organization not set up. Please go back to Step 1.');
+      return;
+    }
     setSaving(true);
     setError(null);
 
@@ -243,7 +298,10 @@ export default function OnboardingSetupPage() {
 
   // Step 4: Finish onboarding
   async function handleFinish() {
-    if (!orgId) return;
+    if (!orgId) {
+      setError('Organization not set up. Please go back to Step 1.');
+      return;
+    }
     setSaving(true);
     setError(null);
 
