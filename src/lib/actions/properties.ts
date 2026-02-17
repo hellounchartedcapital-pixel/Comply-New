@@ -286,3 +286,109 @@ export async function softDeleteTenant(tenantId: string, propertyId: string) {
   revalidatePath(`/dashboard/properties/${propertyId}`);
   return { success: true };
 }
+
+// ---------------------------------------------------------------------------
+// Vendor update (edit + notifications toggle)
+// ---------------------------------------------------------------------------
+
+export interface UpdateVendorInput {
+  company_name: string;
+  contact_name?: string;
+  contact_email?: string;
+  contact_phone?: string;
+  vendor_type?: string;
+  template_id?: string;
+}
+
+export async function updateVendor(vendorId: string, input: UpdateVendorInput) {
+  const orgId = await getOrgId();
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from('vendors')
+    .update({
+      company_name: input.company_name,
+      contact_name: input.contact_name || null,
+      contact_email: input.contact_email || null,
+      contact_phone: input.contact_phone || null,
+      vendor_type: input.vendor_type || null,
+      template_id: input.template_id || null,
+    })
+    .eq('id', vendorId)
+    .eq('organization_id', orgId);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/dashboard/vendors/${vendorId}`);
+  return { success: true };
+}
+
+export async function toggleVendorNotifications(vendorId: string, paused: boolean) {
+  const orgId = await getOrgId();
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from('vendors')
+    .update({ notifications_paused: paused })
+    .eq('id', vendorId)
+    .eq('organization_id', orgId);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/dashboard/vendors/${vendorId}`);
+  return { success: true };
+}
+
+// ---------------------------------------------------------------------------
+// Tenant update (edit + notifications toggle)
+// ---------------------------------------------------------------------------
+
+export interface UpdateTenantInput {
+  company_name: string;
+  contact_name?: string;
+  contact_email?: string;
+  contact_phone?: string;
+  unit_suite?: string;
+  tenant_type?: string;
+  template_id?: string;
+}
+
+export async function updateTenant(tenantId: string, input: UpdateTenantInput) {
+  const orgId = await getOrgId();
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from('tenants')
+    .update({
+      company_name: input.company_name,
+      contact_name: input.contact_name || null,
+      contact_email: input.contact_email || null,
+      contact_phone: input.contact_phone || null,
+      unit_suite: input.unit_suite || null,
+      tenant_type: input.tenant_type || null,
+      template_id: input.template_id || null,
+    })
+    .eq('id', tenantId)
+    .eq('organization_id', orgId);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/dashboard/tenants/${tenantId}`);
+  return { success: true };
+}
+
+export async function toggleTenantNotifications(tenantId: string, paused: boolean) {
+  const orgId = await getOrgId();
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from('tenants')
+    .update({ notifications_paused: paused })
+    .eq('id', tenantId)
+    .eq('organization_id', orgId);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/dashboard/tenants/${tenantId}`);
+  return { success: true };
+}
