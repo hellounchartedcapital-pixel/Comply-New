@@ -84,34 +84,20 @@ export default function OnboardingSetupPage() {
   }, [supabase, router]);
 
   // Helper: ensure org and user profile exist, return orgId
+  // Uses a SECURITY DEFINER database function to bypass RLS
   async function ensureOrgAndProfile(companyName: string): Promise<string> {
     // If we already have an orgId, just return it
     if (orgId) return orgId;
 
-    const userId = authUserIdRef.current;
-    if (!userId) throw new Error('Not authenticated. Please refresh and try again.');
+    if (!authUserIdRef.current) throw new Error('Not authenticated. Please refresh and try again.');
 
-    // Create organization
-    const { data: newOrg, error: orgError } = await supabase
-      .from('organizations')
-      .insert({ name: companyName })
-      .select('id')
-      .single();
-
-    if (orgError) throw new Error(`Failed to create organization: ${orgError.message}`);
-
-    const newOrgId = newOrg.id;
-
-    // Create user profile linking auth user to organization
-    const { error: userError } = await supabase.from('users').insert({
-      id: userId,
-      organization_id: newOrgId,
-      email: authEmailRef.current ?? '',
-      full_name: authNameRef.current ?? '',
-      role: 'manager',
+    const { data: newOrgId, error } = await supabase.rpc('create_org_and_profile', {
+      org_name: companyName,
+      user_email: authEmailRef.current ?? '',
+      user_full_name: authNameRef.current ?? '',
     });
 
-    if (userError) throw new Error(`Failed to create user profile: ${userError.message}`);
+    if (error) throw new Error(`Failed to create organization: ${error.message}`);
 
     setOrgId(newOrgId);
     return newOrgId;

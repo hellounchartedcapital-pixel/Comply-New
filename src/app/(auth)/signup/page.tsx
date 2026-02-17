@@ -45,30 +45,15 @@ export default function SignUpPage() {
         return;
       }
 
-      // 2. Create organization
-      const { data: org, error: orgError } = await supabase
-        .from('organizations')
-        .insert({ name: `${fullName}'s Organization` })
-        .select('id')
-        .single();
-
-      if (orgError) {
-        setError('Account created but failed to set up organization. Please contact support.');
-        setLoading(false);
-        return;
-      }
-
-      // 3. Create user row linking auth.uid → organization
-      const { error: userError } = await supabase.from('users').insert({
-        id: authData.user.id,
-        organization_id: org.id,
-        email,
-        full_name: fullName,
-        role: 'manager',
+      // 2. Create organization + user profile via SECURITY DEFINER function
+      const { error: setupError } = await supabase.rpc('create_org_and_profile', {
+        org_name: `${fullName}'s Organization`,
+        user_email: email,
+        user_full_name: fullName,
       });
 
-      if (userError) {
-        setError('Account created but failed to set up user profile. Please contact support.');
+      if (setupError) {
+        setError('Account created but failed to set up organization. Please contact support.');
         setLoading(false);
         return;
       }
