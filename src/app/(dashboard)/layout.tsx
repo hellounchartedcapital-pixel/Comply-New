@@ -26,13 +26,19 @@ export default async function DashboardLayout({
     .single();
 
   let orgName = 'My Organization';
+  let onboardingCompleted = false;
   if (profile?.organization_id) {
     const { data: org } = await supabase
       .from('organizations')
-      .select('name')
+      .select('name, settings')
       .eq('id', profile.organization_id)
       .single();
     if (org?.name) orgName = org.name;
+    onboardingCompleted = !!org?.settings?.onboarding_completed;
+  }
+
+  if (!onboardingCompleted) {
+    redirect('/setup');
   }
 
   return (

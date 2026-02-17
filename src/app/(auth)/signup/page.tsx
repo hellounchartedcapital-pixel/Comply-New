@@ -73,8 +73,8 @@ export default function SignUpPage() {
         return;
       }
 
-      // 4. Redirect to dashboard
-      router.push('/dashboard');
+      // 4. Redirect to onboarding setup
+      router.push('/setup');
       router.refresh();
     } catch {
       setError('An unexpected error occurred. Please try again.');

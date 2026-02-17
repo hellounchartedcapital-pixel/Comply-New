@@ -102,6 +102,7 @@ export interface Organization {
 }
 
 export interface OrganizationSettings {
+  onboarding_completed?: boolean;
   notification_preferences?: {
     expiration_warning_days?: number[];
     auto_follow_up_enabled?: boolean;
