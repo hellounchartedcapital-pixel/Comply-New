@@ -1,12 +1,21 @@
 import { supabase } from '@/lib/supabase';
-import type { COIExtractionResult, LeaseExtractionResult, LeaseExtractedData, ExtractedCoverage, ExtractedEndorsement } from '@/types';
+import type {
+  COIExtractionResult,
+  RawExtractedCoverage,
+  RawExtractedEntity,
+  LeaseExtractionResult,
+  LeaseExtractedData,
+  LeaseExtractedCoverage,
+  LeaseExtractedEntityRequirement,
+  CoverageType,
+  LimitType,
+} from '@/types';
 
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => {
       const result = reader.result as string;
-      // Strip the data URL prefix (e.g., "data:application/pdf;base64,")
       const base64 = result.split(',')[1] ?? result;
       resolve(base64);
     };
@@ -42,59 +51,101 @@ export async function extractCOI(file: File): Promise<COIExtractionResult> {
     return {
       success: false,
       coverages: [],
-      endorsements: [],
+      entities: [],
       confidence_score: 0,
       error: result.error ?? 'Extraction failed',
     };
   }
 
-  // Map the raw AI extraction to our COIExtractionResult format
-  const raw = result.data;
-  return mapRawToCOIResult(raw);
+  return mapRawToCOIResult(result.data);
 }
 
+// Maps raw edge-function AI output into our v2 COIExtractionResult format
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mapRawToCOIResult(raw: Record<string, any>): COIExtractionResult {
-  const coverages: ExtractedCoverage[] = [];
+  const coverages: RawExtractedCoverage[] = [];
+  const entities: RawExtractedEntity[] = [];
 
   // General Liability
-  if (raw.generalLiability && raw.generalLiability.amount != null) {
+  if (raw.generalLiability?.amount != null) {
     coverages.push({
-      type: 'General Liability',
-      occurrence_limit: raw.generalLiability.amount,
-      aggregate_limit: raw.generalLiability.aggregate ?? undefined,
-      expiration_date: raw.generalLiability.expirationDate ?? undefined,
-      confidence_score: 90,
+      coverage_type: 'general_liability',
+      carrier_name: raw.insuranceCompany ?? null,
+      policy_number: null,
+      limit_amount: raw.generalLiability.amount,
+      limit_type: 'per_occurrence',
+      effective_date: null,
+      expiration_date: raw.generalLiability.expirationDate ?? null,
+      additional_insured_listed: false,
+      additional_insured_entities: [],
+      waiver_of_subrogation: false,
+      raw_text: null,
     });
+    if (raw.generalLiability.aggregate != null) {
+      coverages.push({
+        coverage_type: 'general_liability',
+        carrier_name: raw.insuranceCompany ?? null,
+        policy_number: null,
+        limit_amount: raw.generalLiability.aggregate,
+        limit_type: 'aggregate',
+        effective_date: null,
+        expiration_date: raw.generalLiability.expirationDate ?? null,
+        additional_insured_listed: false,
+        additional_insured_entities: [],
+        waiver_of_subrogation: false,
+        raw_text: null,
+      });
+    }
   }
 
   // Auto Liability
-  if (raw.autoLiability && raw.autoLiability.amount != null) {
+  if (raw.autoLiability?.amount != null) {
     coverages.push({
-      type: 'Automobile Liability',
-      combined_single_limit: raw.autoLiability.amount,
-      expiration_date: raw.autoLiability.expirationDate ?? undefined,
-      confidence_score: 90,
+      coverage_type: 'automobile_liability',
+      carrier_name: raw.insuranceCompany ?? null,
+      policy_number: null,
+      limit_amount: raw.autoLiability.amount,
+      limit_type: 'combined_single_limit',
+      effective_date: null,
+      expiration_date: raw.autoLiability.expirationDate ?? null,
+      additional_insured_listed: false,
+      additional_insured_entities: [],
+      waiver_of_subrogation: false,
+      raw_text: null,
     });
   }
 
   // Workers' Compensation
   if (raw.workersComp) {
     coverages.push({
-      type: "Workers' Compensation",
-      is_statutory: true,
-      expiration_date: raw.workersComp.expirationDate ?? undefined,
-      confidence_score: 90,
+      coverage_type: 'workers_compensation',
+      carrier_name: raw.insuranceCompany ?? null,
+      policy_number: null,
+      limit_amount: null,
+      limit_type: 'statutory',
+      effective_date: null,
+      expiration_date: raw.workersComp.expirationDate ?? null,
+      additional_insured_listed: false,
+      additional_insured_entities: [],
+      waiver_of_subrogation: false,
+      raw_text: null,
     });
   }
 
   // Employers Liability
-  if (raw.employersLiability && raw.employersLiability.amount != null) {
+  if (raw.employersLiability?.amount != null) {
     coverages.push({
-      type: "Employers' Liability",
-      occurrence_limit: raw.employersLiability.amount,
-      expiration_date: raw.employersLiability.expirationDate ?? undefined,
-      confidence_score: 85,
+      coverage_type: 'employers_liability',
+      carrier_name: raw.insuranceCompany ?? null,
+      policy_number: null,
+      limit_amount: raw.employersLiability.amount,
+      limit_type: 'per_accident',
+      effective_date: null,
+      expiration_date: raw.employersLiability.expirationDate ?? null,
+      additional_insured_listed: false,
+      additional_insured_entities: [],
+      waiver_of_subrogation: false,
+      raw_text: null,
     });
   }
 
@@ -102,51 +153,63 @@ function mapRawToCOIResult(raw: Record<string, any>): COIExtractionResult {
   if (raw.additionalCoverages && Array.isArray(raw.additionalCoverages)) {
     for (const cov of raw.additionalCoverages) {
       if (cov.type) {
-        coverages.push({
-          type: cov.type,
-          occurrence_limit: cov.amount ?? undefined,
-          aggregate_limit: cov.aggregate ?? undefined,
-          expiration_date: cov.expirationDate ?? undefined,
-          confidence_score: 80,
-        });
+        const mappedType = mapCoverageTypeName(cov.type);
+        if (mappedType) {
+          coverages.push({
+            coverage_type: mappedType,
+            carrier_name: raw.insuranceCompany ?? null,
+            policy_number: null,
+            limit_amount: cov.amount ?? null,
+            limit_type: 'per_occurrence',
+            effective_date: null,
+            expiration_date: cov.expirationDate ?? null,
+            additional_insured_listed: false,
+            additional_insured_entities: [],
+            waiver_of_subrogation: false,
+            raw_text: null,
+          });
+        }
       }
     }
   }
 
-  // Endorsements
-  const endorsements: ExtractedEndorsement[] = [];
-  const certHolderText = raw.certificateHolder ?? '';
-
-  if (raw.additionalInsured) {
-    endorsements.push({
-      type: 'Additional Insured',
-      present: (raw.additionalInsured || '').toLowerCase() === 'yes',
-      // Store the certificate holder text as endorsement details so the
-      // compliance engine can verify entity names against it. On ACORD 25
-      // forms, the AI entity name typically appears in the Certificate
-      // Holder section at the bottom of the form.
-      details: certHolderText || undefined,
-      confidence_score: 85,
+  // Certificate holder entity
+  if (raw.certificateHolder) {
+    entities.push({
+      entity_name: raw.certificateHolder,
+      entity_address: null,
+      entity_type: 'certificate_holder',
     });
   }
-  if (raw.waiverOfSubrogation) {
-    endorsements.push({
-      type: 'Waiver of Subrogation',
-      present: (raw.waiverOfSubrogation || '').toLowerCase() === 'yes',
-      confidence_score: 85,
-    });
+
+  // Additional insured entities
+  if (raw.additionalInsuredNames && Array.isArray(raw.additionalInsuredNames)) {
+    for (const name of raw.additionalInsuredNames) {
+      entities.push({
+        entity_name: name,
+        entity_address: null,
+        entity_type: 'additional_insured',
+      });
+    }
   }
 
   return {
     success: true,
-    carrier: raw.insuranceCompany ?? undefined,
-    named_insured: raw.companyName ?? undefined,
-    certificate_holder: certHolderText || undefined,
-    expiration_date: raw.expirationDate ?? undefined,
     coverages,
-    endorsements,
+    entities,
     confidence_score: 85,
   };
+}
+
+function mapCoverageTypeName(name: string): CoverageType | null {
+  const lower = name.toLowerCase();
+  if (lower.includes('umbrella') || lower.includes('excess')) return 'umbrella_excess_liability';
+  if (lower.includes('professional') || lower.includes('e&o')) return 'professional_liability_eo';
+  if (lower.includes('cyber')) return 'cyber_liability';
+  if (lower.includes('pollution')) return 'pollution_liability';
+  if (lower.includes('liquor')) return 'liquor_liability';
+  if (lower.includes('property') || lower.includes('inland marine')) return 'property_inland_marine';
+  return null;
 }
 
 export async function extractLeaseRequirements(file: File): Promise<LeaseExtractionResult> {
@@ -155,7 +218,6 @@ export async function extractLeaseRequirements(file: File): Promise<LeaseExtract
 
   const pdfBase64 = await fileToBase64(file);
 
-  // Check if payload might be too large for edge function (approx 6MB limit for Supabase)
   const payloadSizeMB = (pdfBase64.length * 0.75) / (1024 * 1024);
   if (payloadSizeMB > 5) {
     throw new Error(
@@ -198,30 +260,123 @@ export async function extractLeaseRequirements(file: File): Promise<LeaseExtract
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mapRawToLeaseResult(raw: Record<string, any>): LeaseExtractionResult {
-  // Each AI-extracted field is { value, confidence, lease_ref }
-  // We flatten to just the values for LeaseExtractedData
   const v = (key: string) => raw[key]?.value ?? null;
+  const conf = (key: string): number => raw[key]?.confidence ?? 0;
+  const ref = (key: string): string | null => raw[key]?.lease_ref ?? null;
+
+  const coverageRequirements: LeaseExtractedCoverage[] = [];
+  const entityRequirements: LeaseExtractedEntityRequirement[] = [];
+
+  // Map flat extracted fields to coverage requirements
+  if (v('general_liability_per_occurrence') != null) {
+    coverageRequirements.push({
+      coverage_type: 'general_liability',
+      is_required: true,
+      minimum_limit: v('general_liability_per_occurrence'),
+      limit_type: 'per_occurrence' as LimitType,
+      requires_additional_insured: v('additional_insured_entities')?.length > 0,
+      requires_waiver_of_subrogation: v('waiver_of_subrogation_required') === true,
+      confidence: conf('general_liability_per_occurrence'),
+      lease_reference: ref('general_liability_per_occurrence'),
+    });
+  }
+
+  if (v('general_liability_aggregate') != null) {
+    coverageRequirements.push({
+      coverage_type: 'general_liability',
+      is_required: true,
+      minimum_limit: v('general_liability_aggregate'),
+      limit_type: 'aggregate' as LimitType,
+      requires_additional_insured: false,
+      requires_waiver_of_subrogation: false,
+      confidence: conf('general_liability_aggregate'),
+      lease_reference: ref('general_liability_aggregate'),
+    });
+  }
+
+  if (v('auto_liability') != null) {
+    coverageRequirements.push({
+      coverage_type: 'automobile_liability',
+      is_required: true,
+      minimum_limit: v('auto_liability'),
+      limit_type: 'combined_single_limit' as LimitType,
+      requires_additional_insured: false,
+      requires_waiver_of_subrogation: false,
+      confidence: conf('auto_liability'),
+      lease_reference: ref('auto_liability'),
+    });
+  }
+
+  if (v('workers_comp_required') === true) {
+    coverageRequirements.push({
+      coverage_type: 'workers_compensation',
+      is_required: true,
+      minimum_limit: null,
+      limit_type: 'statutory' as LimitType,
+      requires_additional_insured: false,
+      requires_waiver_of_subrogation: false,
+      confidence: conf('workers_comp_required'),
+      lease_reference: ref('workers_comp_required'),
+    });
+  }
+
+  if (v('employers_liability') != null) {
+    coverageRequirements.push({
+      coverage_type: 'employers_liability',
+      is_required: true,
+      minimum_limit: v('employers_liability'),
+      limit_type: 'per_accident' as LimitType,
+      requires_additional_insured: false,
+      requires_waiver_of_subrogation: false,
+      confidence: conf('employers_liability'),
+      lease_reference: ref('employers_liability'),
+    });
+  }
+
+  if (v('umbrella_liability') != null) {
+    coverageRequirements.push({
+      coverage_type: 'umbrella_excess_liability',
+      is_required: true,
+      minimum_limit: v('umbrella_liability'),
+      limit_type: 'per_occurrence' as LimitType,
+      requires_additional_insured: false,
+      requires_waiver_of_subrogation: false,
+      confidence: conf('umbrella_liability'),
+      lease_reference: ref('umbrella_liability'),
+    });
+  }
+
+  if (v('liquor_liability') != null) {
+    coverageRequirements.push({
+      coverage_type: 'liquor_liability',
+      is_required: true,
+      minimum_limit: v('liquor_liability'),
+      limit_type: 'per_occurrence' as LimitType,
+      requires_additional_insured: false,
+      requires_waiver_of_subrogation: false,
+      confidence: conf('liquor_liability'),
+      lease_reference: ref('liquor_liability'),
+    });
+  }
+
+  // Map additional insured entities
+  const aiEntities: string[] = raw.additional_insured_entities?.value ?? [];
+  for (const name of aiEntities) {
+    entityRequirements.push({
+      entity_name: name,
+      entity_type: 'additional_insured',
+      confidence: conf('additional_insured_entities'),
+      lease_reference: ref('additional_insured_entities'),
+    });
+  }
 
   const data: LeaseExtractedData = {
     tenant_name: raw.tenant_name?.value ?? null,
     premises_description: raw.premises_description?.value ?? null,
     lease_start_date: raw.lease_start_date?.value ?? null,
     lease_end_date: raw.lease_end_date?.value ?? null,
-    general_liability_per_occurrence: v('general_liability_per_occurrence'),
-    general_liability_aggregate: v('general_liability_aggregate'),
-    auto_liability: v('auto_liability'),
-    workers_comp_required: v('workers_comp_required') === true,
-    employers_liability: v('employers_liability'),
-    umbrella_liability: v('umbrella_liability'),
-    property_insurance_required: v('property_insurance_required') === true,
-    business_interruption_required: v('business_interruption_required') === true,
-    business_interruption_minimum: v('business_interruption_minimum'),
-    liquor_liability: v('liquor_liability'),
-    additional_insured_entities: raw.additional_insured_entities?.value ?? [],
-    waiver_of_subrogation_required: v('waiver_of_subrogation_required') === true,
-    loss_payee_required: v('loss_payee_required') === true,
-    insurer_rating_minimum: v('insurer_rating_minimum'),
-    cancellation_notice_days: v('cancellation_notice_days'),
+    coverage_requirements: coverageRequirements,
+    entity_requirements: entityRequirements,
   };
 
   return {

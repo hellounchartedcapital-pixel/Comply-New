@@ -1,17 +1,20 @@
-// ============================================
+// ============================================================================
 // SmartCOI — Compliance Engine
-// The SINGLE function used everywhere:
-//   vendor upload, tenant upload, self-service, re-checks
-// ============================================
+// Core compliance checking logic. Compares extracted coverage data against
+// template requirements and property entity requirements.
+//
+// NOTE: This engine uses its own input/output types (ComplianceCheckInput,
+// ComplianceCheckOutput) which are distinct from the database row types
+// in src/types/index.ts. Application code maps between the two.
+// ============================================================================
 
 import { formatCurrency } from './utils';
-import type { COIExtractedData } from '@/types';
 
-// ============================================
-// TYPES
-// ============================================
+// ============================================================================
+// ENGINE TYPES (distinct from DB row types in @/types)
+// ============================================================================
 
-export interface ComplianceInput {
+export interface ComplianceCheckInput {
   coi: {
     general_liability_per_occurrence: number | null;
     general_liability_aggregate: number | null;
@@ -38,18 +41,17 @@ export interface ComplianceInput {
     cancellation_notice_days?: number | null;
     liquor_liability?: number | null;
     business_interruption_required?: boolean;
-    additional_insured_entities?: string[]; // from lease, on top of property level
+    additional_insured_entities?: string[];
   };
 
   property: {
     additional_insured_entities: string[];
     certificate_holder_name: string | null;
     certificate_holder_address?: string | null;
-    loss_payee_entities: string[];
   };
 }
 
-export interface ComplianceResultItem {
+export interface ComplianceCheckItem {
   field: string;
   display_name: string;
   required: string;
@@ -58,15 +60,15 @@ export interface ComplianceResultItem {
   reason: string | null;
 }
 
-export interface ComplianceResult {
+export interface ComplianceCheckOutput {
   overall_status: 'compliant' | 'non_compliant' | 'expired';
   earliest_expiration: string | null;
-  items: ComplianceResultItem[];
+  items: ComplianceCheckItem[];
 }
 
-// ============================================
+// ============================================================================
 // FUZZY MATCHING UTILITIES
-// ============================================
+// ============================================================================
 
 function normalizeEntityName(name: string): string {
   return name
@@ -94,25 +96,24 @@ function fuzzyMatchInList(name: string, list: string[]): boolean {
   return list.some((item) => entityNameMatches(name, item));
 }
 
-// ============================================
+// ============================================================================
 // FORMAT HELPERS
-// ============================================
+// ============================================================================
 
 function fmtLimit(val: number | null | undefined): string {
   if (val == null) return 'Not found';
   return formatCurrency(val);
 }
 
-// ============================================
+// ============================================================================
 // MAIN COMPLIANCE CHECK
-// ============================================
+// ============================================================================
 
-export function checkCompliance(input: ComplianceInput): ComplianceResult {
+export function checkCompliance(input: ComplianceCheckInput): ComplianceCheckOutput {
   const { coi, requirements, property } = input;
-  const items: ComplianceResultItem[] = [];
+  const items: ComplianceCheckItem[] = [];
   let earliestExp: string | null = null;
 
-  // Track expiration dates
   const now = new Date();
   const thirtyDays = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
 
@@ -131,7 +132,6 @@ export function checkCompliance(input: ComplianceInput): ComplianceResult {
     }
   }
 
-  // Find the expiration date for a coverage type
   function findPolicyExpiration(coverageType: string): string | undefined {
     const policy = coi.policies.find(
       (p) => p.coverage_type.toLowerCase().includes(coverageType.toLowerCase())
@@ -147,7 +147,7 @@ export function checkCompliance(input: ComplianceInput): ComplianceResult {
     const expStatus = checkExpiration(expDate);
     updateEarliestExpiration(expDate);
 
-    let status: ComplianceResultItem['status'];
+    let status: ComplianceCheckItem['status'];
     if (actual == null) status = 'not_found';
     else if (expStatus === 'expired') status = 'expired';
     else if (actual < required) status = 'fail';
@@ -178,7 +178,7 @@ export function checkCompliance(input: ComplianceInput): ComplianceResult {
     const actual = coi.general_liability_aggregate;
     const required = requirements.general_liability_aggregate;
 
-    let status: ComplianceResultItem['status'];
+    let status: ComplianceCheckItem['status'];
     if (actual == null) status = 'not_found';
     else if (actual < required) status = 'fail';
     else status = 'pass';
@@ -206,7 +206,7 @@ export function checkCompliance(input: ComplianceInput): ComplianceResult {
     const expStatus = checkExpiration(expDate);
     updateEarliestExpiration(expDate);
 
-    let status: ComplianceResultItem['status'];
+    let status: ComplianceCheckItem['status'];
     if (actual == null) status = 'not_found';
     else if (expStatus === 'expired') status = 'expired';
     else if (actual < required) status = 'fail';
@@ -239,7 +239,7 @@ export function checkCompliance(input: ComplianceInput): ComplianceResult {
     const expStatus = checkExpiration(expDate);
     updateEarliestExpiration(expDate);
 
-    let status: ComplianceResultItem['status'];
+    let status: ComplianceCheckItem['status'];
     if (!found) status = 'not_found';
     else if (expStatus === 'expired') status = 'expired';
     else if (expStatus === 'expiring') status = 'expiring';
@@ -269,7 +269,7 @@ export function checkCompliance(input: ComplianceInput): ComplianceResult {
     const expStatus = checkExpiration(expDate);
     updateEarliestExpiration(expDate);
 
-    let status: ComplianceResultItem['status'];
+    let status: ComplianceCheckItem['status'];
     if (actual == null) status = 'not_found';
     else if (expStatus === 'expired') status = 'expired';
     else if (actual < required) status = 'fail';
@@ -303,7 +303,7 @@ export function checkCompliance(input: ComplianceInput): ComplianceResult {
     const expStatus = checkExpiration(expDate);
     updateEarliestExpiration(expDate);
 
-    let status: ComplianceResultItem['status'];
+    let status: ComplianceCheckItem['status'];
     if (actual == null) status = 'not_found';
     else if (expStatus === 'expired') status = 'expired';
     else if (actual < required) status = 'fail';
@@ -345,7 +345,6 @@ export function checkCompliance(input: ComplianceInput): ComplianceResult {
 
   // ---- Liquor Liability (tenant — restaurant) ----
   if (requirements.liquor_liability != null) {
-    // We'd need to check this from the extraction — for now check if any relevant coverage found
     items.push({
       field: 'liquor_liability',
       display_name: 'Liquor Liability',
@@ -361,7 +360,6 @@ export function checkCompliance(input: ComplianceInput): ComplianceResult {
   // ============================================
 
   // ---- Additional Insured ----
-  // Merge property-level + requirement-level entities (deduplicate)
   const allAIEntities: string[] = [];
   if (property.additional_insured_entities?.length) {
     allAIEntities.push(...property.additional_insured_entities);
@@ -374,11 +372,10 @@ export function checkCompliance(input: ComplianceInput): ComplianceResult {
     }
   }
 
-  // Check each required AI entity
   for (const entity of allAIEntities) {
     if (!entity) continue;
     const found = fuzzyMatchInList(entity, coi.additional_insured_names);
-    const source = property.additional_insured_entities?.includes(entity) ? 'Property' : 'Lease';
+    const source = property.additional_insured_entities?.includes(entity) ? 'Property' : 'Template';
 
     items.push({
       field: `additional_insured_${normalizeEntityName(entity).replace(/\s+/g, '_')}`,
@@ -413,18 +410,13 @@ export function checkCompliance(input: ComplianceInput): ComplianceResult {
   }
 
   // ---- Waiver of Subrogation ----
-  // NOTE: We can't fully check this from COI extraction alone — COI forms
-  // typically indicate WOS with a checkbox. For now we flag it as a requirement.
   if (requirements.waiver_of_subrogation_required) {
-    // The COI extraction may not explicitly extract WOS — check the description_of_operations
-    // or a dedicated endorsement field. For now, mark as needs verification unless
-    // the AI extraction found specific endorsement info.
     items.push({
       field: 'waiver_of_subrogation',
       display_name: 'Waiver of Subrogation',
       required: 'Required',
       actual: 'See COI',
-      status: 'pass', // Optimistic — real check would parse endorsement data
+      status: 'pass',
       reason: 'Waiver of subrogation requirement noted — verify on COI document',
     });
   }
@@ -433,7 +425,6 @@ export function checkCompliance(input: ComplianceInput): ComplianceResult {
   // DETERMINE OVERALL STATUS
   // ============================================
 
-  // Update earliest expiration from all policies
   for (const policy of coi.policies) {
     updateEarliestExpiration(policy.expiration_date);
   }
@@ -441,7 +432,7 @@ export function checkCompliance(input: ComplianceInput): ComplianceResult {
   const hasExpired = items.some((i) => i.status === 'expired');
   const hasFail = items.some((i) => i.status === 'fail' || i.status === 'not_found');
 
-  let overall_status: ComplianceResult['overall_status'];
+  let overall_status: ComplianceCheckOutput['overall_status'];
   if (hasExpired) {
     overall_status = 'expired';
   } else if (hasFail) {
@@ -457,11 +448,11 @@ export function checkCompliance(input: ComplianceInput): ComplianceResult {
   };
 }
 
-// ============================================
+// ============================================================================
 // HELPER: Get plain-English compliance gaps
-// ============================================
+// ============================================================================
 
-export function getComplianceGaps(result: ComplianceResult): string[] {
+export function getComplianceGaps(result: ComplianceCheckOutput): string[] {
   return result.items
     .filter((i) => i.status !== 'pass' && i.status !== 'expiring')
     .map((i) => {
@@ -470,27 +461,4 @@ export function getComplianceGaps(result: ComplianceResult): string[] {
       if (i.status === 'fail') return `${i.display_name}: ${i.reason}`;
       return `${i.display_name}: ${i.reason}`;
     });
-}
-
-// ============================================
-// HELPER: Convert COIExtractedData to ComplianceInput.coi
-// ============================================
-
-export function extractedDataToComplianceCOI(data: COIExtractedData): ComplianceInput['coi'] {
-  return {
-    general_liability_per_occurrence: data.general_liability_per_occurrence ?? null,
-    general_liability_aggregate: data.general_liability_aggregate ?? null,
-    auto_liability: data.auto_liability ?? null,
-    workers_comp_found: data.workers_comp_found ?? false,
-    employers_liability: data.employers_liability ?? null,
-    umbrella_per_occurrence: data.umbrella_per_occurrence ?? null,
-    umbrella_aggregate: data.umbrella_aggregate ?? null,
-    property_insurance: data.property_insurance ?? null,
-    additional_insured_names: data.additional_insured_names ?? [],
-    certificate_holder_name: data.certificate_holder_name ?? null,
-    policies: (data.policies ?? []).map((p) => ({
-      coverage_type: p.coverage_type,
-      expiration_date: p.expiration_date ?? '',
-    })),
-  };
 }
