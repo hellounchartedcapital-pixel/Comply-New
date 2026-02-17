@@ -18,31 +18,29 @@ export default async function DashboardLayout({
     redirect('/login');
   }
 
-  // Fetch the user's profile
+  // Fetch the user's profile and org name — use fallbacks if missing
   const { data: profile } = await supabase
     .from('users')
     .select('full_name, email, organization_id')
     .eq('id', user.id)
     .single();
 
-  // If no profile or org exists, redirect to onboarding
-  if (!profile?.organization_id) {
-    redirect('/onboarding');
+  let orgName = 'My Organization';
+  if (profile?.organization_id) {
+    const { data: org } = await supabase
+      .from('organizations')
+      .select('name')
+      .eq('id', profile.organization_id)
+      .single();
+    if (org?.name) orgName = org.name;
   }
-
-  // Fetch the organization name
-  const { data: org } = await supabase
-    .from('organizations')
-    .select('name')
-    .eq('id', profile.organization_id)
-    .single();
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50">
       <DashboardShell
-        userName={profile.full_name}
-        userEmail={profile.email ?? user.email ?? ''}
-        orgName={org?.name ?? 'My Organization'}
+        userName={profile?.full_name ?? null}
+        userEmail={profile?.email ?? user.email ?? ''}
+        orgName={orgName}
       >
         {children}
       </DashboardShell>
