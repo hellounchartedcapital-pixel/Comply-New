@@ -9,7 +9,7 @@ import type {
   LimitType,
 } from '@/types';
 
-async function getOrgId(): Promise<string> {
+async function getAuthContext() {
   const supabase = await createClient();
   const {
     data: { user },
@@ -23,7 +23,7 @@ async function getOrgId(): Promise<string> {
     .single();
 
   if (!profile?.organization_id) throw new Error('No organization');
-  return profile.organization_id;
+  return { supabase, userId: user.id, orgId: profile.organization_id };
 }
 
 // ---------------------------------------------------------------------------
@@ -38,8 +38,7 @@ export interface CreateTemplateInput {
 }
 
 export async function createTemplate(input: CreateTemplateInput) {
-  const orgId = await getOrgId();
-  const supabase = await createClient();
+  const { supabase, userId, orgId } = await getAuthContext();
 
   const { data, error } = await supabase
     .from('requirement_templates')
@@ -55,6 +54,13 @@ export async function createTemplate(input: CreateTemplateInput) {
     .single();
 
   if (error) throw new Error(error.message);
+
+  await supabase.from('activity_log').insert({
+    organization_id: orgId,
+    action: 'template_updated',
+    description: `Requirement template "${input.name}" created`,
+    performed_by: userId,
+  });
 
   revalidatePath('/dashboard/templates');
   return { id: data.id };
@@ -84,8 +90,7 @@ export async function updateTemplate(
   templateId: string,
   input: UpdateTemplateInput
 ) {
-  const orgId = await getOrgId();
-  const supabase = await createClient();
+  const { supabase, userId, orgId } = await getAuthContext();
 
   // Verify org owns template and it's not a system default
   const { data: tpl, error: tplError } = await supabase
@@ -135,6 +140,13 @@ export async function updateTemplate(
 
   // Cascade: recalculate compliance for assigned vendors/tenants
   await recalculateComplianceForTemplate(orgId, templateId);
+
+  await supabase.from('activity_log').insert({
+    organization_id: orgId,
+    action: 'template_updated',
+    description: `Requirement template "${input.name}" updated with ${input.requirements.filter((r) => r.is_required).length} required coverage(s)`,
+    performed_by: userId,
+  });
 
   revalidatePath('/dashboard/templates');
   revalidatePath(`/dashboard/templates/${templateId}`);
@@ -287,13 +299,23 @@ async function recalculateComplianceForTemplate(
     }
 
     // Update entity compliance status
+    const newStatus = allMet ? 'compliant' : 'non_compliant';
     const table = entity.type === 'vendor' ? 'vendors' : 'tenants';
     await supabase
       .from(table)
       .update({
-        compliance_status: allMet ? 'compliant' : 'non_compliant',
+        compliance_status: newStatus,
       })
       .eq('id', entity.id);
+
+    // Log compliance recalculation for each entity
+    await supabase.from('activity_log').insert({
+      organization_id: orgId,
+      certificate_id: cert.id,
+      [entity.type === 'vendor' ? 'vendor_id' : 'tenant_id']: entity.id,
+      action: 'compliance_checked',
+      description: `Compliance recalculated after template update: ${newStatus}`,
+    });
   }
 }
 
@@ -302,8 +324,7 @@ async function recalculateComplianceForTemplate(
 // ---------------------------------------------------------------------------
 
 export async function getTemplateUsageCount(templateId: string) {
-  const orgId = await getOrgId();
-  const supabase = await createClient();
+  const { supabase, orgId } = await getAuthContext();
 
   const { count: vendorCount } = await supabase
     .from('vendors')
@@ -352,8 +373,7 @@ export async function getTemplateUsageCount(templateId: string) {
 // ---------------------------------------------------------------------------
 
 export async function duplicateTemplate(sourceTemplateId: string) {
-  const orgId = await getOrgId();
-  const supabase = await createClient();
+  const { supabase, userId, orgId } = await getAuthContext();
 
   // Fetch source template
   const { data: source, error: srcError } = await supabase
@@ -364,12 +384,14 @@ export async function duplicateTemplate(sourceTemplateId: string) {
 
   if (srcError || !source) throw new Error('Template not found');
 
+  const newName = `${source.name} (Custom)`;
+
   // Create duplicate
   const { data: newTemplate, error: createError } = await supabase
     .from('requirement_templates')
     .insert({
       organization_id: orgId,
-      name: `${source.name} (Custom)`,
+      name: newName,
       description: source.description,
       category: source.category,
       risk_level: source.risk_level,
@@ -405,6 +427,13 @@ export async function duplicateTemplate(sourceTemplateId: string) {
     await supabase.from('template_coverage_requirements').insert(rows);
   }
 
+  await supabase.from('activity_log').insert({
+    organization_id: orgId,
+    action: 'template_updated',
+    description: `Template "${newName}" created from "${source.name}"`,
+    performed_by: userId,
+  });
+
   revalidatePath('/dashboard/templates');
   return { id: newTemplate.id };
 }
@@ -414,13 +443,12 @@ export async function duplicateTemplate(sourceTemplateId: string) {
 // ---------------------------------------------------------------------------
 
 export async function deleteTemplate(templateId: string) {
-  const orgId = await getOrgId();
-  const supabase = await createClient();
+  const { supabase, userId, orgId } = await getAuthContext();
 
   // Verify ownership
   const { data: tpl } = await supabase
     .from('requirement_templates')
-    .select('id, is_system_default, organization_id')
+    .select('id, name, is_system_default, organization_id')
     .eq('id', templateId)
     .single();
 
@@ -463,6 +491,13 @@ export async function deleteTemplate(templateId: string) {
     .eq('organization_id', orgId);
 
   if (error) throw new Error(error.message);
+
+  await supabase.from('activity_log').insert({
+    organization_id: orgId,
+    action: 'template_updated',
+    description: `Requirement template "${tpl.name}" deleted`,
+    performed_by: userId,
+  });
 
   revalidatePath('/dashboard/templates');
   return { success: true };

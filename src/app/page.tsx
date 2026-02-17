@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import { Navbar } from '@/components/landing/navbar';
+import { Footer } from '@/components/landing/footer';
 import { HeroDashboard } from '@/components/landing/hero-dashboard';
 import { AnimateIn } from '@/components/landing/animate-in';
 import { ScrollLink } from '@/components/landing/scroll-link';
@@ -9,6 +10,9 @@ export const metadata: Metadata = {
   title: 'SmartCOI — AI-Powered COI Compliance Tracking for Property Managers',
   description:
     'Automate certificate of insurance tracking for your commercial properties. AI-powered compliance checking, automated follow-ups, and portfolio-wide visibility.',
+  alternates: {
+    canonical: 'https://smartcoi.com',
+  },
   openGraph: {
     title: 'SmartCOI — AI-Powered COI Compliance Tracking for Property Managers',
     description:
@@ -515,53 +519,7 @@ export default function LandingPage() {
         </section>
       </main>
 
-      {/* ───────── 8. Footer ───────── */}
-      <footer className="border-t border-slate-800 bg-slate-950 py-12">
-        <div className="mx-auto max-w-7xl px-6">
-          <div className="flex flex-col items-center justify-between gap-8 sm:flex-row sm:items-start">
-            {/* Brand */}
-            <div className="flex flex-col items-center gap-3 sm:items-start">
-              <div className="flex items-center gap-2.5">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/logo-icon.svg" alt="" className="h-7 w-7" />
-                <span className="text-lg font-bold text-white">SmartCOI</span>
-              </div>
-              <p className="text-sm text-slate-500">
-                AI-powered COI compliance tracking.
-              </p>
-            </div>
-
-            {/* Links */}
-            <div className="flex flex-wrap justify-center gap-x-8 gap-y-3 text-sm">
-              <a href="#features" className="text-slate-400 transition-colors hover:text-white">
-                Features
-              </a>
-              <a href="#pricing" className="text-slate-400 transition-colors hover:text-white">
-                Pricing
-              </a>
-              <Link href="/login" className="text-slate-400 transition-colors hover:text-white">
-                Login
-              </Link>
-              <Link href="/signup" className="text-slate-400 transition-colors hover:text-white">
-                Sign Up
-              </Link>
-              <a href="#" className="text-slate-400 transition-colors hover:text-white">
-                Terms
-              </a>
-              <a href="#" className="text-slate-400 transition-colors hover:text-white">
-                Privacy
-              </a>
-              <a href="#" className="text-slate-400 transition-colors hover:text-white">
-                Contact
-              </a>
-            </div>
-          </div>
-
-          <div className="mt-10 border-t border-slate-800 pt-6 text-center text-xs text-slate-500">
-            &copy; {new Date().getFullYear()} SmartCOI. All rights reserved.
-          </div>
-        </div>
-      </footer>
+      <Footer />
     </>
   );
 }

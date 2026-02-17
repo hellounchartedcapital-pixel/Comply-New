@@ -252,7 +252,15 @@ export async function sendManualFollowUp(
 // ============================================================================
 
 export async function cancelNotification(notificationId: string): Promise<void> {
-  const { supabase, orgId } = await getAuthContext();
+  const { supabase, userId, orgId } = await getAuthContext();
+
+  // Fetch notification details for logging
+  const { data: notif } = await supabase
+    .from('notifications')
+    .select('vendor_id, tenant_id, type, email_subject')
+    .eq('id', notificationId)
+    .eq('organization_id', orgId)
+    .single();
 
   const { error } = await supabase
     .from('notifications')
@@ -262,5 +270,15 @@ export async function cancelNotification(notificationId: string): Promise<void> 
     .eq('status', 'scheduled');
 
   if (error) throw new Error(`Failed to cancel notification: ${error.message}`);
+
+  await supabase.from('activity_log').insert({
+    organization_id: orgId,
+    vendor_id: notif?.vendor_id ?? null,
+    tenant_id: notif?.tenant_id ?? null,
+    action: 'notification_sent',
+    description: `Scheduled notification cancelled: ${notif?.email_subject ?? notif?.type ?? 'unknown'}`,
+    performed_by: userId,
+  });
+
   revalidatePath('/dashboard/notifications');
 }

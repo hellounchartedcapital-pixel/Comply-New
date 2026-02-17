@@ -8,7 +8,7 @@ import type { PropertyType, EntityType } from '@/types';
 // Helpers
 // ---------------------------------------------------------------------------
 
-async function getOrgId(): Promise<string> {
+async function getAuthContext() {
   const supabase = await createClient();
   const {
     data: { user },
@@ -22,7 +22,7 @@ async function getOrgId(): Promise<string> {
     .single();
 
   if (!profile?.organization_id) throw new Error('No organization');
-  return profile.organization_id;
+  return { supabase, userId: user.id, orgId: profile.organization_id };
 }
 
 // ---------------------------------------------------------------------------
@@ -44,8 +44,7 @@ export interface CreatePropertyInput {
 }
 
 export async function createProperty(input: CreatePropertyInput) {
-  const orgId = await getOrgId();
-  const supabase = await createClient();
+  const { supabase, userId, orgId } = await getAuthContext();
 
   const { data: property, error: propError } = await supabase
     .from('properties')
@@ -81,6 +80,14 @@ export async function createProperty(input: CreatePropertyInput) {
     }
   }
 
+  await supabase.from('activity_log').insert({
+    organization_id: orgId,
+    property_id: property.id,
+    action: 'status_changed',
+    description: `Property "${input.name}" created`,
+    performed_by: userId,
+  });
+
   revalidatePath('/dashboard/properties');
   return { id: property.id };
 }
@@ -89,8 +96,7 @@ export async function updateProperty(
   propertyId: string,
   input: CreatePropertyInput
 ) {
-  const orgId = await getOrgId();
-  const supabase = await createClient();
+  const { supabase, userId, orgId } = await getAuthContext();
 
   const { error: propError } = await supabase
     .from('properties')
@@ -128,14 +134,21 @@ export async function updateProperty(
     }
   }
 
+  await supabase.from('activity_log').insert({
+    organization_id: orgId,
+    property_id: propertyId,
+    action: 'status_changed',
+    description: `Property "${input.name}" updated`,
+    performed_by: userId,
+  });
+
   revalidatePath('/dashboard/properties');
   revalidatePath(`/dashboard/properties/${propertyId}`);
   return { id: propertyId };
 }
 
 export async function deleteProperty(propertyId: string) {
-  const orgId = await getOrgId();
-  const supabase = await createClient();
+  const { supabase, userId, orgId } = await getAuthContext();
 
   // Check for active vendors / tenants
   const { count: vendorCount } = await supabase
@@ -158,6 +171,13 @@ export async function deleteProperty(propertyId: string) {
     );
   }
 
+  // Get property name for log before deleting
+  const { data: prop } = await supabase
+    .from('properties')
+    .select('name')
+    .eq('id', propertyId)
+    .single();
+
   // Delete entities first, then the property
   await supabase.from('property_entities').delete().eq('property_id', propertyId);
 
@@ -168,6 +188,13 @@ export async function deleteProperty(propertyId: string) {
     .eq('organization_id', orgId);
 
   if (error) throw new Error(error.message);
+
+  await supabase.from('activity_log').insert({
+    organization_id: orgId,
+    action: 'status_changed',
+    description: `Property "${prop?.name ?? propertyId}" deleted`,
+    performed_by: userId,
+  });
 
   revalidatePath('/dashboard/properties');
   return { success: true };
@@ -188,8 +215,7 @@ export interface CreateVendorInput {
 }
 
 export async function createVendor(input: CreateVendorInput) {
-  const orgId = await getOrgId();
-  const supabase = await createClient();
+  const { supabase, userId, orgId } = await getAuthContext();
 
   const { data, error } = await supabase
     .from('vendors')
@@ -209,13 +235,27 @@ export async function createVendor(input: CreateVendorInput) {
 
   if (error) throw new Error(error.message);
 
+  await supabase.from('activity_log').insert({
+    organization_id: orgId,
+    property_id: input.property_id,
+    vendor_id: data.id,
+    action: 'vendor_created',
+    description: `Vendor "${input.company_name}" added`,
+    performed_by: userId,
+  });
+
   revalidatePath(`/dashboard/properties/${input.property_id}`);
   return { id: data.id };
 }
 
 export async function softDeleteVendor(vendorId: string, propertyId: string) {
-  const orgId = await getOrgId();
-  const supabase = await createClient();
+  const { supabase, userId, orgId } = await getAuthContext();
+
+  const { data: vendor } = await supabase
+    .from('vendors')
+    .select('company_name')
+    .eq('id', vendorId)
+    .single();
 
   const { error } = await supabase
     .from('vendors')
@@ -224,6 +264,15 @@ export async function softDeleteVendor(vendorId: string, propertyId: string) {
     .eq('organization_id', orgId);
 
   if (error) throw new Error(error.message);
+
+  await supabase.from('activity_log').insert({
+    organization_id: orgId,
+    property_id: propertyId,
+    vendor_id: vendorId,
+    action: 'status_changed',
+    description: `Vendor "${vendor?.company_name ?? vendorId}" removed`,
+    performed_by: userId,
+  });
 
   revalidatePath(`/dashboard/properties/${propertyId}`);
   return { success: true };
@@ -245,8 +294,7 @@ export interface CreateTenantInput {
 }
 
 export async function createTenant(input: CreateTenantInput) {
-  const orgId = await getOrgId();
-  const supabase = await createClient();
+  const { supabase, userId, orgId } = await getAuthContext();
 
   const { data, error } = await supabase
     .from('tenants')
@@ -267,13 +315,27 @@ export async function createTenant(input: CreateTenantInput) {
 
   if (error) throw new Error(error.message);
 
+  await supabase.from('activity_log').insert({
+    organization_id: orgId,
+    property_id: input.property_id,
+    tenant_id: data.id,
+    action: 'tenant_created',
+    description: `Tenant "${input.company_name}" added`,
+    performed_by: userId,
+  });
+
   revalidatePath(`/dashboard/properties/${input.property_id}`);
   return { id: data.id };
 }
 
 export async function softDeleteTenant(tenantId: string, propertyId: string) {
-  const orgId = await getOrgId();
-  const supabase = await createClient();
+  const { supabase, userId, orgId } = await getAuthContext();
+
+  const { data: tenant } = await supabase
+    .from('tenants')
+    .select('company_name')
+    .eq('id', tenantId)
+    .single();
 
   const { error } = await supabase
     .from('tenants')
@@ -282,6 +344,15 @@ export async function softDeleteTenant(tenantId: string, propertyId: string) {
     .eq('organization_id', orgId);
 
   if (error) throw new Error(error.message);
+
+  await supabase.from('activity_log').insert({
+    organization_id: orgId,
+    property_id: propertyId,
+    tenant_id: tenantId,
+    action: 'status_changed',
+    description: `Tenant "${tenant?.company_name ?? tenantId}" removed`,
+    performed_by: userId,
+  });
 
   revalidatePath(`/dashboard/properties/${propertyId}`);
   return { success: true };
@@ -301,8 +372,7 @@ export interface UpdateVendorInput {
 }
 
 export async function updateVendor(vendorId: string, input: UpdateVendorInput) {
-  const orgId = await getOrgId();
-  const supabase = await createClient();
+  const { supabase, userId, orgId } = await getAuthContext();
 
   const { error } = await supabase
     .from('vendors')
@@ -319,13 +389,20 @@ export async function updateVendor(vendorId: string, input: UpdateVendorInput) {
 
   if (error) throw new Error(error.message);
 
+  await supabase.from('activity_log').insert({
+    organization_id: orgId,
+    vendor_id: vendorId,
+    action: 'status_changed',
+    description: `Vendor "${input.company_name}" updated`,
+    performed_by: userId,
+  });
+
   revalidatePath(`/dashboard/vendors/${vendorId}`);
   return { success: true };
 }
 
 export async function toggleVendorNotifications(vendorId: string, paused: boolean) {
-  const orgId = await getOrgId();
-  const supabase = await createClient();
+  const { supabase, userId, orgId } = await getAuthContext();
 
   const { error } = await supabase
     .from('vendors')
@@ -334,6 +411,14 @@ export async function toggleVendorNotifications(vendorId: string, paused: boolea
     .eq('organization_id', orgId);
 
   if (error) throw new Error(error.message);
+
+  await supabase.from('activity_log').insert({
+    organization_id: orgId,
+    vendor_id: vendorId,
+    action: 'status_changed',
+    description: `Vendor notifications ${paused ? 'paused' : 'resumed'}`,
+    performed_by: userId,
+  });
 
   revalidatePath(`/dashboard/vendors/${vendorId}`);
   return { success: true };
@@ -354,8 +439,7 @@ export interface UpdateTenantInput {
 }
 
 export async function updateTenant(tenantId: string, input: UpdateTenantInput) {
-  const orgId = await getOrgId();
-  const supabase = await createClient();
+  const { supabase, userId, orgId } = await getAuthContext();
 
   const { error } = await supabase
     .from('tenants')
@@ -373,13 +457,20 @@ export async function updateTenant(tenantId: string, input: UpdateTenantInput) {
 
   if (error) throw new Error(error.message);
 
+  await supabase.from('activity_log').insert({
+    organization_id: orgId,
+    tenant_id: tenantId,
+    action: 'status_changed',
+    description: `Tenant "${input.company_name}" updated`,
+    performed_by: userId,
+  });
+
   revalidatePath(`/dashboard/tenants/${tenantId}`);
   return { success: true };
 }
 
 export async function toggleTenantNotifications(tenantId: string, paused: boolean) {
-  const orgId = await getOrgId();
-  const supabase = await createClient();
+  const { supabase, userId, orgId } = await getAuthContext();
 
   const { error } = await supabase
     .from('tenants')
@@ -388,6 +479,14 @@ export async function toggleTenantNotifications(tenantId: string, paused: boolea
     .eq('organization_id', orgId);
 
   if (error) throw new Error(error.message);
+
+  await supabase.from('activity_log').insert({
+    organization_id: orgId,
+    tenant_id: tenantId,
+    action: 'status_changed',
+    description: `Tenant notifications ${paused ? 'paused' : 'resumed'}`,
+    performed_by: userId,
+  });
 
   revalidatePath(`/dashboard/tenants/${tenantId}`);
   return { success: true };
