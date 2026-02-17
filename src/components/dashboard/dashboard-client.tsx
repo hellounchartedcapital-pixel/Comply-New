@@ -1,7 +1,9 @@
 'use client';
 
+import { useState, useCallback } from 'react';
 import Link from 'next/link';
 import { toast } from 'sonner';
+import { sendManualFollowUp } from '@/lib/actions/notifications';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -361,6 +363,19 @@ function ActionQueue({ items }: { items: ActionItem[] }) {
 
 function ActionItemRow({ item }: { item: ActionItem }) {
   const config = STATUS_CONFIG[item.status as keyof StatusDistribution] ?? STATUS_CONFIG.pending;
+  const [sending, setSending] = useState(false);
+
+  const handleFollowUp = useCallback(async () => {
+    setSending(true);
+    try {
+      await sendManualFollowUp(item.entityType as 'vendor' | 'tenant', item.id);
+      toast.success(`Follow-up sent to ${item.name}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to send follow-up');
+    } finally {
+      setSending(false);
+    }
+  }, [item.entityType, item.id, item.name]);
 
   let description = '';
   switch (item.status) {
@@ -427,10 +442,11 @@ function ActionItemRow({ item }: { item: ActionItem }) {
           size="sm"
           variant="ghost"
           className="h-7 px-2 text-xs"
-          onClick={() => toast.info('Follow-up notifications coming soon')}
+          disabled={sending}
+          onClick={handleFollowUp}
         >
           <Mail className="mr-1 h-3 w-3" />
-          Follow-up
+          {sending ? 'Sending...' : 'Follow-up'}
         </Button>
       </div>
     </div>

@@ -15,6 +15,7 @@ import {
   softDeleteTenant,
   toggleTenantNotifications,
 } from '@/lib/actions/properties';
+import { sendManualFollowUp, generatePortalLink } from '@/lib/actions/notifications';
 import { toast } from 'sonner';
 import type {
   Tenant,
@@ -63,6 +64,34 @@ export function TenantDetailClient({
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [togglingNotif, setTogglingNotif] = useState(false);
+  const [sendingFollowUp, setSendingFollowUp] = useState(false);
+  const [generatingLink, setGeneratingLink] = useState(false);
+
+  async function handleSendFollowUp() {
+    setSendingFollowUp(true);
+    try {
+      await sendManualFollowUp('tenant', tenant.id);
+      toast.success('Follow-up email sent');
+      router.refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to send follow-up');
+    } finally {
+      setSendingFollowUp(false);
+    }
+  }
+
+  async function handleGeneratePortalLink() {
+    setGeneratingLink(true);
+    try {
+      const link = await generatePortalLink('tenant', tenant.id);
+      await navigator.clipboard.writeText(link);
+      toast.success('Portal link copied to clipboard');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to generate portal link');
+    } finally {
+      setGeneratingLink(false);
+    }
+  }
 
   async function handleDelete() {
     if (!tenant.property_id) return;
@@ -220,16 +249,18 @@ export function TenantDetailClient({
               <Button
                 variant="outline"
                 className="w-full"
-                onClick={() => toast.info('Follow-up system coming soon')}
+                onClick={handleSendFollowUp}
+                disabled={sendingFollowUp}
               >
-                Send Follow-Up
+                {sendingFollowUp ? 'Sending...' : 'Send Follow-Up'}
               </Button>
               <Button
                 variant="outline"
                 className="w-full"
-                onClick={() => toast.info('Portal links coming soon')}
+                onClick={handleGeneratePortalLink}
+                disabled={generatingLink}
               >
-                Generate Portal Link
+                {generatingLink ? 'Generating...' : 'Generate Portal Link'}
               </Button>
             </div>
           </div>
