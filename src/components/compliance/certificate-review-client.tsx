@@ -57,10 +57,7 @@ import {
   XCircle,
   Minus,
   Info,
-  Eye,
-  Download,
 } from 'lucide-react';
-import { getCOISignedUrl } from '@/lib/actions/certificates';
 
 // ============================================================================
 // Types for editable state
@@ -231,34 +228,6 @@ function ReviewInterface({
 }: CertificateReviewClientProps & { isConfirmed: boolean }) {
   const router = useRouter();
   const [confirming, setConfirming] = useState(false);
-  const [loadingDoc, setLoadingDoc] = useState(false);
-
-  async function handleViewPdf() {
-    setLoadingDoc(true);
-    try {
-      const { url } = await getCOISignedUrl(certificate.id);
-      window.open(url, '_blank');
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to get document URL');
-    } finally {
-      setLoadingDoc(false);
-    }
-  }
-
-  async function handleDownload() {
-    setLoadingDoc(true);
-    try {
-      const { url } = await getCOISignedUrl(certificate.id);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `coi-${certificate.id}.pdf`;
-      a.click();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to download document');
-    } finally {
-      setLoadingDoc(false);
-    }
-  }
 
   // Editable coverages
   const [coverages, setCoverages] = useState<EditableCoverage[]>(() =>
@@ -441,21 +410,7 @@ function ReviewInterface({
       {/* Header */}
       <div className="space-y-1">
         <BackLink entityType={entityType} entityId={entityId} entityName={entityName} />
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold tracking-tight">Review Certificate</h1>
-          {certificate.file_path && (
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" disabled={loadingDoc} onClick={handleViewPdf}>
-                <Eye className="mr-1.5 h-3.5 w-3.5" />
-                View PDF
-              </Button>
-              <Button variant="outline" size="sm" disabled={loadingDoc} onClick={handleDownload}>
-                <Download className="mr-1.5 h-3.5 w-3.5" />
-                Download
-              </Button>
-            </div>
-          )}
-        </div>
+        <h1 className="text-2xl font-bold tracking-tight">Review Certificate</h1>
         <p className="text-sm text-muted-foreground">
           {entityType === 'vendor' ? 'Vendor' : 'Tenant'}:{' '}
           <span className="font-medium text-foreground">{entityName}</span>
@@ -804,7 +759,18 @@ function CoverageCard({
   onChange: (field: keyof EditableCoverage, value: unknown) => void;
   onRemove: () => void;
 }) {
-  const [rawExpanded, setRawExpanded] = useState(false);
+  const [detailsExpanded, setDetailsExpanded] = useState(false);
+
+  // Derive a quick expiration status for the primary row
+  const expirationStatus = (() => {
+    if (!coverage.expiration_date) return null;
+    const exp = new Date(coverage.expiration_date + 'T00:00:00');
+    const now = new Date();
+    const thirtyDays = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    if (exp < now) return 'expired' as const;
+    if (exp < thirtyDays) return 'expiring_soon' as const;
+    return 'valid' as const;
+  })();
 
   return (
     <div
@@ -821,7 +787,8 @@ function CoverageCard({
         </div>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      {/* PRIMARY: Coverage Type, Limit, Expiration, Endorsements */}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {/* Coverage Type */}
         <div className="space-y-1">
           <Label className="text-xs text-muted-foreground">Coverage Type</Label>
@@ -846,98 +813,58 @@ function CoverageCard({
           )}
         </div>
 
-        {/* Carrier */}
+        {/* Limit Amount + Type */}
         <div className="space-y-1">
-          <Label className="text-xs text-muted-foreground">Carrier</Label>
+          <Label className="text-xs text-muted-foreground">Limit</Label>
           {readOnly ? (
-            <p className="text-sm">{coverage.carrier_name || '—'}</p>
-          ) : (
-            <Input
-              className="h-8 text-xs"
-              value={coverage.carrier_name}
-              onChange={(e) => onChange('carrier_name', e.target.value)}
-              placeholder="Carrier name"
-            />
-          )}
-        </div>
-
-        {/* Policy Number */}
-        <div className="space-y-1">
-          <Label className="text-xs text-muted-foreground">Policy Number</Label>
-          {readOnly ? (
-            <p className="text-sm">{coverage.policy_number || '—'}</p>
-          ) : (
-            <Input
-              className="h-8 text-xs"
-              value={coverage.policy_number}
-              onChange={(e) => onChange('policy_number', e.target.value)}
-              placeholder="Policy #"
-            />
-          )}
-        </div>
-
-        {/* Limit Amount */}
-        <div className="space-y-1">
-          <Label className="text-xs text-muted-foreground">Limit Amount ($)</Label>
-          {readOnly ? (
-            <p className="text-sm">
-              {coverage.limit_amount ? formatCurrency(Number(coverage.limit_amount)) : '—'}
+            <p className="text-sm font-medium">
+              {coverage.limit_type === 'statutory'
+                ? 'Statutory'
+                : coverage.limit_amount
+                  ? `${formatCurrency(Number(coverage.limit_amount))} ${LIMIT_TYPE_LABELS[coverage.limit_type]?.toLowerCase() ?? ''}`
+                  : '—'}
             </p>
           ) : (
-            <Input
-              className="h-8 text-xs"
-              type="number"
-              value={coverage.limit_amount}
-              onChange={(e) => onChange('limit_amount', e.target.value)}
-              placeholder="e.g. 1000000"
-            />
-          )}
-        </div>
-
-        {/* Limit Type */}
-        <div className="space-y-1">
-          <Label className="text-xs text-muted-foreground">Limit Type</Label>
-          {readOnly ? (
-            <p className="text-sm">{LIMIT_TYPE_LABELS[coverage.limit_type]}</p>
-          ) : (
-            <Select
-              value={coverage.limit_type}
-              onValueChange={(val) => onChange('limit_type', val)}
-            >
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {LIMIT_TYPE_OPTIONS.map((o) => (
-                  <SelectItem key={o.value} value={o.value}>
-                    {o.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-        </div>
-
-        {/* Effective Date */}
-        <div className="space-y-1">
-          <Label className="text-xs text-muted-foreground">Effective Date</Label>
-          {readOnly ? (
-            <p className="text-sm">{coverage.effective_date ? formatDate(coverage.effective_date) : '—'}</p>
-          ) : (
-            <Input
-              className="h-8 text-xs"
-              type="date"
-              value={coverage.effective_date}
-              onChange={(e) => onChange('effective_date', e.target.value)}
-            />
+            <div className="flex gap-1.5">
+              <Input
+                className="h-8 text-xs flex-1"
+                type="number"
+                value={coverage.limit_amount}
+                onChange={(e) => onChange('limit_amount', e.target.value)}
+                placeholder="e.g. 1000000"
+              />
+              <Select
+                value={coverage.limit_type}
+                onValueChange={(val) => onChange('limit_type', val)}
+              >
+                <SelectTrigger className="h-8 text-xs w-[120px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {LIMIT_TYPE_OPTIONS.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           )}
         </div>
 
         {/* Expiration Date */}
         <div className="space-y-1">
-          <Label className="text-xs text-muted-foreground">Expiration Date</Label>
+          <Label className="text-xs text-muted-foreground">Expiration</Label>
           {readOnly ? (
-            <p className="text-sm">{coverage.expiration_date ? formatDate(coverage.expiration_date) : '—'}</p>
+            <div className="flex items-center gap-1.5">
+              <p className="text-sm">{coverage.expiration_date ? formatDate(coverage.expiration_date) : '—'}</p>
+              {expirationStatus === 'expired' && (
+                <Badge variant="outline" className="text-[10px] border-red-200 bg-red-50 text-red-700">Expired</Badge>
+              )}
+              {expirationStatus === 'expiring_soon' && (
+                <Badge variant="outline" className="text-[10px] border-amber-200 bg-amber-50 text-amber-700">Expiring Soon</Badge>
+              )}
+            </div>
           ) : (
             <Input
               className="h-8 text-xs"
@@ -965,21 +892,19 @@ function CoverageCard({
         </div>
       </div>
 
-      {/* Raw text + remove */}
+      {/* SECONDARY: Expandable details section */}
       <div className="mt-3 flex items-center justify-between">
-        {coverage.raw_extracted_text && (
-          <button
-            onClick={() => setRawExpanded(!rawExpanded)}
-            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-          >
-            {rawExpanded ? (
-              <ChevronDown className="h-3.5 w-3.5" />
-            ) : (
-              <ChevronRight className="h-3.5 w-3.5" />
-            )}
-            Raw text
-          </button>
-        )}
+        <button
+          onClick={() => setDetailsExpanded(!detailsExpanded)}
+          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+        >
+          {detailsExpanded ? (
+            <ChevronDown className="h-3.5 w-3.5" />
+          ) : (
+            <ChevronRight className="h-3.5 w-3.5" />
+          )}
+          Details
+        </button>
         {!readOnly && (
           <button
             onClick={onRemove}
@@ -990,10 +915,66 @@ function CoverageCard({
           </button>
         )}
       </div>
-      {rawExpanded && coverage.raw_extracted_text && (
-        <pre className="mt-2 max-h-32 overflow-auto rounded bg-slate-100 p-2 text-[11px] text-slate-700">
-          {coverage.raw_extracted_text}
-        </pre>
+
+      {detailsExpanded && (
+        <div className="mt-3 border-t border-slate-100 pt-3">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {/* Carrier */}
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Carrier</Label>
+              {readOnly ? (
+                <p className="text-sm">{coverage.carrier_name || '—'}</p>
+              ) : (
+                <Input
+                  className="h-8 text-xs"
+                  value={coverage.carrier_name}
+                  onChange={(e) => onChange('carrier_name', e.target.value)}
+                  placeholder="Carrier name"
+                />
+              )}
+            </div>
+
+            {/* Policy Number */}
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Policy Number</Label>
+              {readOnly ? (
+                <p className="text-sm">{coverage.policy_number || '—'}</p>
+              ) : (
+                <Input
+                  className="h-8 text-xs"
+                  value={coverage.policy_number}
+                  onChange={(e) => onChange('policy_number', e.target.value)}
+                  placeholder="Policy #"
+                />
+              )}
+            </div>
+
+            {/* Effective Date */}
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Effective Date</Label>
+              {readOnly ? (
+                <p className="text-sm">{coverage.effective_date ? formatDate(coverage.effective_date) : '—'}</p>
+              ) : (
+                <Input
+                  className="h-8 text-xs"
+                  type="date"
+                  value={coverage.effective_date}
+                  onChange={(e) => onChange('effective_date', e.target.value)}
+                />
+              )}
+            </div>
+          </div>
+
+          {/* Raw extracted text */}
+          {coverage.raw_extracted_text && (
+            <div className="mt-3">
+              <Label className="text-xs text-muted-foreground">Raw Extracted Text</Label>
+              <pre className="mt-1 max-h-32 overflow-auto rounded bg-slate-100 p-2 text-[11px] text-slate-700">
+                {coverage.raw_extracted_text}
+              </pre>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );

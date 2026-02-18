@@ -140,22 +140,45 @@ function normalizeEntityName(name: string): string {
     .trim();
 }
 
+/**
+ * Improved entity matching: handles cases where a COI lists multiple entities
+ * together in one certificate holder block (e.g., "ABC Management, Alturas
+ * Stanford LLC, 123 Main St, Boise ID"). Checks substring containment in
+ * both directions after normalization, with a word-boundary fallback using
+ * the significant words from the required entity name.
+ */
 function entityNameMatches(
   required: string,
   actual: string
 ): { matched: boolean; exact: boolean } {
-  const rNorm = normalizeEntityName(required);
-  const aNorm = normalizeEntityName(actual);
-
+  // 1. Exact case-insensitive match
   if (required.toLowerCase().trim() === actual.toLowerCase().trim()) {
     return { matched: true, exact: true };
   }
+
+  const rNorm = normalizeEntityName(required);
+  const aNorm = normalizeEntityName(actual);
+
+  // 2. Normalized exact match
   if (rNorm === aNorm) {
     return { matched: true, exact: false };
   }
+
+  // 3. Substring containment in both directions
   if (aNorm.includes(rNorm) || rNorm.includes(aNorm)) {
     return { matched: true, exact: false };
   }
+
+  // 4. Word-based containment: check if all significant words from the
+  //    required entity appear in the actual text (handles multi-entity blocks)
+  const rWords = rNorm.split(' ').filter((w) => w.length > 1);
+  if (rWords.length >= 2) {
+    const allWordsFound = rWords.every((w) => aNorm.includes(w));
+    if (allWordsFound) {
+      return { matched: true, exact: false };
+    }
+  }
+
   return { matched: false, exact: false };
 }
 

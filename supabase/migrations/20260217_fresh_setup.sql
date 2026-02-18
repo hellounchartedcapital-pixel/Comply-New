@@ -683,11 +683,11 @@ VALUES (
 );
 
 INSERT INTO template_coverage_requirements (template_id, coverage_type, is_required, minimum_limit, limit_type, requires_additional_insured, requires_waiver_of_subrogation) VALUES
-  ('a0000000-0000-0000-0000-000000000001', 'general_liability', true, 1000000, 'per_occurrence', true, true),
-  ('a0000000-0000-0000-0000-000000000001', 'general_liability', true, 2000000, 'aggregate', true, true),
-  ('a0000000-0000-0000-0000-000000000001', 'automobile_liability', true, 1000000, 'combined_single_limit', true, true),
-  ('a0000000-0000-0000-0000-000000000001', 'workers_compensation', true, NULL, 'statutory', true, true),
-  ('a0000000-0000-0000-0000-000000000001', 'employers_liability', true, 500000, 'per_accident', true, true),
+  ('a0000000-0000-0000-0000-000000000001', 'general_liability', true, 1000000, 'per_occurrence', false, false),
+  ('a0000000-0000-0000-0000-000000000001', 'general_liability', true, 2000000, 'aggregate', false, false),
+  ('a0000000-0000-0000-0000-000000000001', 'automobile_liability', true, 1000000, 'combined_single_limit', false, false),
+  ('a0000000-0000-0000-0000-000000000001', 'workers_compensation', true, NULL, 'statutory', false, false),
+  ('a0000000-0000-0000-0000-000000000001', 'employers_liability', true, 500000, 'per_accident', false, false),
   ('a0000000-0000-0000-0000-000000000001', 'umbrella_excess_liability', false, 1000000, 'per_occurrence', false, false);
 
 -- Vendor: High-Risk Vendor
@@ -699,12 +699,12 @@ VALUES (
 );
 
 INSERT INTO template_coverage_requirements (template_id, coverage_type, is_required, minimum_limit, limit_type, requires_additional_insured, requires_waiver_of_subrogation) VALUES
-  ('a0000000-0000-0000-0000-000000000002', 'general_liability', true, 2000000, 'per_occurrence', true, true),
-  ('a0000000-0000-0000-0000-000000000002', 'general_liability', true, 4000000, 'aggregate', true, true),
-  ('a0000000-0000-0000-0000-000000000002', 'automobile_liability', true, 1000000, 'combined_single_limit', true, true),
-  ('a0000000-0000-0000-0000-000000000002', 'workers_compensation', true, NULL, 'statutory', true, true),
-  ('a0000000-0000-0000-0000-000000000002', 'employers_liability', true, 1000000, 'per_accident', true, true),
-  ('a0000000-0000-0000-0000-000000000002', 'umbrella_excess_liability', true, 5000000, 'per_occurrence', true, true),
+  ('a0000000-0000-0000-0000-000000000002', 'general_liability', true, 2000000, 'per_occurrence', false, false),
+  ('a0000000-0000-0000-0000-000000000002', 'general_liability', true, 4000000, 'aggregate', false, false),
+  ('a0000000-0000-0000-0000-000000000002', 'automobile_liability', true, 1000000, 'combined_single_limit', false, false),
+  ('a0000000-0000-0000-0000-000000000002', 'workers_compensation', true, NULL, 'statutory', false, false),
+  ('a0000000-0000-0000-0000-000000000002', 'employers_liability', true, 1000000, 'per_accident', false, false),
+  ('a0000000-0000-0000-0000-000000000002', 'umbrella_excess_liability', true, 5000000, 'per_occurrence', false, false),
   ('a0000000-0000-0000-0000-000000000002', 'pollution_liability', false, 1000000, 'per_occurrence', false, false);
 
 -- Vendor: Professional Services
@@ -716,8 +716,8 @@ VALUES (
 );
 
 INSERT INTO template_coverage_requirements (template_id, coverage_type, is_required, minimum_limit, limit_type, requires_additional_insured, requires_waiver_of_subrogation) VALUES
-  ('a0000000-0000-0000-0000-000000000003', 'general_liability', true, 1000000, 'per_occurrence', true, true),
-  ('a0000000-0000-0000-0000-000000000003', 'general_liability', true, 2000000, 'aggregate', true, true),
+  ('a0000000-0000-0000-0000-000000000003', 'general_liability', true, 1000000, 'per_occurrence', false, false),
+  ('a0000000-0000-0000-0000-000000000003', 'general_liability', true, 2000000, 'aggregate', false, false),
   ('a0000000-0000-0000-0000-000000000003', 'professional_liability_eo', true, 1000000, 'per_occurrence', false, false),
   ('a0000000-0000-0000-0000-000000000003', 'workers_compensation', true, NULL, 'statutory', false, false),
   ('a0000000-0000-0000-0000-000000000003', 'cyber_liability', false, 1000000, 'per_occurrence', false, false);
@@ -731,8 +731,8 @@ VALUES (
 );
 
 INSERT INTO template_coverage_requirements (template_id, coverage_type, is_required, minimum_limit, limit_type, requires_additional_insured, requires_waiver_of_subrogation) VALUES
-  ('a0000000-0000-0000-0000-000000000004', 'general_liability', true, 1000000, 'per_occurrence', true, true),
-  ('a0000000-0000-0000-0000-000000000004', 'general_liability', true, 2000000, 'aggregate', true, true),
+  ('a0000000-0000-0000-0000-000000000004', 'general_liability', true, 1000000, 'per_occurrence', false, false),
+  ('a0000000-0000-0000-0000-000000000004', 'general_liability', true, 2000000, 'aggregate', false, false),
   ('a0000000-0000-0000-0000-000000000004', 'property_inland_marine', false, 100000, 'per_occurrence', false, false),
   ('a0000000-0000-0000-0000-000000000004', 'workers_compensation', true, NULL, 'statutory', false, false),
   ('a0000000-0000-0000-0000-000000000004', 'umbrella_excess_liability', false, 1000000, 'per_occurrence', false, false);
@@ -746,12 +746,12 @@ VALUES (
 );
 
 INSERT INTO template_coverage_requirements (template_id, coverage_type, is_required, minimum_limit, limit_type, requires_additional_insured, requires_waiver_of_subrogation) VALUES
-  ('a0000000-0000-0000-0000-000000000005', 'general_liability', true, 1000000, 'per_occurrence', true, true),
-  ('a0000000-0000-0000-0000-000000000005', 'general_liability', true, 2000000, 'aggregate', true, true),
-  ('a0000000-0000-0000-0000-000000000005', 'liquor_liability', true, 1000000, 'per_occurrence', true, true),
+  ('a0000000-0000-0000-0000-000000000005', 'general_liability', true, 1000000, 'per_occurrence', false, false),
+  ('a0000000-0000-0000-0000-000000000005', 'general_liability', true, 2000000, 'aggregate', false, false),
+  ('a0000000-0000-0000-0000-000000000005', 'liquor_liability', true, 1000000, 'per_occurrence', false, false),
   ('a0000000-0000-0000-0000-000000000005', 'property_inland_marine', false, 250000, 'per_occurrence', false, false),
   ('a0000000-0000-0000-0000-000000000005', 'workers_compensation', true, NULL, 'statutory', false, false),
-  ('a0000000-0000-0000-0000-000000000005', 'umbrella_excess_liability', true, 2000000, 'per_occurrence', true, true);
+  ('a0000000-0000-0000-0000-000000000005', 'umbrella_excess_liability', true, 2000000, 'per_occurrence', false, false);
 
 -- Tenant: Industrial / Warehouse
 INSERT INTO requirement_templates (id, organization_id, name, description, category, risk_level, is_system_default)
@@ -762,10 +762,10 @@ VALUES (
 );
 
 INSERT INTO template_coverage_requirements (template_id, coverage_type, is_required, minimum_limit, limit_type, requires_additional_insured, requires_waiver_of_subrogation) VALUES
-  ('a0000000-0000-0000-0000-000000000006', 'general_liability', true, 2000000, 'per_occurrence', true, true),
-  ('a0000000-0000-0000-0000-000000000006', 'general_liability', true, 4000000, 'aggregate', true, true),
-  ('a0000000-0000-0000-0000-000000000006', 'automobile_liability', true, 1000000, 'combined_single_limit', true, true),
-  ('a0000000-0000-0000-0000-000000000006', 'workers_compensation', true, NULL, 'statutory', true, true),
-  ('a0000000-0000-0000-0000-000000000006', 'employers_liability', true, 500000, 'per_accident', true, true),
-  ('a0000000-0000-0000-0000-000000000006', 'pollution_liability', true, 1000000, 'per_occurrence', true, true),
-  ('a0000000-0000-0000-0000-000000000006', 'umbrella_excess_liability', true, 5000000, 'per_occurrence', true, true);
+  ('a0000000-0000-0000-0000-000000000006', 'general_liability', true, 2000000, 'per_occurrence', false, false),
+  ('a0000000-0000-0000-0000-000000000006', 'general_liability', true, 4000000, 'aggregate', false, false),
+  ('a0000000-0000-0000-0000-000000000006', 'automobile_liability', true, 1000000, 'combined_single_limit', false, false),
+  ('a0000000-0000-0000-0000-000000000006', 'workers_compensation', true, NULL, 'statutory', false, false),
+  ('a0000000-0000-0000-0000-000000000006', 'employers_liability', true, 500000, 'per_accident', false, false),
+  ('a0000000-0000-0000-0000-000000000006', 'pollution_liability', true, 1000000, 'per_occurrence', false, false),
+  ('a0000000-0000-0000-0000-000000000006', 'umbrella_excess_liability', true, 5000000, 'per_occurrence', false, false);

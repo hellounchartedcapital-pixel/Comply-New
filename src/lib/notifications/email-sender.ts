@@ -10,7 +10,11 @@ interface SendResult {
   devMode?: boolean;
 }
 
-const FROM_ADDRESS = 'SmartCOI <notifications@smartcoi.com>';
+const DEFAULT_FROM_ADDRESS = 'SmartCOI <noreply@smartcoi.io>';
+
+function getFromAddress(): string {
+  return process.env.EMAIL_FROM_ADDRESS || DEFAULT_FROM_ADDRESS;
+}
 
 /**
  * Send an email via Resend. Falls back to console logging in development
@@ -27,32 +31,37 @@ export async function sendNotificationEmail(
     console.log('RESEND_API_KEY is missing — email will be logged to console only');
     console.log('=== EMAIL (dev mode) ===');
     console.log(`To: ${to}`);
+    console.log(`From: ${getFromAddress()}`);
     console.log(`Subject: ${subject}`);
     console.log(`Body: ${html.substring(0, 200)}...`);
     console.log('=== END EMAIL ===');
     return { success: true, devMode: true };
   }
 
-  console.log('RESEND_API_KEY is set — sending email to:', to);
+  const fromAddress = getFromAddress();
+  console.log(`Sending email via Resend — to: ${to}, from: ${fromAddress}`);
 
   try {
     const resend = new Resend(apiKey);
-    const { error } = await resend.emails.send({
-      from: FROM_ADDRESS,
+    const { data, error } = await resend.emails.send({
+      from: fromAddress,
       to,
       subject,
       html,
     });
 
     if (error) {
-      console.error('Resend error:', error);
+      console.error('Resend API error:', JSON.stringify(error, null, 2));
       return { success: false, error: error.message };
     }
 
+    console.log('Email sent successfully, id:', data?.id);
     return { success: true };
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Unknown email send error';
+    const stack = err instanceof Error ? err.stack : undefined;
     console.error('Email send failed:', msg);
+    if (stack) console.error('Stack trace:', stack);
     return { success: false, error: msg };
   }
 }

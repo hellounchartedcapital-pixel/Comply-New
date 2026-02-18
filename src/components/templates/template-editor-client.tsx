@@ -468,29 +468,39 @@ export function TemplateEditorClient({
                         label="Required"
                       />
                     </div>
-                    <div className="flex items-center justify-between">
-                      <Label className="text-xs">Add&apos;l Insured</Label>
-                      <ToggleSwitch
-                        checked={row.requires_additional_insured}
-                        onChange={(v) =>
-                          updateRow(row._key, { requires_additional_insured: v })
-                        }
-                        disabled={isReadOnly}
-                        label="Additional Insured"
-                      />
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs">Add&apos;l Insured</Label>
+                        <ToggleSwitch
+                          checked={row.requires_additional_insured}
+                          onChange={(v) =>
+                            updateRow(row._key, { requires_additional_insured: v })
+                          }
+                          disabled={isReadOnly}
+                          label="Additional Insured"
+                        />
+                      </div>
+                      <p className="mt-0.5 text-[10px] leading-tight text-muted-foreground">
+                        Requires the vendor/tenant&apos;s policy to name your property entities as additional insured. Note: this is often documented on a separate endorsement and may not appear on the standard ACORD certificate.
+                      </p>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <Label className="text-xs">Waiver of Sub.</Label>
-                      <ToggleSwitch
-                        checked={row.requires_waiver_of_subrogation}
-                        onChange={(v) =>
-                          updateRow(row._key, {
-                            requires_waiver_of_subrogation: v,
-                          })
-                        }
-                        disabled={isReadOnly}
-                        label="Waiver of Subrogation"
-                      />
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs">Waiver of Sub.</Label>
+                        <ToggleSwitch
+                          checked={row.requires_waiver_of_subrogation}
+                          onChange={(v) =>
+                            updateRow(row._key, {
+                              requires_waiver_of_subrogation: v,
+                            })
+                          }
+                          disabled={isReadOnly}
+                          label="Waiver of Subrogation"
+                        />
+                      </div>
+                      <p className="mt-0.5 text-[10px] leading-tight text-muted-foreground">
+                        Requires the vendor/tenant&apos;s insurer to waive the right to subrogate against your organization. Note: this is typically shown on a separate endorsement page.
+                      </p>
                     </div>
                   </div>
                 </div>
