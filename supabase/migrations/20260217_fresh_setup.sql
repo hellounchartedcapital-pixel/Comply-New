@@ -298,7 +298,7 @@ BEGIN
   NEW.updated_at = now();
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SET search_path = public;
 
 CREATE TRIGGER update_organizations_updated_at
   BEFORE UPDATE ON organizations FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
@@ -318,8 +318,8 @@ CREATE TRIGGER update_requirement_templates_updated_at
 
 CREATE OR REPLACE FUNCTION get_user_organization_id()
 RETURNS UUID AS $$
-  SELECT organization_id FROM users WHERE id = auth.uid()
-$$ LANGUAGE sql SECURITY DEFINER STABLE;
+  SELECT organization_id FROM public.users WHERE id = auth.uid()
+$$ LANGUAGE sql SECURITY DEFINER STABLE SET search_path = public;
 
 
 -- ============================================================================

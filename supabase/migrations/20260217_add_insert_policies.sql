@@ -27,14 +27,14 @@ DECLARE
   new_org_id UUID;
 BEGIN
   -- Create organization
-  INSERT INTO organizations (name)
+  INSERT INTO public.organizations (name)
   VALUES (org_name)
   RETURNING id INTO new_org_id;
 
   -- Create user profile
-  INSERT INTO users (id, organization_id, email, full_name, role)
+  INSERT INTO public.users (id, organization_id, email, full_name, role)
   VALUES (auth.uid(), new_org_id, user_email, user_full_name, 'manager');
 
   RETURN new_org_id;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
