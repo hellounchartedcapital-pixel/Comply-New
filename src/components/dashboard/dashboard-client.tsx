@@ -112,6 +112,22 @@ export function DashboardClient({
 }: DashboardClientProps) {
   return (
     <div className="space-y-6">
+      {/* ---- Page Header with primary action ---- */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-semibold text-slate-900">Overview</h2>
+          <p className="text-sm text-muted-foreground">
+            Compliance snapshot across all properties
+          </p>
+        </div>
+        <Button asChild>
+          <Link href="/dashboard/certificates/upload">
+            <Upload className="mr-2 h-4 w-4" />
+            Upload COI
+          </Link>
+        </Button>
+      </div>
+
       {/* ---- Stats Row ---- */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
