@@ -46,7 +46,6 @@ import type {
 } from '@/types';
 
 import {
-  ArrowLeft,
   Plus,
   Trash2,
   ChevronDown,
@@ -144,7 +143,7 @@ export function CertificateReviewClient({
   if (isFailed) {
     return (
       <div className="mx-auto max-w-2xl space-y-6 p-6">
-        <BackLink entityType={entityType} entityId={entityId} />
+        <BackLink entityType={entityType} entityId={entityId} entityName={entityName} />
         <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-8 text-center">
           <XCircle className="mx-auto mb-3 h-10 w-10 text-destructive" />
           <h2 className="text-lg font-semibold">Certificate could not be processed</h2>
@@ -170,7 +169,7 @@ export function CertificateReviewClient({
   if (isProcessing) {
     return (
       <div className="mx-auto max-w-2xl space-y-6 p-6">
-        <BackLink entityType={entityType} entityId={entityId} />
+        <BackLink entityType={entityType} entityId={entityId} entityName={entityName} />
         <div className="rounded-lg border bg-muted/30 p-8 text-center">
           <Loader2 className="mx-auto mb-3 h-10 w-10 animate-spin text-primary" />
           <h2 className="text-lg font-semibold">Processing Certificate</h2>
@@ -410,7 +409,7 @@ function ReviewInterface({
     <div className="space-y-6 p-6">
       {/* Header */}
       <div className="space-y-1">
-        <BackLink entityType={entityType} entityId={entityId} />
+        <BackLink entityType={entityType} entityId={entityId} entityName={entityName} />
         <h1 className="text-2xl font-bold tracking-tight">Review Certificate</h1>
         <p className="text-sm text-muted-foreground">
           {entityType === 'vendor' ? 'Vendor' : 'Tenant'}:{' '}
@@ -1028,15 +1027,15 @@ function EntityCard({
 // Small helper components
 // ============================================================================
 
-function BackLink({ entityType, entityId }: { entityType: string; entityId: string }) {
+function BackLink({ entityType, entityId, entityName }: { entityType: string; entityId: string; entityName?: string }) {
   return (
-    <Link
-      href={`/dashboard/${entityType}s/${entityId}`}
-      className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-    >
-      <ArrowLeft className="h-4 w-4" />
-      Back to {entityType} detail
-    </Link>
+    <nav className="flex items-center gap-1.5 text-sm text-muted-foreground">
+      <Link href={`/dashboard/${entityType}s/${entityId}`} className="hover:text-foreground">
+        {entityName || (entityType === 'vendor' ? 'Vendor' : 'Tenant')}
+      </Link>
+      <ChevronRight className="h-3.5 w-3.5" />
+      <span className="font-medium text-foreground">Review Certificate</span>
+    </nav>
   );
 }
 

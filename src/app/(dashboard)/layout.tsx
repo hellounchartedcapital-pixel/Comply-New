@@ -1,7 +1,6 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { DashboardShell } from '@/components/dashboard/sidebar';
-import { Toaster } from '@/components/ui/sonner';
 
 export default async function DashboardLayout({
   children,
@@ -50,8 +49,6 @@ export default async function DashboardLayout({
       >
         {children}
       </DashboardShell>
-
-      <Toaster position="bottom-right" richColors />
     </div>
   );
 }
