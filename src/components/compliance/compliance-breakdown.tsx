@@ -109,8 +109,16 @@ export function ComplianceBreakdown({
   complianceResults,
   hasCertificate,
 }: ComplianceBreakdownProps) {
-  const met = complianceResults.filter((r) => r.status === 'met').length;
-  const total = requirements.filter((r) => r.is_required).length;
+  // Separate required vs optional counts
+  const requiredReqIds = new Set(requirements.filter((r) => r.is_required).map((r) => r.id));
+  const optionalReqIds = new Set(requirements.filter((r) => !r.is_required).map((r) => r.id));
+  const requiredMet = complianceResults.filter(
+    (r) => r.status === 'met' && requiredReqIds.has(r.coverage_requirement_id)
+  ).length;
+  const optionalMet = complianceResults.filter(
+    (r) => r.status === 'met' && optionalReqIds.has(r.coverage_requirement_id)
+  ).length;
+  const requiredTotal = requiredReqIds.size;
 
   if (requirements.length === 0) {
     return (
@@ -128,16 +136,29 @@ export function ComplianceBreakdown({
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-foreground">Compliance Status</h3>
         {hasCertificate && (
-          <Badge
-            variant="outline"
-            className={`text-xs ${
-              met === total
-                ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
-                : 'border-red-200 bg-red-50 text-red-800'
-            }`}
-          >
-            {met} of {total} requirements met
-          </Badge>
+          <div className="flex flex-col items-end gap-0.5">
+            <Badge
+              variant="outline"
+              className={`text-xs ${
+                requiredTotal === 0
+                  ? 'border-slate-200 bg-slate-50 text-slate-600'
+                  : requiredMet >= requiredTotal
+                    ? 'border-emerald-300 bg-emerald-100 text-emerald-900'
+                    : requiredMet >= requiredTotal / 2
+                      ? 'border-amber-300 bg-amber-100 text-amber-900'
+                      : 'border-red-300 bg-red-100 text-red-900'
+              }`}
+            >
+              {requiredMet >= requiredTotal && requiredTotal > 0
+                ? `All ${requiredTotal} required coverages met`
+                : `${requiredMet} of ${requiredTotal} required coverages met`}
+            </Badge>
+            {optionalMet > 0 && (
+              <span className="text-[10px] text-muted-foreground">
+                +{optionalMet} optional coverage{optionalMet !== 1 ? 's' : ''} also met
+              </span>
+            )}
+          </div>
         )}
       </div>
 

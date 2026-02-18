@@ -399,9 +399,16 @@ function ReviewInterface({
     }
   };
 
-  // Compliance summary counts
-  const metCount = complianceResult.coverageResults.filter((r) => r.status === 'met').length;
-  const requiredCount = templateRequirements.filter((r) => r.is_required).length;
+  // Compliance summary counts — separate required vs optional
+  const requiredReqIds = new Set(templateRequirements.filter((r) => r.is_required).map((r) => r.id));
+  const optionalReqIds = new Set(templateRequirements.filter((r) => !r.is_required).map((r) => r.id));
+  const requiredMetCount = complianceResult.coverageResults.filter(
+    (r) => r.status === 'met' && requiredReqIds.has(r.coverage_requirement_id)
+  ).length;
+  const optionalMetCount = complianceResult.coverageResults.filter(
+    (r) => r.status === 'met' && optionalReqIds.has(r.coverage_requirement_id)
+  ).length;
+  const requiredCount = requiredReqIds.size;
 
   // Consolidated expiration summary for the banner
   const expirationSummary = summarizeExpiredCoverages(coverages, formatDate);
@@ -595,18 +602,29 @@ function ReviewInterface({
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-semibold text-foreground">Compliance Check</h2>
               {templateRequirements.length > 0 && (
-                <Badge
-                  variant="outline"
-                  className={`text-xs ${
-                    metCount === requiredCount && requiredCount > 0
-                      ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
-                      : requiredCount === 0
+                <div className="flex flex-col items-end gap-0.5">
+                  <Badge
+                    variant="outline"
+                    className={`text-xs ${
+                      requiredCount === 0
                         ? 'border-slate-200 bg-slate-50 text-slate-600'
-                        : 'border-red-200 bg-red-50 text-red-800'
-                  }`}
-                >
-                  {metCount} of {requiredCount} requirements met
-                </Badge>
+                        : requiredMetCount >= requiredCount
+                          ? 'border-emerald-300 bg-emerald-100 text-emerald-900'
+                          : requiredMetCount >= requiredCount / 2
+                            ? 'border-amber-300 bg-amber-100 text-amber-900'
+                            : 'border-red-300 bg-red-100 text-red-900'
+                    }`}
+                  >
+                    {requiredMetCount >= requiredCount && requiredCount > 0
+                      ? `All ${requiredCount} required coverages met`
+                      : `${requiredMetCount} of ${requiredCount} required coverages met`}
+                  </Badge>
+                  {optionalMetCount > 0 && (
+                    <span className="text-[10px] text-muted-foreground">
+                      +{optionalMetCount} optional coverage{optionalMetCount !== 1 ? 's' : ''} also met
+                    </span>
+                  )}
+                </div>
               )}
             </div>
 
