@@ -1,10 +1,12 @@
 // ============================================================================
 // SmartCOI — Email Templates
-// Professional notification emails with merge-field substitution.
+// Friendly, professional notification emails that maximize vendor/tenant
+// response rates. Tone scales with urgency.
 // ============================================================================
 
 export interface EmailMergeFields {
   entity_name: string; // vendor or tenant company name
+  contact_name?: string; // optional contact person name
   entity_type: 'vendor' | 'tenant';
   property_name: string;
   organization_name: string;
@@ -48,7 +50,7 @@ function emailWrapper(body: string, fields: Pick<EmailMergeFields, 'organization
 </html>`;
 }
 
-function portalButton(link: string, label = 'Upload Updated Certificate'): string {
+function portalButton(link: string, label = 'Upload Your Certificate'): string {
   return `<table cellpadding="0" cellspacing="0" style="margin:24px 0;">
 <tr><td style="background:#059669;border-radius:6px;padding:12px 24px;">
   <a href="${link}" style="color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;">${label}</a>
@@ -56,10 +58,20 @@ function portalButton(link: string, label = 'Upload Updated Certificate'): strin
 </table>`;
 }
 
+function greeting(fields: Pick<EmailMergeFields, 'contact_name' | 'entity_name'>): string {
+  const name = fields.contact_name || fields.entity_name;
+  return `<p style="font-size:14px;color:#334155;line-height:1.6;margin:0 0 16px;">Hi ${name},</p>`;
+}
+
 function contactBlock(fields: Pick<EmailMergeFields, 'pm_name' | 'pm_email'>): string {
   return `<p style="font-size:13px;color:#475569;margin-top:24px;">
-  If you have questions, please contact:<br/>
-  <strong>${fields.pm_name}</strong> — <a href="mailto:${fields.pm_email}" style="color:#059669;">${fields.pm_email}</a>
+  Questions? Reach out to <strong>${fields.pm_name}</strong> at <a href="mailto:${fields.pm_email}" style="color:#059669;">${fields.pm_email}</a>
+</p>`;
+}
+
+function brokerInstruction(): string {
+  return `<p style="font-size:14px;color:#334155;line-height:1.6;margin-top:16px;">
+  Please send this email to your insurance broker and ask them to issue an updated certificate with these changes. Then upload the new certificate using the button below.
 </p>`;
 }
 
@@ -69,38 +81,27 @@ function contactBlock(fields: Pick<EmailMergeFields, 'pm_name' | 'pm_email'>): s
 
 export function expirationWarning(fields: EmailMergeFields): EmailTemplate {
   const days = fields.days_until_expiration;
-  let urgency: string;
-  let tone: string;
+  let message: string;
 
   if (days > 45) {
-    urgency = 'Friendly Reminder';
-    tone = `This is a friendly reminder that the certificate of insurance for <strong>${fields.entity_name}</strong> will expire on <strong>${fields.expiration_date}</strong> (${days} days from now).`;
+    // 60+ days: casual and friendly
+    message = `Just a heads up that your certificate of insurance for <strong>${fields.property_name}</strong> expires on <strong>${fields.expiration_date}</strong>. No rush, but we wanted to give you plenty of time to get an updated certificate from your broker.`;
   } else if (days > 20) {
-    urgency = 'Please Address Soon';
-    tone = `The certificate of insurance for <strong>${fields.entity_name}</strong> is expiring on <strong>${fields.expiration_date}</strong> — just ${days} days away. Please arrange for an updated certificate at your earliest convenience.`;
+    // ~30 days: friendly but clear
+    message = `Your certificate of insurance for <strong>${fields.property_name}</strong> expires on <strong>${fields.expiration_date}</strong> — about ${days} days from now. Please start the renewal process with your insurance broker so we can keep your file up to date.`;
   } else {
-    urgency = 'Urgent Action Needed';
-    tone = `The certificate of insurance for <strong>${fields.entity_name}</strong> expires on <strong>${fields.expiration_date}</strong> — only <strong>${days} day${days !== 1 ? 's' : ''}</strong> remain. Immediate action is required to maintain compliance.`;
+    // 14 days or less: direct
+    message = `Your certificate of insurance for <strong>${fields.property_name}</strong> expires on <strong>${fields.expiration_date}</strong> — that\u2019s just <strong>${days} day${days !== 1 ? 's' : ''} away</strong>. Please upload an updated certificate as soon as possible to avoid a lapse in compliance.`;
   }
 
   const body = `
-<p style="font-size:14px;color:#1e293b;margin:0 0 16px;">
-  <strong style="color:#059669;">${urgency}</strong>
-</p>
-<p style="font-size:14px;color:#334155;line-height:1.6;">${tone}</p>
-<p style="font-size:13px;color:#475569;margin-top:12px;">
-  <strong>Property:</strong> ${fields.property_name}<br/>
-  <strong>${fields.entity_type === 'vendor' ? 'Vendor' : 'Tenant'}:</strong> ${fields.entity_name}<br/>
-  <strong>Expiration Date:</strong> ${fields.expiration_date}
-</p>
-<p style="font-size:14px;color:#334155;margin-top:16px;">
-  Please upload an updated certificate of insurance using the link below:
-</p>
+${greeting(fields)}
+<p style="font-size:14px;color:#334155;line-height:1.6;">${message}</p>
 ${portalButton(fields.portal_link)}
 ${contactBlock(fields)}`;
 
   return {
-    subject: 'Certificate of Insurance Expiring Soon — Action Required',
+    subject: `Your Certificate of Insurance for ${fields.property_name} Expires Soon`,
     html: emailWrapper(body, fields),
   };
 }
@@ -111,25 +112,19 @@ ${contactBlock(fields)}`;
 
 export function gapNotification(fields: EmailMergeFields): EmailTemplate {
   const body = `
-<p style="font-size:14px;color:#1e293b;margin:0 0 16px;">
-  <strong>Coverage Gaps Identified</strong>
-</p>
+${greeting(fields)}
 <p style="font-size:14px;color:#334155;line-height:1.6;">
-  We have reviewed the certificate of insurance on file for <strong>${fields.entity_name}</strong>
-  at <strong>${fields.property_name}</strong> and identified the following compliance gaps:
+  We reviewed your certificate of insurance for <strong>${fields.property_name}</strong> and found a few items that need to be updated:
 </p>
-<div style="background:#fef2f2;border-left:4px solid #ef4444;border-radius:4px;padding:12px 16px;margin:16px 0;">
+<div style="background:#f8fafc;border-radius:6px;padding:14px 18px;margin:16px 0;">
   ${fields.gaps_summary}
 </div>
-<p style="font-size:14px;color:#334155;margin-top:16px;">
-  To become fully compliant, please have your insurance provider issue an updated certificate
-  addressing the items above and upload it using the link below:
-</p>
+${brokerInstruction()}
 ${portalButton(fields.portal_link)}
 ${contactBlock(fields)}`;
 
   return {
-    subject: 'Certificate of Insurance — Coverage Gaps Identified',
+    subject: `Action Needed: Certificate of Insurance Update for ${fields.property_name}`,
     html: emailWrapper(body, fields),
   };
 }
@@ -140,25 +135,19 @@ ${contactBlock(fields)}`;
 
 export function followUpReminder(fields: EmailMergeFields): EmailTemplate {
   const body = `
-<p style="font-size:14px;color:#1e293b;margin:0 0 16px;">
-  <strong>Reminder: Updated Certificate Needed</strong>
-</p>
+${greeting(fields)}
 <p style="font-size:14px;color:#334155;line-height:1.6;">
-  This is a follow-up regarding the certificate of insurance for <strong>${fields.entity_name}</strong>
-  at <strong>${fields.property_name}</strong>. We previously notified you of compliance gaps,
-  and we have not yet received an updated certificate.
+  We wanted to follow up on your certificate of insurance for <strong>${fields.property_name}</strong>. We still need an updated certificate that addresses the following:
 </p>
-<div style="background:#fef2f2;border-left:4px solid #ef4444;border-radius:4px;padding:12px 16px;margin:16px 0;">
+<div style="background:#f8fafc;border-radius:6px;padding:14px 18px;margin:16px 0;">
   ${fields.gaps_summary}
 </div>
-<p style="font-size:14px;color:#334155;margin-top:16px;">
-  It is important that these items are addressed promptly. Please upload an updated certificate:
-</p>
+${brokerInstruction()}
 ${portalButton(fields.portal_link)}
 ${contactBlock(fields)}`;
 
   return {
-    subject: 'Reminder: Updated Certificate of Insurance Needed',
+    subject: `Friendly Reminder: Updated Certificate Needed for ${fields.property_name}`,
     html: emailWrapper(body, fields),
   };
 }
@@ -169,35 +158,29 @@ ${contactBlock(fields)}`;
 
 export function expiredNotice(fields: EmailMergeFields): EmailTemplate {
   const body = `
-<p style="font-size:14px;color:#1e293b;margin:0 0 16px;">
-  <strong style="color:#dc2626;">Immediate Action Required</strong>
-</p>
+${greeting(fields)}
 <p style="font-size:14px;color:#334155;line-height:1.6;">
-  The certificate of insurance for <strong>${fields.entity_name}</strong>
-  at <strong>${fields.property_name}</strong> expired on <strong>${fields.expiration_date}</strong>.
-  Without a current certificate, ${fields.entity_type === 'vendor' ? 'work performed' : 'occupancy'}
-  may not be covered by insurance.
+  Your certificate of insurance for <strong>${fields.property_name}</strong> expired on <strong>${fields.expiration_date}</strong>. Please upload a current certificate immediately to maintain compliance.
 </p>
-<p style="font-size:14px;color:#334155;margin-top:12px;">
-  Please have your insurance provider issue a new certificate of insurance immediately
-  and upload it using the link below:
+<p style="font-size:14px;color:#334155;line-height:1.6;margin-top:12px;">
+  If you\u2019ve already renewed your policy, just ask your broker to send over the updated certificate and upload it using the button below.
 </p>
-${portalButton(fields.portal_link, 'Upload New Certificate Now')}
+${portalButton(fields.portal_link)}
 ${contactBlock(fields)}`;
 
   return {
-    subject: 'Certificate of Insurance Expired — Immediate Action Required',
+    subject: `Your Certificate of Insurance for ${fields.property_name} Has Expired`,
     html: emailWrapper(body, fields),
   };
 }
 
 // ============================================================================
-// Format gap descriptions as HTML list
+// Format gap descriptions as a friendly HTML list
 // ============================================================================
 
 export function formatGapsAsHtml(gaps: string[]): string {
-  if (gaps.length === 0) return '<p style="font-size:13px;color:#991b1b;">No specific gaps listed.</p>';
-  return `<ul style="margin:0;padding:0 0 0 16px;font-size:13px;color:#991b1b;line-height:1.8;">
+  if (gaps.length === 0) return '<p style="font-size:13px;color:#475569;">No specific items listed.</p>';
+  return `<ul style="margin:0;padding:0 0 0 18px;font-size:13px;color:#334155;line-height:2;">
 ${gaps.map((g) => `  <li>${g}</li>`).join('\n')}
 </ul>`;
 }
