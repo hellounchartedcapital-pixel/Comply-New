@@ -14,6 +14,7 @@ export interface EmailMergeFields {
   portal_link: string;
   expiration_date: string; // formatted date string
   days_until_expiration: number;
+  is_expired?: boolean; // true when the certificate has expired coverage
   pm_name: string;
   pm_email: string;
 }
@@ -111,11 +112,20 @@ ${contactBlock(fields)}`;
 // ============================================================================
 
 export function gapNotification(fields: EmailMergeFields): EmailTemplate {
+  const expirationLead = fields.is_expired
+    ? `<p style="font-size:14px;color:#dc2626;line-height:1.6;font-weight:600;margin-bottom:12px;">
+  Your certificate of insurance for <strong>${fields.property_name}</strong> expired on <strong>${fields.expiration_date}</strong>. An updated certificate is needed immediately.
+</p>
+<p style="font-size:14px;color:#334155;line-height:1.6;">
+  In addition, we found the following items that need to be addressed:
+</p>`
+    : `<p style="font-size:14px;color:#334155;line-height:1.6;">
+  We reviewed your certificate of insurance for <strong>${fields.property_name}</strong> and found a few items that need to be updated:
+</p>`;
+
   const body = `
 ${greeting(fields)}
-<p style="font-size:14px;color:#334155;line-height:1.6;">
-  We reviewed your certificate of insurance for <strong>${fields.property_name}</strong> and found a few items that need to be updated:
-</p>
+${expirationLead}
 <div style="background:#f8fafc;border-radius:6px;padding:14px 18px;margin:16px 0;">
   ${fields.gaps_summary}
 </div>
@@ -134,11 +144,20 @@ ${contactBlock(fields)}`;
 // ============================================================================
 
 export function followUpReminder(fields: EmailMergeFields): EmailTemplate {
+  const expirationLead = fields.is_expired
+    ? `<p style="font-size:14px;color:#dc2626;line-height:1.6;font-weight:600;margin-bottom:12px;">
+  Your certificate of insurance for <strong>${fields.property_name}</strong> expired on <strong>${fields.expiration_date}</strong>. An updated certificate is needed immediately.
+</p>
+<p style="font-size:14px;color:#334155;line-height:1.6;">
+  We still need an updated certificate that also addresses the following:
+</p>`
+    : `<p style="font-size:14px;color:#334155;line-height:1.6;">
+  We wanted to follow up on your certificate of insurance for <strong>${fields.property_name}</strong>. We still need an updated certificate that addresses the following:
+</p>`;
+
   const body = `
 ${greeting(fields)}
-<p style="font-size:14px;color:#334155;line-height:1.6;">
-  We wanted to follow up on your certificate of insurance for <strong>${fields.property_name}</strong>. We still need an updated certificate that addresses the following:
-</p>
+${expirationLead}
 <div style="background:#f8fafc;border-radius:6px;padding:14px 18px;margin:16px 0;">
   ${fields.gaps_summary}
 </div>
@@ -181,6 +200,12 @@ ${contactBlock(fields)}`;
 export function formatGapsAsHtml(gaps: string[]): string {
   if (gaps.length === 0) return '<p style="font-size:13px;color:#475569;">No specific items listed.</p>';
   return `<ul style="margin:0;padding:0 0 0 18px;font-size:13px;color:#334155;line-height:2;">
-${gaps.map((g) => `  <li>${g}</li>`).join('\n')}
+${gaps.map((g) => {
+    // Style "Certificate expired" items with urgency
+    if (g.startsWith('Certificate expired')) {
+      return `  <li style="color:#dc2626;font-weight:600;">${g}</li>`;
+    }
+    return `  <li>${g}</li>`;
+  }).join('\n')}
 </ul>`;
 }

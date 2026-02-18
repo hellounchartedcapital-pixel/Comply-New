@@ -70,8 +70,8 @@ type SortField = 'name' | 'status';
 type SortDir = 'asc' | 'desc';
 
 const STATUS_ORDER: Record<ComplianceStatus, number> = {
-  non_compliant: 0,
-  expired: 1,
+  expired: 0,
+  non_compliant: 1,
   expiring_soon: 2,
   under_review: 3,
   pending: 4,

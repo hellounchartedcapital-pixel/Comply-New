@@ -396,9 +396,9 @@ function ActionItemRow({ item }: { item: ActionItem }) {
   let description = '';
   switch (item.status) {
     case 'expired':
-      description = item.daysSinceExpired
-        ? `Expired ${item.daysSinceExpired} day${item.daysSinceExpired !== 1 ? 's' : ''} ago`
-        : 'Expired';
+      description = item.earliestExpiration
+        ? `Certificate expired on ${item.earliestExpiration}`
+        : 'Certificate expired';
       break;
     case 'non_compliant':
       description = item.gapCount > 0

@@ -402,6 +402,12 @@ function ReviewInterface({
   const metCount = complianceResult.coverageResults.filter((r) => r.status === 'met').length;
   const requiredCount = templateRequirements.filter((r) => r.is_required).length;
 
+  // Detect expired coverages for the prominent banner
+  const expiredCoverages = coverages.filter((c) => {
+    if (!c.expiration_date) return false;
+    return new Date(c.expiration_date + 'T00:00:00') < new Date();
+  });
+
   const certHolderEntities = entities.filter((e) => e.entity_type === 'certificate_holder');
   const additionalInsuredEntities = entities.filter((e) => e.entity_type === 'additional_insured');
 
@@ -423,6 +429,28 @@ function ReviewInterface({
           )}
         </p>
       </div>
+
+      {/* Expired coverage banner — highest priority, shown before everything */}
+      {expiredCoverages.length > 0 && (
+        <div className="rounded-lg border-2 border-red-300 bg-red-50 px-4 py-3">
+          <div className="flex items-start gap-3">
+            <XCircle className="h-5 w-5 flex-shrink-0 text-red-600 mt-0.5" />
+            <div>
+              <p className="text-sm font-semibold text-red-800">
+                This certificate has expired coverage
+              </p>
+              <ul className="mt-1.5 space-y-0.5">
+                {expiredCoverages.map((c) => (
+                  <li key={c._key} className="text-sm text-red-700">
+                    {COVERAGE_LABELS[c.coverage_type]} expired on{' '}
+                    <span className="font-medium">{formatDate(c.expiration_date)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Confirmed banner */}
       {isConfirmed && (

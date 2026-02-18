@@ -205,6 +205,18 @@ export function calculateCompliance(
   let hasExpiringSoon = false;
   let hasGap = false;
 
+  // ---- Check ALL coverages for expiration (not just requirement-matched ones) ----
+  for (const cov of coverages) {
+    if (cov.expiration_date) {
+      const expDate = new Date(cov.expiration_date + 'T00:00:00');
+      if (expDate < now) {
+        hasExpired = true;
+      } else if (expDate < thresholdDate) {
+        hasExpiringSoon = true;
+      }
+    }
+  }
+
   // ---- Coverage requirements ----
   for (const req of requirements) {
     // Find matching extracted coverage by type AND limit_type
@@ -330,11 +342,13 @@ export function calculateCompliance(
   }
 
   // ---- Derive overall status ----
+  // Expiration is the #1 priority — an expired certificate is the most critical
+  // compliance issue and takes precedence over all other checks.
   let overallStatus: ComplianceStatus;
-  if (hasGap) {
-    overallStatus = 'non_compliant';
-  } else if (hasExpired) {
+  if (hasExpired) {
     overallStatus = 'expired';
+  } else if (hasGap) {
+    overallStatus = 'non_compliant';
   } else if (hasExpiringSoon) {
     overallStatus = 'expiring_soon';
   } else {

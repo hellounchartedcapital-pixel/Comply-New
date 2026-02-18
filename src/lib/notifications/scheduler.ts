@@ -208,8 +208,8 @@ export async function checkAndScheduleNotifications(): Promise<number> {
       }
     }
 
-    // ---- Gap follow-up (14 days after last gap notification) ----
-    if (entity.compliance_status === 'non_compliant' && certId) {
+    // ---- Gap / expired follow-up (14 days after last gap notification) ----
+    if ((entity.compliance_status === 'non_compliant' || entity.compliance_status === 'expired') && certId) {
       const { data: lastGapNotif } = await supabase
         .from('notifications')
         .select('sent_date')
@@ -230,6 +230,9 @@ export async function checkAndScheduleNotifications(): Promise<number> {
         if (!notifSet.has(key)) {
           notifSet.add(key);
 
+          // Determine if the certificate is expired
+          const isExpired = entity.compliance_status === 'expired';
+
           // Fetch gaps
           const { data: gapResults } = await supabase
             .from('compliance_results')
@@ -240,6 +243,11 @@ export async function checkAndScheduleNotifications(): Promise<number> {
 
           const gaps = (gapResults ?? []).map((r) => r.gap_description!);
 
+          // When expired, prepend "Certificate expired on [date]" as the first gap item
+          if (isExpired && earliestExp) {
+            gaps.unshift(`Certificate expired on ${formatDate(earliestExp)}`);
+          }
+
           const fields: EmailMergeFields = {
             entity_name: entity.company_name,
             entity_type: entity._type,
@@ -249,6 +257,7 @@ export async function checkAndScheduleNotifications(): Promise<number> {
             portal_link: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/certificates/upload?${entity._type}Id=${entity.id}`,
             expiration_date: earliestExp ? formatDate(earliestExp) : 'N/A',
             days_until_expiration: 0,
+            is_expired: isExpired,
             pm_name: pm.name,
             pm_email: pm.email,
           };

@@ -121,8 +121,9 @@ export default async function PortalPage({ params }: PortalPageProps) {
     propertyEntities = (entities ?? []) as PropertyEntity[];
   }
 
-  // Fetch compliance gaps from the most recent confirmed certificate
+  // Fetch compliance gaps and expiration from the most recent confirmed certificate
   let complianceGaps: string[] = [];
+  let earliestExpiredDate: string | null = null;
   const { data: latestCert } = await supabase
     .from('certificates')
     .select('id')
@@ -133,6 +134,25 @@ export default async function PortalPage({ params }: PortalPageProps) {
     .single();
 
   if (latestCert) {
+    // Check for expired coverages
+    const { data: expiredCovs } = await supabase
+      .from('extracted_coverages')
+      .select('expiration_date')
+      .eq('certificate_id', latestCert.id)
+      .not('expiration_date', 'is', null)
+      .order('expiration_date', { ascending: true });
+
+    if (expiredCovs) {
+      const now = new Date();
+      now.setHours(0, 0, 0, 0);
+      for (const c of expiredCovs) {
+        if (c.expiration_date && new Date(c.expiration_date + 'T00:00:00') < now) {
+          earliestExpiredDate = c.expiration_date;
+          break;
+        }
+      }
+    }
+
     // Get coverage compliance gaps
     const { data: gaps } = await supabase
       .from('compliance_results')
@@ -197,6 +217,26 @@ export default async function PortalPage({ params }: PortalPageProps) {
             )}
           </p>
         </div>
+
+        {/* Expired certificate alert — shown above everything */}
+        {earliestExpiredDate && (
+          <section className="bg-red-50 rounded-xl border-2 border-red-300 p-5 sm:p-6 mb-6">
+            <div className="flex items-start gap-3">
+              <svg className="h-6 w-6 flex-shrink-0 text-red-600 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+              <div>
+                <h2 className="text-lg font-semibold text-red-800">Certificate Expired</h2>
+                <p className="mt-1 text-sm text-red-700">
+                  Your previous certificate expired on <span className="font-medium">{earliestExpiredDate}</span>.
+                  Please upload a current certificate of insurance.
+                </p>
+              </div>
+            </div>
+          </section>
+        )}
 
         {/* Requirements Section */}
         {(coverageRequirements.length > 0 || additionalInsured.length > 0 || certificateHolder) && (

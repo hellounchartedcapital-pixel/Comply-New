@@ -208,6 +208,36 @@ export function VendorDetailClient({
             </dl>
           </div>
 
+          {/* Expired alert banner — highest priority */}
+          {vendor.compliance_status === 'expired' && (
+            <div className="rounded-lg border-2 border-red-300 bg-red-50 px-4 py-3">
+              <div className="flex items-start gap-3">
+                <svg className="h-5 w-5 flex-shrink-0 text-red-600 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="15" y1="9" x2="9" y2="15" />
+                  <line x1="9" y1="9" x2="15" y2="15" />
+                </svg>
+                <div>
+                  <p className="text-sm font-semibold text-red-800">
+                    This vendor&apos;s certificate has expired coverage. An updated certificate is required.
+                  </p>
+                  {extractedCoverages.filter((c) => c.expiration_date && new Date(c.expiration_date + 'T00:00:00') < new Date()).length > 0 && (
+                    <ul className="mt-1.5 space-y-0.5">
+                      {extractedCoverages
+                        .filter((c) => c.expiration_date && new Date(c.expiration_date + 'T00:00:00') < new Date())
+                        .map((c) => (
+                          <li key={c.id} className="text-sm text-red-700">
+                            {c.coverage_type.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())} expired on{' '}
+                            <span className="font-medium">{c.expiration_date}</span>
+                          </li>
+                        ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Compliance Breakdown */}
           <ComplianceBreakdown
             requirements={templateRequirements}
