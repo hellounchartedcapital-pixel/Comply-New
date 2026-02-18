@@ -7,6 +7,7 @@ import { Resend } from 'resend';
 interface SendResult {
   success: boolean;
   error?: string;
+  devMode?: boolean;
 }
 
 const FROM_ADDRESS = 'SmartCOI <notifications@smartcoi.com>';
@@ -23,13 +24,16 @@ export async function sendNotificationEmail(
   const apiKey = process.env.RESEND_API_KEY;
 
   if (!apiKey) {
-    console.log('=== EMAIL (RESEND_API_KEY not set — dev mode) ===');
+    console.log('RESEND_API_KEY is missing — email will be logged to console only');
+    console.log('=== EMAIL (dev mode) ===');
     console.log(`To: ${to}`);
     console.log(`Subject: ${subject}`);
     console.log(`Body: ${html.substring(0, 200)}...`);
     console.log('=== END EMAIL ===');
-    return { success: true };
+    return { success: true, devMode: true };
   }
+
+  console.log('RESEND_API_KEY is set — sending email to:', to);
 
   try {
     const resend = new Resend(apiKey);

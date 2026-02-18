@@ -295,3 +295,32 @@ export async function confirmCertificate(
     entityId,
   };
 }
+
+// ============================================================================
+// COI Document Signed URL
+// ============================================================================
+
+export async function getCOISignedUrl(
+  certificateId: string
+): Promise<{ url: string }> {
+  const { supabase, orgId } = await getAuthContext();
+
+  const { data: cert } = await supabase
+    .from('certificates')
+    .select('file_path')
+    .eq('id', certificateId)
+    .eq('organization_id', orgId)
+    .single();
+
+  if (!cert?.file_path) throw new Error('Certificate or file not found');
+
+  const { data, error } = await supabase.storage
+    .from('coi-documents')
+    .createSignedUrl(cert.file_path, 3600); // 1 hour
+
+  if (error || !data?.signedUrl) {
+    throw new Error('Failed to generate signed URL');
+  }
+
+  return { url: data.signedUrl };
+}

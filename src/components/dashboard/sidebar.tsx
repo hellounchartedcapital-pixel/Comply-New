@@ -8,6 +8,7 @@ import {
   Building2,
   FileCheck,
   Bell,
+  Settings,
   LogOut,
   PanelLeftClose,
   PanelLeftOpen,
@@ -24,6 +25,7 @@ const navItems = [
   { label: 'Properties', href: '/dashboard/properties', icon: Building2 },
   { label: 'Templates', href: '/dashboard/templates', icon: FileCheck },
   { label: 'Notifications', href: '/dashboard/notifications', icon: Bell },
+  { label: 'Settings', href: '/dashboard/settings', icon: Settings },
 ] as const;
 
 function getPageTitle(pathname: string): string {

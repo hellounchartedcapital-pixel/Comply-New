@@ -33,9 +33,23 @@ export default async function TemplatesPage() {
     .order('is_system_default', { ascending: false })
     .order('name');
 
-  const allTemplates = (templates ?? []) as (RequirementTemplate & {
+  const rawTemplates = (templates ?? []) as (RequirementTemplate & {
     coverage_requirements: TemplateCoverageRequirement[];
   })[];
+
+  // Deduplicate: if the org has its own copy of a system default, hide the default.
+  // Match by category + risk_level to detect which system defaults have been adopted.
+  const orgTemplateKeys = new Set(
+    rawTemplates
+      .filter((t) => !t.is_system_default && t.organization_id === orgId)
+      .map((t) => `${t.category}:${t.risk_level}`)
+  );
+  const allTemplates = rawTemplates.filter((t) => {
+    if (t.is_system_default) {
+      return !orgTemplateKeys.has(`${t.category}:${t.risk_level}`);
+    }
+    return true;
+  });
 
   // Fetch vendor/tenant usage counts per template
   const templateIds = allTemplates.map((t) => t.id);

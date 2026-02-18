@@ -70,8 +70,12 @@ export function VendorDetailClient({
   async function handleSendFollowUp() {
     setSendingFollowUp(true);
     try {
-      await sendManualFollowUp('vendor', vendor.id);
-      toast.success('Follow-up email sent');
+      const result = await sendManualFollowUp('vendor', vendor.id);
+      if (result.devMode) {
+        toast.info('Email logged to console (Resend not configured)');
+      } else {
+        toast.success('Follow-up email sent');
+      }
       router.refresh();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to send follow-up');
