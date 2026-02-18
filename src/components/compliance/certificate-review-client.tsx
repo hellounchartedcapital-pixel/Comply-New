@@ -57,7 +57,10 @@ import {
   XCircle,
   Minus,
   Info,
+  Eye,
+  Download,
 } from 'lucide-react';
+import { getCOISignedUrl } from '@/lib/actions/certificates';
 
 // ============================================================================
 // Types for editable state
@@ -228,6 +231,34 @@ function ReviewInterface({
 }: CertificateReviewClientProps & { isConfirmed: boolean }) {
   const router = useRouter();
   const [confirming, setConfirming] = useState(false);
+  const [loadingDoc, setLoadingDoc] = useState(false);
+
+  async function handleViewPdf() {
+    setLoadingDoc(true);
+    try {
+      const { url } = await getCOISignedUrl(certificate.id);
+      window.open(url, '_blank');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to get document URL');
+    } finally {
+      setLoadingDoc(false);
+    }
+  }
+
+  async function handleDownload() {
+    setLoadingDoc(true);
+    try {
+      const { url } = await getCOISignedUrl(certificate.id);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `coi-${certificate.id}.pdf`;
+      a.click();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to download document');
+    } finally {
+      setLoadingDoc(false);
+    }
+  }
 
   // Editable coverages
   const [coverages, setCoverages] = useState<EditableCoverage[]>(() =>
@@ -410,7 +441,21 @@ function ReviewInterface({
       {/* Header */}
       <div className="space-y-1">
         <BackLink entityType={entityType} entityId={entityId} entityName={entityName} />
-        <h1 className="text-2xl font-bold tracking-tight">Review Certificate</h1>
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold tracking-tight">Review Certificate</h1>
+          {certificate.file_path && (
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" disabled={loadingDoc} onClick={handleViewPdf}>
+                <Eye className="mr-1.5 h-3.5 w-3.5" />
+                View PDF
+              </Button>
+              <Button variant="outline" size="sm" disabled={loadingDoc} onClick={handleDownload}>
+                <Download className="mr-1.5 h-3.5 w-3.5" />
+                Download
+              </Button>
+            </div>
+          )}
+        </div>
         <p className="text-sm text-muted-foreground">
           {entityType === 'vendor' ? 'Vendor' : 'Tenant'}:{' '}
           <span className="font-medium text-foreground">{entityName}</span>

@@ -107,7 +107,7 @@ export async function generatePortalLink(
 export async function sendManualFollowUp(
   entityType: 'vendor' | 'tenant',
   entityId: string
-): Promise<void> {
+): Promise<{ devMode?: boolean }> {
   const { supabase, userId, orgId, pmName, pmEmail, orgName } = await getAuthContext();
 
   // Fetch entity
@@ -245,6 +245,7 @@ export async function sendManualFollowUp(
 
   revalidatePath(`/dashboard/${entityType}s/${entityId}`);
   revalidatePath('/dashboard/notifications');
+  return { devMode: result.devMode };
 }
 
 // ============================================================================

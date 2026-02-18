@@ -1,6 +1,13 @@
+'use client';
+
+import { useState } from 'react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Eye, Download } from 'lucide-react';
 import { formatRelativeDate } from '@/lib/utils';
+import { getCOISignedUrl } from '@/lib/actions/certificates';
+import { toast } from 'sonner';
 import type {
   Certificate,
   UploadSource,
@@ -32,6 +39,35 @@ interface COIHistoryProps {
 }
 
 export function COIHistory({ certificates }: COIHistoryProps) {
+  const [loadingId, setLoadingId] = useState<string | null>(null);
+
+  async function handleViewPdf(certId: string) {
+    setLoadingId(certId);
+    try {
+      const { url } = await getCOISignedUrl(certId);
+      window.open(url, '_blank');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to get document URL');
+    } finally {
+      setLoadingId(null);
+    }
+  }
+
+  async function handleDownload(certId: string) {
+    setLoadingId(certId);
+    try {
+      const { url } = await getCOISignedUrl(certId);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `coi-${certId}.pdf`;
+      a.click();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to download document');
+    } finally {
+      setLoadingId(null);
+    }
+  }
+
   if (certificates.length === 0) {
     return (
       <div className="rounded-lg border border-slate-200 bg-white p-5">
@@ -53,14 +89,17 @@ export function COIHistory({ certificates }: COIHistoryProps) {
           const results = cert.compliance_results ?? [];
           const metCount = results.filter((r) => r.status === 'met').length;
           const totalCount = results.length;
+          const isLoading = loadingId === cert.id;
 
           return (
-            <Link
+            <div
               key={cert.id}
-              href={`/dashboard/certificates/${cert.id}/review`}
-              className="flex items-center justify-between gap-3 py-3 hover:bg-slate-50 -mx-2 px-2 rounded transition-colors"
+              className="flex items-center justify-between gap-3 py-3 -mx-2 px-2 rounded"
             >
-              <div className="min-w-0 flex-1">
+              <Link
+                href={`/dashboard/certificates/${cert.id}/review`}
+                className="min-w-0 flex-1 rounded p-1 -m-1 transition-colors hover:bg-slate-50"
+              >
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium text-foreground">
                     {formatRelativeDate(cert.uploaded_at)}
@@ -77,11 +116,32 @@ export function COIHistory({ certificates }: COIHistoryProps) {
                     {metCount} of {totalCount} requirements met
                   </p>
                 )}
-              </div>
-              <svg className="h-4 w-4 shrink-0 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-              </svg>
-            </Link>
+              </Link>
+              {cert.file_path && (
+                <div className="flex shrink-0 gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 w-7 p-0"
+                    title="View PDF"
+                    disabled={isLoading}
+                    onClick={() => handleViewPdf(cert.id)}
+                  >
+                    <Eye className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 w-7 p-0"
+                    title="Download"
+                    disabled={isLoading}
+                    onClick={() => handleDownload(cert.id)}
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              )}
+            </div>
           );
         })}
       </div>
