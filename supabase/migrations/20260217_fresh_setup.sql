@@ -286,6 +286,44 @@ CREATE INDEX IF NOT EXISTS idx_notifications_scheduled_date ON notifications(sch
 
 CREATE INDEX IF NOT EXISTS idx_activity_log_organization_id ON activity_log(organization_id);
 CREATE INDEX IF NOT EXISTS idx_activity_log_created_at ON activity_log(created_at);
+CREATE INDEX IF NOT EXISTS idx_activity_log_certificate_id ON activity_log(certificate_id);
+CREATE INDEX IF NOT EXISTS idx_activity_log_performed_by ON activity_log(performed_by);
+CREATE INDEX IF NOT EXISTS idx_activity_log_property_id ON activity_log(property_id);
+CREATE INDEX IF NOT EXISTS idx_activity_log_tenant_id ON activity_log(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_activity_log_vendor_id ON activity_log(vendor_id);
+
+CREATE INDEX IF NOT EXISTS idx_certificates_organization_id ON certificates(organization_id);
+CREATE INDEX IF NOT EXISTS idx_certificates_reviewed_by ON certificates(reviewed_by);
+
+CREATE INDEX IF NOT EXISTS idx_compliance_results_certificate_id ON compliance_results(certificate_id);
+CREATE INDEX IF NOT EXISTS idx_compliance_results_coverage_requirement_id ON compliance_results(coverage_requirement_id);
+CREATE INDEX IF NOT EXISTS idx_compliance_results_extracted_coverage_id ON compliance_results(extracted_coverage_id);
+
+CREATE INDEX IF NOT EXISTS idx_entity_compliance_results_certificate_id ON entity_compliance_results(certificate_id);
+CREATE INDEX IF NOT EXISTS idx_entity_compliance_results_extracted_entity_id ON entity_compliance_results(extracted_entity_id);
+CREATE INDEX IF NOT EXISTS idx_entity_compliance_results_property_entity_id ON entity_compliance_results(property_entity_id);
+
+CREATE INDEX IF NOT EXISTS idx_extracted_entities_certificate_id ON extracted_entities(certificate_id);
+
+CREATE INDEX IF NOT EXISTS idx_notifications_tenant_id ON notifications(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_vendor_id ON notifications(vendor_id);
+
+CREATE INDEX IF NOT EXISTS idx_organization_default_entities_organization_id ON organization_default_entities(organization_id);
+
+CREATE INDEX IF NOT EXISTS idx_property_entities_property_id ON property_entities(property_id);
+
+CREATE INDEX IF NOT EXISTS idx_requirement_templates_organization_id ON requirement_templates(organization_id);
+
+CREATE INDEX IF NOT EXISTS idx_template_coverage_requirements_template_id ON template_coverage_requirements(template_id);
+
+CREATE INDEX IF NOT EXISTS idx_tenants_template_id ON tenants(template_id);
+
+CREATE INDEX IF NOT EXISTS idx_upload_portal_tokens_tenant_id ON upload_portal_tokens(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_upload_portal_tokens_vendor_id ON upload_portal_tokens(vendor_id);
+
+CREATE INDEX IF NOT EXISTS idx_users_organization_id ON users(organization_id);
+
+CREATE INDEX IF NOT EXISTS idx_vendors_template_id ON vendors(template_id);
 
 
 -- ============================================================================
