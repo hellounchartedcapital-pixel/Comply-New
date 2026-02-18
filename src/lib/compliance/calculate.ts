@@ -104,6 +104,72 @@ const LIMIT_TYPE_LABELS: Record<LimitType, string> = {
 
 export { COVERAGE_LABELS, LIMIT_TYPE_LABELS };
 
+// ---- Expiration summary consolidation ----
+// Produces a compact 1-3 line summary of expired coverages, deduplicating
+// coverage types and grouping by expiration date.
+
+export interface ExpiredCoverageSummary {
+  /** True when every coverage on the cert shares the same expiration date */
+  allSameDate: boolean;
+  /** Single-date message when allSameDate is true */
+  singleLine: string | null;
+  /** Grouped lines: "GL, Auto — expired Feb 1, 2026" */
+  groupedLines: { types: string; date: string }[];
+  /** Total number of expired coverages (pre-dedup) */
+  expiredCount: number;
+  /** Total number of coverages on the certificate */
+  totalCount: number;
+}
+
+export function summarizeExpiredCoverages(
+  coverages: { coverage_type: string; expiration_date?: string | null }[],
+  formatDateFn: (d: string) => string = (d) => d
+): ExpiredCoverageSummary {
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+
+  const expired = coverages.filter(
+    (c) => c.expiration_date && new Date(c.expiration_date + 'T00:00:00') < now
+  );
+
+  if (expired.length === 0) {
+    return { allSameDate: false, singleLine: null, groupedLines: [], expiredCount: 0, totalCount: coverages.length };
+  }
+
+  // Group by date, dedup coverage types within each group
+  const byDate = new Map<string, Set<string>>();
+  for (const c of expired) {
+    const date = c.expiration_date!;
+    if (!byDate.has(date)) byDate.set(date, new Set());
+    const label =
+      (COVERAGE_LABELS as Record<string, string>)[c.coverage_type] ??
+      c.coverage_type.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
+    byDate.get(date)!.add(label);
+  }
+
+  const allSameDate = byDate.size === 1 && expired.length === coverages.length;
+
+  if (allSameDate) {
+    const [date] = [...byDate.keys()];
+    return {
+      allSameDate: true,
+      singleLine: `All coverages on this certificate expired on ${formatDateFn(date)}`,
+      groupedLines: [],
+      expiredCount: expired.length,
+      totalCount: coverages.length,
+    };
+  }
+
+  const groupedLines = [...byDate.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, types]) => ({
+      types: [...types].join(', '),
+      date: formatDateFn(date),
+    }));
+
+  return { allSameDate: false, singleLine: null, groupedLines, expiredCount: expired.length, totalCount: coverages.length };
+}
+
 function fmtCov(type: CoverageType, limitType: LimitType | null): string {
   const base = COVERAGE_LABELS[type] ?? type;
   if (limitType && limitType !== 'statutory') {

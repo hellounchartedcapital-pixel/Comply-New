@@ -16,6 +16,8 @@ import {
   toggleVendorNotifications,
 } from '@/lib/actions/properties';
 import { sendManualFollowUp, generatePortalLink } from '@/lib/actions/notifications';
+import { summarizeExpiredCoverages } from '@/lib/compliance/calculate';
+import { formatDate } from '@/lib/utils';
 import { toast } from 'sonner';
 import type {
   Vendor,
@@ -208,10 +210,12 @@ export function VendorDetailClient({
             </dl>
           </div>
 
-          {/* Expired alert banner — highest priority */}
-          {vendor.compliance_status === 'expired' && (
-            <div className="rounded-lg border-2 border-red-300 bg-red-50 px-4 py-3">
-              <div className="flex items-start gap-3">
+          {/* Expired alert banner — compact, consolidated */}
+          {vendor.compliance_status === 'expired' && (() => {
+            const summary = summarizeExpiredCoverages(extractedCoverages, formatDate);
+            if (summary.expiredCount === 0) return null;
+            return (
+              <div className="flex items-start gap-3 rounded-lg border-2 border-red-300 bg-red-50 px-4 py-3">
                 <svg className="h-5 w-5 flex-shrink-0 text-red-600 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
                   <circle cx="12" cy="12" r="10" />
                   <line x1="15" y1="9" x2="9" y2="15" />
@@ -219,24 +223,24 @@ export function VendorDetailClient({
                 </svg>
                 <div>
                   <p className="text-sm font-semibold text-red-800">
-                    This vendor&apos;s certificate has expired coverage. An updated certificate is required.
+                    {summary.singleLine
+                      ? `This vendor\u2019s certificate has expired. ${summary.singleLine}.`
+                      : `This vendor\u2019s certificate has expired coverage (${summary.expiredCount} of ${summary.totalCount}). An updated certificate is required.`}
                   </p>
-                  {extractedCoverages.filter((c) => c.expiration_date && new Date(c.expiration_date + 'T00:00:00') < new Date()).length > 0 && (
-                    <ul className="mt-1.5 space-y-0.5">
-                      {extractedCoverages
-                        .filter((c) => c.expiration_date && new Date(c.expiration_date + 'T00:00:00') < new Date())
-                        .map((c) => (
-                          <li key={c.id} className="text-sm text-red-700">
-                            {c.coverage_type.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())} expired on{' '}
-                            <span className="font-medium">{c.expiration_date}</span>
-                          </li>
-                        ))}
-                    </ul>
+                  {!summary.allSameDate && summary.groupedLines.length > 0 && (
+                    <p className="mt-1 text-sm text-red-700">
+                      {summary.groupedLines.map((g, i) => (
+                        <span key={i}>
+                          {i > 0 && ' · '}
+                          {g.types} — expired {g.date}
+                        </span>
+                      ))}
+                    </p>
                   )}
                 </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* Compliance Breakdown */}
           <ComplianceBreakdown
