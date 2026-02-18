@@ -21,12 +21,20 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { ComplianceBadge } from './compliance-badge';
 import { EditPropertyDialog } from './edit-property-dialog';
 import { AddVendorDialog } from './add-vendor-dialog';
@@ -37,6 +45,7 @@ import {
   softDeleteVendor,
   softDeleteTenant,
 } from '@/lib/actions/properties';
+import { sendManualFollowUp } from '@/lib/actions/notifications';
 import { toast } from 'sonner';
 import type {
   Property,
@@ -94,6 +103,8 @@ export function PropertyDetailClient({
   const [deleteVendorId, setDeleteVendorId] = useState<string | null>(null);
   const [deleteTenantId, setDeleteTenantId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [sendingFollowUp, setSendingFollowUp] = useState(false);
+  const [coiPrompt, setCoiPrompt] = useState<{ type: 'vendor' | 'tenant'; id: string; name: string } | null>(null);
 
   // Vendor table state
   const [vendorStatusFilter, setVendorStatusFilter] = useState<string>('all');
@@ -207,9 +218,32 @@ export function PropertyDetailClient({
     }
   }
 
+  async function handleSendFollowUp(entityType: 'vendor' | 'tenant', entityId: string) {
+    setSendingFollowUp(true);
+    try {
+      await sendManualFollowUp(entityType, entityId);
+      toast.success('Follow-up email sent');
+      router.refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to send follow-up');
+    } finally {
+      setSendingFollowUp(false);
+    }
+  }
+
+  function handleVendorCreated(id: string, name: string) {
+    setCoiPrompt({ type: 'vendor', id, name });
+  }
+
+  function handleTenantCreated(id: string, name: string) {
+    setCoiPrompt({ type: 'tenant', id, name });
+  }
+
   function SortIndicator({ field, current }: { field: SortField; current: { field: SortField; dir: SortDir } }) {
-    if (current.field !== field) return <span className="ml-1 text-slate-300">&#x2195;</span>;
-    return <span className="ml-1">{current.dir === 'asc' ? '&#x2191;' : '&#x2193;'}</span>;
+    if (current.field !== field) return <ArrowUpDown className="ml-1 inline h-3.5 w-3.5 text-slate-300" />;
+    return current.dir === 'asc'
+      ? <ArrowUp className="ml-1 inline h-3.5 w-3.5" />
+      : <ArrowDown className="ml-1 inline h-3.5 w-3.5" />;
   }
 
   function StatusFilterSelect({
@@ -453,9 +487,18 @@ export function PropertyDetailClient({
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem>View Details</DropdownMenuItem>
-                            <DropdownMenuItem>Upload COI</DropdownMenuItem>
-                            <DropdownMenuItem>Send Follow-up</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => router.push(`/dashboard/vendors/${v.id}`)}>
+                              View Details
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => router.push(`/dashboard/certificates/upload?vendorId=${v.id}`)}>
+                              Upload COI
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              disabled={sendingFollowUp}
+                              onClick={() => handleSendFollowUp('vendor', v.id)}
+                            >
+                              Send Follow-up
+                            </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
                               className="text-destructive focus:text-destructive"
@@ -584,9 +627,18 @@ export function PropertyDetailClient({
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem>View Details</DropdownMenuItem>
-                            <DropdownMenuItem>Upload COI</DropdownMenuItem>
-                            <DropdownMenuItem>Send Follow-up</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => router.push(`/dashboard/tenants/${t.id}`)}>
+                              View Details
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => router.push(`/dashboard/certificates/upload?tenantId=${t.id}`)}>
+                              Upload COI
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              disabled={sendingFollowUp}
+                              onClick={() => handleSendFollowUp('tenant', t.id)}
+                            >
+                              Send Follow-up
+                            </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
                               className="text-destructive focus:text-destructive"
@@ -618,12 +670,14 @@ export function PropertyDetailClient({
         templates={templates}
         open={addVendorOpen}
         onOpenChange={setAddVendorOpen}
+        onCreated={handleVendorCreated}
       />
       <AddTenantDialog
         propertyId={property.id}
         templates={templates}
         open={addTenantOpen}
         onOpenChange={setAddTenantOpen}
+        onCreated={handleTenantCreated}
       />
       <ConfirmDialog
         open={deletePropertyOpen}
@@ -659,6 +713,32 @@ export function PropertyDetailClient({
         loading={deleting}
         onConfirm={handleDeleteTenant}
       />
+      <Dialog open={coiPrompt !== null} onOpenChange={(open) => !open && setCoiPrompt(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{coiPrompt?.type === 'vendor' ? 'Vendor' : 'Tenant'} Added</DialogTitle>
+            <DialogDescription>
+              Would you like to upload a COI for {coiPrompt?.name} now?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => setCoiPrompt(null)}>
+              Skip for Now
+            </Button>
+            <Button
+              onClick={() => {
+                if (coiPrompt) {
+                  const param = coiPrompt.type === 'vendor' ? 'vendorId' : 'tenantId';
+                  router.push(`/dashboard/certificates/upload?${param}=${coiPrompt.id}`);
+                  setCoiPrompt(null);
+                }
+              }}
+            >
+              Upload COI
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

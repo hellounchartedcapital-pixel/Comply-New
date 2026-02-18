@@ -36,6 +36,7 @@ interface AddTenantDialogProps {
   templates: RequirementTemplate[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onCreated?: (id: string, name: string) => void;
 }
 
 export function AddTenantDialog({
@@ -43,6 +44,7 @@ export function AddTenantDialog({
   templates,
   open,
   onOpenChange,
+  onCreated,
 }: AddTenantDialogProps) {
   const [saving, setSaving] = useState(false);
   const [companyName, setCompanyName] = useState('');
@@ -72,7 +74,7 @@ export function AddTenantDialog({
     setSaving(true);
 
     try {
-      await createTenant({
+      const result = await createTenant({
         property_id: propertyId,
         company_name: companyName.trim(),
         contact_name: contactName.trim() || undefined,
@@ -83,8 +85,10 @@ export function AddTenantDialog({
         template_id: templateId || undefined,
       });
       toast.success('Tenant added');
+      const name = companyName.trim();
       reset();
       onOpenChange(false);
+      onCreated?.(result.id, name);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to add tenant');
     } finally {

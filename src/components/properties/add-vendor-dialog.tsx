@@ -40,6 +40,7 @@ interface AddVendorDialogProps {
   templates: RequirementTemplate[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onCreated?: (id: string, name: string) => void;
 }
 
 export function AddVendorDialog({
@@ -47,6 +48,7 @@ export function AddVendorDialog({
   templates,
   open,
   onOpenChange,
+  onCreated,
 }: AddVendorDialogProps) {
   const [saving, setSaving] = useState(false);
   const [companyName, setCompanyName] = useState('');
@@ -74,7 +76,7 @@ export function AddVendorDialog({
     setSaving(true);
 
     try {
-      await createVendor({
+      const result = await createVendor({
         property_id: propertyId,
         company_name: companyName.trim(),
         contact_name: contactName.trim() || undefined,
@@ -84,8 +86,10 @@ export function AddVendorDialog({
         template_id: templateId || undefined,
       });
       toast.success('Vendor added');
+      const name = companyName.trim();
       reset();
       onOpenChange(false);
+      onCreated?.(result.id, name);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to add vendor');
     } finally {
