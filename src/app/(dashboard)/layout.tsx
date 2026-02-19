@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { isOrgOnboarded } from '@/lib/actions/auth';
 import { DashboardShell } from '@/components/dashboard/sidebar';
 import { TrialBanner } from '@/components/dashboard/trial-banner';
 
@@ -29,7 +30,6 @@ export default async function DashboardLayout({
   let orgPlan = 'trial';
   let trialEndsAt: string | null = null;
   let onboardingCompleted = false;
-  let rawSettings: unknown = null;
   if (profile?.organization_id) {
     const { data: org } = await supabase
       .from('organizations')
@@ -39,13 +39,14 @@ export default async function DashboardLayout({
     if (org?.name) orgName = org.name;
     orgPlan = org?.plan ?? 'trial';
     trialEndsAt = org?.trial_ends_at ?? null;
-    rawSettings = org?.settings;
-    const raw = org?.settings?.onboarding_completed;
-    onboardingCompleted = raw === true || raw === 'true';
+
+    // Use the service-role-based check which also has a property/vendor fallback
+    // and auto-fixes stale data. This bypasses any RLS issues with reading settings.
+    onboardingCompleted = await isOrgOnboarded(profile.organization_id);
   }
 
   if (!onboardingCompleted) {
-    console.log('[DashboardLayout] Redirecting to /setup — profile:', !!profile, 'orgId:', profile?.organization_id ?? 'none', 'settings:', JSON.stringify(rawSettings));
+    console.log('[DashboardLayout] Redirecting to /setup — profile:', !!profile, 'orgId:', profile?.organization_id ?? 'none');
     redirect('/setup');
   }
 

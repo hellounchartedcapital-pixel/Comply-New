@@ -113,3 +113,68 @@ export async function completeOnboarding(orgId: string): Promise<void> {
     throw new Error(`Failed to complete onboarding: ${error.message}`);
   }
 }
+
+/**
+ * Check if an organization should be considered "onboarded" based on its data.
+ *
+ * Returns true if:
+ * 1. settings.onboarding_completed is true / "true", OR
+ * 2. The org has at least one property (meaning they've already been using the app)
+ *
+ * If case 2 triggers, also auto-fixes the settings flag so future checks are fast.
+ * Uses the service role client to bypass RLS for both the check and the fix.
+ */
+export async function isOrgOnboarded(orgId: string): Promise<boolean> {
+  const supabase = createServiceClient();
+
+  // Check the flag first
+  const { data: org } = await supabase
+    .from('organizations')
+    .select('settings')
+    .eq('id', orgId)
+    .single();
+
+  const raw = (org?.settings as Record<string, unknown>)?.onboarding_completed;
+  if (raw === true || raw === 'true') {
+    return true;
+  }
+
+  // Fallback: check if the org has properties (already using the app)
+  const { count } = await supabase
+    .from('properties')
+    .select('id', { count: 'exact', head: true })
+    .eq('organization_id', orgId);
+
+  if (count && count > 0) {
+    // Auto-fix: set the flag so we don't repeat this query every request
+    console.log(`[isOrgOnboarded] Auto-fixing org ${orgId} — has ${count} properties but missing onboarding flag`);
+    const currentSettings = (org?.settings as Record<string, unknown>) || {};
+    await supabase
+      .from('organizations')
+      .update({
+        settings: { ...currentSettings, onboarding_completed: true },
+      })
+      .eq('id', orgId);
+    return true;
+  }
+
+  // Also check vendors as a secondary fallback
+  const { count: vendorCount } = await supabase
+    .from('vendors')
+    .select('id', { count: 'exact', head: true })
+    .eq('organization_id', orgId);
+
+  if (vendorCount && vendorCount > 0) {
+    console.log(`[isOrgOnboarded] Auto-fixing org ${orgId} — has ${vendorCount} vendors but missing onboarding flag`);
+    const currentSettings = (org?.settings as Record<string, unknown>) || {};
+    await supabase
+      .from('organizations')
+      .update({
+        settings: { ...currentSettings, onboarding_completed: true },
+      })
+      .eq('id', orgId);
+    return true;
+  }
+
+  return false;
+}

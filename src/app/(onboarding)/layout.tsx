@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { isOrgOnboarded } from '@/lib/actions/auth';
 
 export default async function OnboardingLayout({
   children,
@@ -27,14 +28,10 @@ export default async function OnboardingLayout({
     .single();
 
   if (profile?.organization_id) {
-    const { data: org } = await supabase
-      .from('organizations')
-      .select('settings')
-      .eq('id', profile.organization_id)
-      .single();
-
-    const raw = org?.settings?.onboarding_completed;
-    if (raw === true || raw === 'true') {
+    // Use the service-role-based check which also has a property/vendor fallback
+    // and auto-fixes stale data. This bypasses any RLS issues with reading settings.
+    const onboarded = await isOrgOnboarded(profile.organization_id);
+    if (onboarded) {
       redirect('/dashboard');
     }
   }

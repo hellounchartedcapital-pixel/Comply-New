@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 
 // Routes that don't require authentication
 const publicRoutes = ['/', '/login', '/signup', '/opengraph-image', '/twitter-image', '/favicon.ico'];
-const publicPrefixes = ['/portal/', '/api/portal/'];
+const publicPrefixes = ['/portal/', '/api/portal/', '/api/debug/'];
 
 function isPublicRoute(pathname: string): boolean {
   if (publicRoutes.includes(pathname)) return true;
