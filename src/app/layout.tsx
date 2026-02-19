@@ -12,9 +12,9 @@ export const metadata: Metadata = {
   icons: {
     icon: '/favicon.svg',
   },
-  metadataBase: process.env.NEXT_PUBLIC_APP_URL
-    ? new URL(process.env.NEXT_PUBLIC_APP_URL)
-    : undefined,
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_APP_URL || 'https://smartcoi.io'
+  ),
   openGraph: {
     title: 'SmartCOI',
     description:

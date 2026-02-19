@@ -1,7 +1,5 @@
 import { ImageResponse } from 'next/og';
 
-export const runtime = 'edge';
-
 export const alt = 'SmartCOI — AI-Powered COI Compliance Tracking';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
@@ -21,7 +19,7 @@ export default function OGImage() {
           fontFamily: 'system-ui, -apple-system, sans-serif',
         }}
       >
-        {/* Logo */}
+        {/* Logo mark + wordmark */}
         <div
           style={{
             display: 'flex',
@@ -30,33 +28,30 @@ export default function OGImage() {
             marginBottom: 40,
           }}
         >
-          {/* Logo icon — rounded square with document checkmark */}
-          <svg
-            width="88"
-            height="88"
-            viewBox="0 0 96 96"
-            fill="none"
+          {/* Simplified logo icon — green rounded square with white checkmark */}
+          <div
+            style={{
+              width: 88,
+              height: 88,
+              borderRadius: 18,
+              background: 'linear-gradient(135deg, #73E2A7, #5CC98E)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
           >
-            <defs>
-              <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#73E2A7" />
-                <stop offset="100%" stopColor="#5CC98E" />
-              </linearGradient>
-            </defs>
-            <rect width="96" height="96" rx="19" fill="url(#g)" />
-            <g
-              transform="translate(24, 20)"
-              stroke="white"
-              strokeWidth="4"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              fill="none"
-            >
-              <path d="M28 4H12C9.79 4 8 5.79 8 8V48C8 50.21 9.79 52 12 52H36C38.21 52 40 50.21 40 48V16L28 4Z" />
-              <path d="M28 4V16H40" />
-              <path d="M16 32L22 38L32 28" />
-            </g>
-          </svg>
+            {/* Checkmark using CSS borders */}
+            <div
+              style={{
+                width: 36,
+                height: 20,
+                borderLeft: '5px solid white',
+                borderBottom: '5px solid white',
+                transform: 'rotate(-45deg)',
+                marginBottom: 8,
+              }}
+            />
+          </div>
           <span
             style={{
               fontSize: 56,
@@ -75,8 +70,7 @@ export default function OGImage() {
           style={{
             fontSize: 28,
             fontWeight: 500,
-            color: '#ffffff',
-            opacity: 0.95,
+            color: 'rgba(255,255,255,0.95)',
             letterSpacing: '0.01em',
           }}
         >
