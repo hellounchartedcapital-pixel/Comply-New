@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { createOrgAfterSignup } from '@/lib/actions/auth';
 import { StepOrgSetup, type OrgSetupData } from '@/components/onboarding/step-org-setup';
 import { StepProperty, type PropertyData } from '@/components/onboarding/step-property';
 import { StepTemplates, type SelectedTemplate } from '@/components/onboarding/step-templates';
@@ -84,20 +85,18 @@ export default function OnboardingSetupPage() {
   }, [supabase, router]);
 
   // Helper: ensure org and user profile exist, return orgId
-  // Uses a SECURITY DEFINER database function to bypass RLS
+  // Uses a server action with service role to bypass RLS
   async function ensureOrgAndProfile(companyName: string): Promise<string> {
     // If we already have an orgId, just return it
     if (orgId) return orgId;
 
     if (!authUserIdRef.current) throw new Error('Not authenticated. Please refresh and try again.');
 
-    const { data: newOrgId, error } = await supabase.rpc('create_org_and_profile', {
-      org_name: companyName,
-      user_email: authEmailRef.current ?? '',
-      user_full_name: authNameRef.current ?? '',
-    });
-
-    if (error) throw new Error(`Failed to create organization: ${error.message}`);
+    const { orgId: newOrgId } = await createOrgAfterSignup(
+      authUserIdRef.current,
+      authEmailRef.current ?? '',
+      authNameRef.current ?? '',
+    );
 
     setOrgId(newOrgId);
     return newOrgId;
