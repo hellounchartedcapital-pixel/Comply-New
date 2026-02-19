@@ -38,7 +38,7 @@ export function BillingClient({
 }: BillingClientProps) {
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState<string | null>(null);
-  const [interval, setInterval] = useState<BillingInterval>('monthly');
+  const [interval, setInterval] = useState<BillingInterval>('annual');
 
   // Show toasts for success/canceled query params
   useEffect(() => {
