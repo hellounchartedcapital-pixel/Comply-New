@@ -21,7 +21,7 @@ type BillingInterval = 'monthly' | 'annual';
 /* ─── Component ─── */
 
 export function PricingSection() {
-  const [interval, setInterval] = useState<BillingInterval>('monthly');
+  const [interval, setInterval] = useState<BillingInterval>('annual');
   const isAnnual = interval === 'annual';
 
   const starterPrice = isAnnual ? 79 : 99;
