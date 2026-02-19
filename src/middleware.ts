@@ -2,7 +2,7 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
 // Routes that don't require authentication
-const publicRoutes = ['/', '/login', '/signup'];
+const publicRoutes = ['/', '/login', '/signup', '/opengraph-image', '/twitter-image', '/favicon.ico'];
 const publicPrefixes = ['/portal/', '/api/portal/'];
 
 function isPublicRoute(pathname: string): boolean {
