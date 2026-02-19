@@ -96,6 +96,8 @@ export type ActivityAction =
 export interface Organization {
   id: string;
   name: string;
+  plan: string;
+  trial_ends_at: string | null;
   settings: OrganizationSettings;
   created_at: string;
   updated_at: string;

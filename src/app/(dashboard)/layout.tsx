@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { DashboardShell } from '@/components/dashboard/sidebar';
+import { TrialBanner } from '@/components/dashboard/trial-banner';
 
 export default async function DashboardLayout({
   children,
@@ -25,14 +26,18 @@ export default async function DashboardLayout({
     .single();
 
   let orgName = 'My Organization';
+  let orgPlan = 'trial';
+  let trialEndsAt: string | null = null;
   let onboardingCompleted = false;
   if (profile?.organization_id) {
     const { data: org } = await supabase
       .from('organizations')
-      .select('name, settings')
+      .select('name, settings, plan, trial_ends_at')
       .eq('id', profile.organization_id)
       .single();
     if (org?.name) orgName = org.name;
+    orgPlan = org?.plan ?? 'trial';
+    trialEndsAt = org?.trial_ends_at ?? null;
     onboardingCompleted = org?.settings?.onboarding_completed === true;
   }
 
@@ -47,6 +52,7 @@ export default async function DashboardLayout({
         userName={profile?.full_name ?? null}
         userEmail={profile?.email ?? user.email ?? ''}
         orgName={orgName}
+        topBanner={<TrialBanner plan={orgPlan} trialEndsAt={trialEndsAt} />}
       >
         {children}
       </DashboardShell>

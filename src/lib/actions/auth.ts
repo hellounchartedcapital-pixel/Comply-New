@@ -40,10 +40,15 @@ export async function createOrgAfterSignup(
     return { orgId: existing.organization_id };
   }
 
-  // Create organization
+  // Create organization with 14-day trial
+  const trialEndsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
   const { data: org, error: orgError } = await supabase
     .from('organizations')
-    .insert({ name: `${fullName}'s Organization` })
+    .insert({
+      name: `${fullName}'s Organization`,
+      plan: 'trial',
+      trial_ends_at: trialEndsAt,
+    })
     .select('id')
     .single();
 

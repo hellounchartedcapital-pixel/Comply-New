@@ -9,6 +9,7 @@ import {
   FileCheck,
   Bell,
   Settings,
+  CreditCard,
   LogOut,
   PanelLeftClose,
   PanelLeftOpen,
@@ -26,10 +27,13 @@ const navItems = [
   { label: 'Templates', href: '/dashboard/templates', icon: FileCheck },
   { label: 'Notifications', href: '/dashboard/notifications', icon: Bell },
   { label: 'Settings', href: '/dashboard/settings', icon: Settings },
+  { label: 'Billing', href: '/dashboard/settings/billing', icon: CreditCard },
 ] as const;
 
 function getPageTitle(pathname: string): string {
-  const match = navItems.find(
+  // Sort by longest href first so more-specific routes match before parents
+  const sorted = [...navItems].sort((a, b) => b.href.length - a.href.length);
+  const match = sorted.find(
     (item) =>
       pathname === item.href ||
       (item.href !== '/dashboard' && pathname.startsWith(item.href + '/'))
@@ -41,6 +45,7 @@ interface DashboardShellProps {
   userName: string | null;
   userEmail: string;
   orgName: string;
+  topBanner?: React.ReactNode;
   children: React.ReactNode;
 }
 
@@ -48,6 +53,7 @@ export function DashboardShell({
   userName,
   userEmail,
   orgName,
+  topBanner,
   children,
 }: DashboardShellProps) {
   const pathname = usePathname();
@@ -132,10 +138,19 @@ export function DashboardShell({
         <nav className="flex-1 overflow-y-auto px-2 py-4">
           <ul className="space-y-1">
             {navItems.map((item) => {
-              const isActive =
+              // Check if this item matches the current path
+              const matches =
                 pathname === item.href ||
                 (item.href !== '/dashboard' &&
                   pathname.startsWith(item.href + '/'));
+              // If a more-specific nav item also matches, this one shouldn't be active
+              const hasMoreSpecificMatch = matches && navItems.some(
+                (other) =>
+                  other.href !== item.href &&
+                  other.href.startsWith(item.href + '/') &&
+                  (pathname === other.href || pathname.startsWith(other.href + '/'))
+              );
+              const isActive = matches && !hasMoreSpecificMatch;
               const Icon = item.icon;
               return (
                 <li key={item.href}>
@@ -235,6 +250,9 @@ export function DashboardShell({
           </button>
           <h1 className="text-sm font-semibold text-slate-950">{pageTitle}</h1>
         </header>
+
+        {/* Trial / plan banner */}
+        {topBanner}
 
         {/* Scrollable content */}
         <main className="flex-1 overflow-y-auto bg-slate-50 p-4 md:p-6">
