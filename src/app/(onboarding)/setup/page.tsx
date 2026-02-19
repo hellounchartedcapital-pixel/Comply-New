@@ -62,19 +62,15 @@ export default function OnboardingSetupPage() {
       if (profile?.organization_id) {
         setOrgId(profile.organization_id);
 
-        // Check if onboarding is already completed
+        // Onboarding-complete redirect is handled by the server layout
+        // (src/app/(onboarding)/layout.tsx) to avoid server/client mismatch loops.
+        // Here we only pre-fill the company name if the org already exists.
         const { data: org } = await supabase
           .from('organizations')
-          .select('name, settings')
+          .select('name')
           .eq('id', profile.organization_id)
           .single();
 
-        if (org?.settings?.onboarding_completed) {
-          router.push('/dashboard');
-          return;
-        }
-
-        // Pre-fill company name if already set
         if (org?.name && !org.name.endsWith("'s Organization")) {
           setOrgData((prev) => ({ ...prev, companyName: org.name }));
         }

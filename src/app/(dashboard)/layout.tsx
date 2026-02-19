@@ -33,10 +33,11 @@ export default async function DashboardLayout({
       .eq('id', profile.organization_id)
       .single();
     if (org?.name) orgName = org.name;
-    onboardingCompleted = !!org?.settings?.onboarding_completed;
+    onboardingCompleted = org?.settings?.onboarding_completed === true;
   }
 
   if (!onboardingCompleted) {
+    console.log('[DashboardLayout] Redirecting to /setup — profile exists:', !!profile, 'orgId:', profile?.organization_id ?? 'none', 'onboardingCompleted:', onboardingCompleted);
     redirect('/setup');
   }
 

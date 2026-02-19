@@ -16,6 +16,28 @@ export default async function OnboardingLayout({
     redirect('/login');
   }
 
+  // If the user already completed onboarding, send them to the dashboard.
+  // This server-side guard prevents a redirect loop between /dashboard and /setup
+  // (dashboard layout redirects here if !onboardingCompleted, so this layout
+  // must redirect back only when onboarding IS completed).
+  const { data: profile } = await supabase
+    .from('users')
+    .select('organization_id')
+    .eq('id', user.id)
+    .single();
+
+  if (profile?.organization_id) {
+    const { data: org } = await supabase
+      .from('organizations')
+      .select('settings')
+      .eq('id', profile.organization_id)
+      .single();
+
+    if (org?.settings?.onboarding_completed === true) {
+      redirect('/dashboard');
+    }
+  }
+
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Header with logo */}
