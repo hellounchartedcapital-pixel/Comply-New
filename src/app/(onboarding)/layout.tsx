@@ -33,7 +33,8 @@ export default async function OnboardingLayout({
       .eq('id', profile.organization_id)
       .single();
 
-    if (org?.settings?.onboarding_completed === true) {
+    const raw = org?.settings?.onboarding_completed;
+    if (raw === true || raw === 'true') {
       redirect('/dashboard');
     }
   }

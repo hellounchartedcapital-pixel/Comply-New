@@ -29,6 +29,7 @@ export default async function DashboardLayout({
   let orgPlan = 'trial';
   let trialEndsAt: string | null = null;
   let onboardingCompleted = false;
+  let rawSettings: unknown = null;
   if (profile?.organization_id) {
     const { data: org } = await supabase
       .from('organizations')
@@ -38,11 +39,13 @@ export default async function DashboardLayout({
     if (org?.name) orgName = org.name;
     orgPlan = org?.plan ?? 'trial';
     trialEndsAt = org?.trial_ends_at ?? null;
-    onboardingCompleted = org?.settings?.onboarding_completed === true;
+    rawSettings = org?.settings;
+    const raw = org?.settings?.onboarding_completed;
+    onboardingCompleted = raw === true || raw === 'true';
   }
 
   if (!onboardingCompleted) {
-    console.log('[DashboardLayout] Redirecting to /setup — profile exists:', !!profile, 'orgId:', profile?.organization_id ?? 'none', 'onboardingCompleted:', onboardingCompleted);
+    console.log('[DashboardLayout] Redirecting to /setup — profile:', !!profile, 'orgId:', profile?.organization_id ?? 'none', 'settings:', JSON.stringify(rawSettings));
     redirect('/setup');
   }
 
