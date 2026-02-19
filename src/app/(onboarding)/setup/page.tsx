@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { createOrgAfterSignup } from '@/lib/actions/auth';
+import { createOrgAfterSignup, completeOnboarding } from '@/lib/actions/auth';
 import { StepOrgSetup, type OrgSetupData } from '@/components/onboarding/step-org-setup';
 import { StepProperty, type PropertyData } from '@/components/onboarding/step-property';
 import { StepTemplates, type SelectedTemplate } from '@/components/onboarding/step-templates';
@@ -278,6 +278,9 @@ export default function OnboardingSetupPage() {
   }
 
   // Step 4: Finish onboarding
+  // Uses a server action with service role to bypass RLS — the client-side
+  // UPDATE on organizations can be silently blocked by RLS (0 rows affected,
+  // no error), causing onboarding_completed to never be set.
   async function handleFinish() {
     if (!orgId) {
       setError('Organization not set up. Please go back to Step 1.');
@@ -287,24 +290,7 @@ export default function OnboardingSetupPage() {
     setError(null);
 
     try {
-      // Get current settings
-      const { data: org } = await supabase
-        .from('organizations')
-        .select('settings')
-        .eq('id', orgId)
-        .single();
-
-      const currentSettings = org?.settings || {};
-
-      // Set onboarding_completed flag
-      const { error: updateError } = await supabase
-        .from('organizations')
-        .update({
-          settings: { ...currentSettings, onboarding_completed: true },
-        })
-        .eq('id', orgId);
-
-      if (updateError) throw updateError;
+      await completeOnboarding(orgId);
 
       router.push('/dashboard');
       router.refresh();

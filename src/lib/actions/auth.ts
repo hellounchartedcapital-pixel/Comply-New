@@ -80,3 +80,36 @@ export async function createOrgAfterSignup(
 
   return { orgId: org.id };
 }
+
+/**
+ * Mark onboarding as completed for an organization.
+ *
+ * Uses the service role client to bypass RLS — the client-side UPDATE on the
+ * organizations table can be silently blocked by RLS (returns no error but
+ * 0 rows affected), causing the onboarding_completed flag to never be set
+ * and a redirect loop between /dashboard and /setup.
+ */
+export async function completeOnboarding(orgId: string): Promise<void> {
+  const supabase = createServiceClient();
+
+  // Read current settings
+  const { data: org } = await supabase
+    .from('organizations')
+    .select('settings')
+    .eq('id', orgId)
+    .single();
+
+  const currentSettings = (org?.settings as Record<string, unknown>) || {};
+
+  // Write onboarding_completed: true (boolean)
+  const { error } = await supabase
+    .from('organizations')
+    .update({
+      settings: { ...currentSettings, onboarding_completed: true },
+    })
+    .eq('id', orgId);
+
+  if (error) {
+    throw new Error(`Failed to complete onboarding: ${error.message}`);
+  }
+}
