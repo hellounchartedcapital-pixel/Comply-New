@@ -169,16 +169,19 @@ export default async function PortalPage({ params }: PortalPageProps) {
     // Get entity compliance gaps
     const { data: entityGaps } = await supabase
       .from('entity_compliance_results')
-      .select('match_details, status, property_entity:property_entities(entity_name, entity_type)')
+      .select('match_details, status, property_entity:property_entities(entity_name, entity_address, entity_type)')
       .eq('certificate_id', latestCert.id)
       .in('status', ['missing', 'partial_match']);
 
     if (entityGaps && entityGaps.length > 0) {
       for (const eg of entityGaps as EntityComplianceGap[]) {
-        const pe = eg.property_entity?.[0];
-        if (pe) {
-          const label = pe.entity_type === 'additional_insured' ? 'Additional Insured' : 'Certificate Holder';
-          complianceGaps.push(`Missing ${label}: ${pe.entity_name}`);
+        const pe = eg.property_entity?.[0] as unknown as { entity_name: string; entity_address?: string | null; entity_type: string } | undefined;
+        if (!pe) continue;
+        if (pe.entity_type === 'additional_insured') {
+          complianceGaps.push(`Your certificate needs to list ${pe.entity_name} as an Additional Insured. Please ask your insurance broker to add this endorsement.`);
+        } else {
+          const addr = pe.entity_address ? `, ${pe.entity_address}` : '';
+          complianceGaps.push(`The Certificate Holder on your COI should be listed as: ${pe.entity_name}${addr}`);
         }
       }
     }
@@ -194,12 +197,7 @@ export default async function PortalPage({ params }: PortalPageProps) {
       {/* Header */}
       <header className="bg-white border-b border-gray-200">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-5 flex items-center gap-3">
-          <div className="h-8 w-8 rounded-lg bg-emerald-500 flex items-center justify-center flex-shrink-0">
-            <svg className="h-5 w-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M9 12l2 2 4-4" />
-              <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z" />
-            </svg>
-          </div>
+          <img src="/logo-icon.svg" alt="SmartCOI" className="h-8 w-8 flex-shrink-0" />
           <span className="text-lg font-bold text-gray-900 tracking-tight">SmartCOI</span>
         </div>
       </header>
@@ -350,12 +348,7 @@ function PortalErrorPage({ message }: { message: string }) {
       {/* Header */}
       <header className="bg-white border-b border-gray-200">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-5 flex items-center gap-3">
-          <div className="h-8 w-8 rounded-lg bg-emerald-500 flex items-center justify-center flex-shrink-0">
-            <svg className="h-5 w-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M9 12l2 2 4-4" />
-              <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z" />
-            </svg>
-          </div>
+          <img src="/logo-icon.svg" alt="SmartCOI" className="h-8 w-8 flex-shrink-0" />
           <span className="text-lg font-bold text-gray-900 tracking-tight">SmartCOI</span>
         </div>
       </header>

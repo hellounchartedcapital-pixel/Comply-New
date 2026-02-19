@@ -135,7 +135,7 @@ export async function sendManualFollowUp(
     if (prop) propertyName = prop.name;
   }
 
-  // Get compliance gaps
+  // Get compliance gaps (coverage + entity)
   const gaps: string[] = [];
   const { data: latestCert } = await supabase
     .from('certificates')
@@ -147,6 +147,7 @@ export async function sendManualFollowUp(
     .single();
 
   if (latestCert) {
+    // Coverage gaps
     const { data: results } = await supabase
       .from('compliance_results')
       .select('gap_description')
@@ -155,6 +156,24 @@ export async function sendManualFollowUp(
       .not('gap_description', 'is', null);
     for (const r of results ?? []) {
       if (r.gap_description) gaps.push(r.gap_description);
+    }
+
+    // Entity gaps (missing additional insured / certificate holder)
+    const { data: entityGaps } = await supabase
+      .from('entity_compliance_results')
+      .select('status, property_entity:property_entities(entity_name, entity_address, entity_type)')
+      .eq('certificate_id', latestCert.id)
+      .in('status', ['missing', 'partial_match']);
+
+    for (const eg of entityGaps ?? []) {
+      const pe = (eg.property_entity as unknown as { entity_name: string; entity_address: string | null; entity_type: string }[] | null)?.[0];
+      if (!pe) continue;
+      if (pe.entity_type === 'additional_insured') {
+        gaps.push(`Your certificate needs to list ${pe.entity_name} as an Additional Insured. Please ask your insurance broker to add this endorsement.`);
+      } else {
+        const addr = pe.entity_address ? `, ${pe.entity_address}` : '';
+        gaps.push(`The Certificate Holder on your COI should be listed as: ${pe.entity_name}${addr}`);
+      }
     }
   }
 
