@@ -117,30 +117,28 @@ export function COIHistory({ certificates }: COIHistoryProps) {
                   </p>
                 )}
               </Link>
-              {cert.file_path && (
-                <div className="flex shrink-0 gap-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 w-7 p-0"
-                    title="View PDF"
-                    disabled={isLoading}
-                    onClick={() => handleViewPdf(cert.id)}
-                  >
-                    <Eye className="h-3.5 w-3.5" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 w-7 p-0"
-                    title="Download"
-                    disabled={isLoading}
-                    onClick={() => handleDownload(cert.id)}
-                  >
-                    <Download className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              )}
+              <div className="flex shrink-0 gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 w-7 p-0"
+                  title={cert.file_path ? 'View PDF' : 'No file available'}
+                  disabled={isLoading || !cert.file_path}
+                  onClick={() => handleViewPdf(cert.id)}
+                >
+                  <Eye className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 w-7 p-0"
+                  title={cert.file_path ? 'Download' : 'No file available'}
+                  disabled={isLoading || !cert.file_path}
+                  onClick={() => handleDownload(cert.id)}
+                >
+                  <Download className="h-3.5 w-3.5" />
+                </Button>
+              </div>
             </div>
           );
         })}

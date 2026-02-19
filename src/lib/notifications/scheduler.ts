@@ -233,7 +233,7 @@ export async function checkAndScheduleNotifications(): Promise<number> {
           // Determine if the certificate is expired
           const isExpired = entity.compliance_status === 'expired';
 
-          // Fetch gaps
+          // Fetch coverage gaps
           const { data: gapResults } = await supabase
             .from('compliance_results')
             .select('gap_description')
@@ -242,6 +242,25 @@ export async function checkAndScheduleNotifications(): Promise<number> {
             .not('gap_description', 'is', null);
 
           const gaps = (gapResults ?? []).map((r) => r.gap_description!);
+
+          // Fetch entity gaps (missing additional insured / certificate holder)
+          const { data: entityGapResults } = await supabase
+            .from('entity_compliance_results')
+            .select('status, property_entity:property_entities(entity_name, entity_address, entity_type)')
+            .eq('certificate_id', certId)
+            .in('status', ['missing', 'partial_match']);
+
+          for (const eg of entityGapResults ?? []) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const pe = (eg.property_entity as any)?.[0];
+            if (!pe) continue;
+            if (pe.entity_type === 'additional_insured') {
+              gaps.push(`Your certificate needs to list ${pe.entity_name} as an Additional Insured. Please ask your insurance broker to add this endorsement.`);
+            } else {
+              const addr = pe.entity_address ? `, ${pe.entity_address}` : '';
+              gaps.push(`The Certificate Holder on your COI should be listed as: ${pe.entity_name}${addr}`);
+            }
+          }
 
           // When expired, prepend "Certificate expired on [date]" as the first gap item
           if (isExpired && earliestExp) {
