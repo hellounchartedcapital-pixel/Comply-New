@@ -21,6 +21,7 @@
     "@radix-ui/react-switch": "^1.2.6",
     "@radix-ui/react-tabs": "^1.1.13",
     "@radix-ui/react-tooltip": "^1.2.8",
+    "@stripe/stripe-js": "^8.7.0",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.49.1",
     "class-variance-authority": "^0.7.1",
@@ -31,6 +32,7 @@
     "react-dom": "^19.0.0",
     "resend": "^6.9.2",
     "sonner": "^1.7.4",
+    "stripe": "^20.3.1",
     "tailwind-merge": "^2.6.0",
     "tailwindcss-animate": "^1.0.7"
   },

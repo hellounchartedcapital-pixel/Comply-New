@@ -29,16 +29,18 @@ export default async function DashboardLayout({
   let orgName = 'My Organization';
   let orgPlan = 'trial';
   let trialEndsAt: string | null = null;
+  let paymentFailed = false;
   let onboardingCompleted = false;
   if (profile?.organization_id) {
     const { data: org } = await supabase
       .from('organizations')
-      .select('name, settings, plan, trial_ends_at')
+      .select('name, settings, plan, trial_ends_at, payment_failed')
       .eq('id', profile.organization_id)
       .single();
     if (org?.name) orgName = org.name;
     orgPlan = org?.plan ?? 'trial';
     trialEndsAt = org?.trial_ends_at ?? null;
+    paymentFailed = org?.payment_failed ?? false;
 
     // Use the service-role-based check which also has a property/vendor fallback
     // and auto-fixes stale data. This bypasses any RLS issues with reading settings.
@@ -56,7 +58,7 @@ export default async function DashboardLayout({
         userName={profile?.full_name ?? null}
         userEmail={profile?.email ?? user.email ?? ''}
         orgName={orgName}
-        topBanner={<TrialBanner plan={orgPlan} trialEndsAt={trialEndsAt} />}
+        topBanner={<TrialBanner plan={orgPlan} trialEndsAt={trialEndsAt} paymentFailed={paymentFailed} />}
       >
         {children}
       </DashboardShell>

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
+import { checkVendorTenantLimit } from '@/lib/plan-limits';
 import type { PropertyType, EntityType } from '@/types';
 
 // ---------------------------------------------------------------------------
@@ -217,6 +218,10 @@ export interface CreateVendorInput {
 export async function createVendor(input: CreateVendorInput) {
   const { supabase, userId, orgId } = await getAuthContext();
 
+  // Enforce plan limits
+  const limitCheck = await checkVendorTenantLimit(orgId);
+  if (!limitCheck.allowed) throw new Error(limitCheck.error);
+
   const { data, error } = await supabase
     .from('vendors')
     .insert({
@@ -295,6 +300,10 @@ export interface CreateTenantInput {
 
 export async function createTenant(input: CreateTenantInput) {
   const { supabase, userId, orgId } = await getAuthContext();
+
+  // Enforce plan limits
+  const limitCheck = await checkVendorTenantLimit(orgId);
+  if (!limitCheck.allowed) throw new Error(limitCheck.error);
 
   const { data, error } = await supabase
     .from('tenants')

@@ -99,6 +99,9 @@ export interface Organization {
   plan: string;
   trial_ends_at: string | null;
   settings: OrganizationSettings;
+  stripe_customer_id: string | null;
+  stripe_subscription_id: string | null;
+  payment_failed: boolean;
   created_at: string;
   updated_at: string;
 }

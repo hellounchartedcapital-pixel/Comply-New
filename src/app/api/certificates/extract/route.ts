@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { extractCOIFromPDF } from '@/lib/ai/extraction';
+import { checkExtractionLimit } from '@/lib/plan-limits';
 
 /**
  * Create a Supabase client with the service role key for storage access.
@@ -76,6 +77,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No organization found' }, { status: 403 });
     }
     const orgId = profile.organization_id;
+
+    // ---- Plan limit check ----
+    const limitCheck = await checkExtractionLimit(orgId);
+    if (!limitCheck.allowed) {
+      return NextResponse.json({ error: limitCheck.error }, { status: 403 });
+    }
 
     // ---- Parse body ----
     const { certificateId } = await req.json();

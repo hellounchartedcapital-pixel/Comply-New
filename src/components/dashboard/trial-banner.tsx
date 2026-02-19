@@ -2,16 +2,17 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { X, Clock, AlertTriangle } from 'lucide-react';
+import { X, Clock, AlertTriangle, CreditCard } from 'lucide-react';
 
 const DISMISSED_KEY = 'smartcoi-trial-banner-dismissed';
 
 interface TrialBannerProps {
   plan: string;
   trialEndsAt: string | null;
+  paymentFailed?: boolean;
 }
 
-export function TrialBanner({ plan, trialEndsAt }: TrialBannerProps) {
+export function TrialBanner({ plan, trialEndsAt, paymentFailed }: TrialBannerProps) {
   const [dismissed, setDismissed] = useState(false);
 
   // Hydrate dismissed state from sessionStorage
@@ -20,6 +21,24 @@ export function TrialBanner({ plan, trialEndsAt }: TrialBannerProps) {
       setDismissed(true);
     }
   }, []);
+
+  // Payment failed banner — NOT dismissible, takes priority
+  if (paymentFailed) {
+    return (
+      <div className="flex items-center justify-center gap-2 border-b border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-800">
+        <CreditCard className="h-4 w-4 flex-shrink-0 text-red-600" />
+        <span className="font-medium">
+          Your last payment failed. Please update your payment method to avoid service interruption.
+        </span>
+        <Link
+          href="/dashboard/settings/billing"
+          className="ml-2 inline-flex items-center rounded-md bg-red-600 px-3 py-1 text-xs font-semibold text-white transition-colors hover:bg-red-700"
+        >
+          Update Payment Method
+        </Link>
+      </div>
+    );
+  }
 
   // Don't show for non-trial plans
   if (plan !== 'trial') return null;
