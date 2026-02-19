@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { createOrgAfterSignup } from '@/lib/actions/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -45,15 +46,14 @@ export default function SignUpPage() {
         return;
       }
 
-      // 2. Create organization + user profile via SECURITY DEFINER function
-      const { error: setupError } = await supabase.rpc('create_org_and_profile', {
-        org_name: `${fullName}'s Organization`,
-        user_email: email,
-        user_full_name: fullName,
-      });
-
-      if (setupError) {
-        setError('Account created but failed to set up organization. Please contact support.');
+      // 2. Create organization + user profile via server action (uses service
+      //    role to bypass RLS — needed because the session may not be
+      //    established yet when email confirmation is enabled)
+      try {
+        await createOrgAfterSignup(authData.user.id, email, fullName);
+      } catch (setupErr) {
+        console.error('Org setup error:', setupErr);
+        setError('Account created but failed to set up organization. Please try logging in or contact support.');
         setLoading(false);
         return;
       }
