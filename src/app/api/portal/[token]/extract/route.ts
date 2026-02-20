@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/service';
+import { extractCOIFromPDF } from '@/lib/ai/extraction';
 
 interface TokenData {
   id: string;
@@ -88,14 +89,13 @@ export async function POST(
       );
     }
 
-    // Download the PDF from storage to get base64
-    // Extract the storage path from the public URL
+    // Download the PDF from storage
+    // Normalize path: strip public URL prefixes if stored as full URL
     const publicUrlPrefix = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/coi-documents/`;
     let storagePath = cert.file_path;
     if (storagePath.startsWith(publicUrlPrefix)) {
       storagePath = storagePath.slice(publicUrlPrefix.length);
     } else if (storagePath.startsWith('http')) {
-      // Try to extract path after /coi-documents/
       const idx = storagePath.indexOf('/coi-documents/');
       if (idx !== -1) {
         storagePath = storagePath.slice(idx + '/coi-documents/'.length);
@@ -107,7 +107,6 @@ export async function POST(
       .download(storagePath);
 
     if (downloadError || !fileData) {
-      // Update certificate status to failed
       await supabase
         .from('certificates')
         .update({ processing_status: 'failed' })
@@ -119,216 +118,59 @@ export async function POST(
       );
     }
 
-    // Convert to base64
+    // Convert to base64 and extract using the shared AI extraction
     const arrayBuffer = await fileData.arrayBuffer();
     const base64 = Buffer.from(arrayBuffer).toString('base64');
 
-    // Call the extract-coi edge function
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+    const result = await extractCOIFromPDF(base64);
 
-    const extractResponse = await fetch(`${supabaseUrl}/functions/v1/extract-coi`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${serviceKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        file_base64: base64,
-        file_name: storagePath.split('/').pop() ?? 'certificate.pdf',
-      }),
-    });
-
-    if (!extractResponse.ok) {
+    if (!result.success) {
       await supabase
         .from('certificates')
         .update({ processing_status: 'failed' })
         .eq('id', certificate_id);
 
       return NextResponse.json(
-        { error: 'Failed to process your document. Please try again.' },
-        { status: 500 }
+        { error: result.userMessage ?? 'Failed to process your document. Please try again.' },
+        { status: 422 }
       );
     }
-
-    const extractResult = await extractResponse.json();
-
-    if (!extractResult.success) {
-      await supabase
-        .from('certificates')
-        .update({ processing_status: 'failed' })
-        .eq('id', certificate_id);
-
-      return NextResponse.json(
-        { error: 'Failed to process your document. Please try again.' },
-        { status: 500 }
-      );
-    }
-
-    const data = extractResult.data;
 
     // Store extracted coverages
-    const coverages: Record<string, unknown>[] = [];
-
-    if (data.general_liability_per_occurrence != null) {
-      const policy = data.policies?.find((p: { coverage_type: string }) =>
-        p.coverage_type?.toLowerCase().includes('general')
-      );
-      coverages.push({
+    if (result.coverages.length > 0) {
+      const coverageRows = result.coverages.map((c) => ({
         certificate_id,
-        coverage_type: 'general_liability',
-        carrier_name: policy?.carrier ?? null,
-        policy_number: policy?.policy_number ?? null,
-        limit_amount: data.general_liability_per_occurrence,
-        limit_type: 'per_occurrence',
-        effective_date: policy?.effective_date ?? null,
-        expiration_date: policy?.expiration_date ?? null,
-        additional_insured_listed: (data.additional_insured_names?.length ?? 0) > 0,
-        additional_insured_entities: data.additional_insured_names ?? [],
-        waiver_of_subrogation: false,
-        confidence_flag: true,
-      });
-    }
-
-    if (data.general_liability_aggregate != null) {
-      const policy = data.policies?.find((p: { coverage_type: string }) =>
-        p.coverage_type?.toLowerCase().includes('general')
-      );
-      coverages.push({
-        certificate_id,
-        coverage_type: 'general_liability',
-        carrier_name: policy?.carrier ?? null,
-        policy_number: policy?.policy_number ?? null,
-        limit_amount: data.general_liability_aggregate,
-        limit_type: 'aggregate',
-        effective_date: policy?.effective_date ?? null,
-        expiration_date: policy?.expiration_date ?? null,
-        additional_insured_listed: false,
-        additional_insured_entities: [],
-        waiver_of_subrogation: false,
-        confidence_flag: true,
-      });
-    }
-
-    if (data.auto_liability != null) {
-      const policy = data.policies?.find((p: { coverage_type: string }) =>
-        p.coverage_type?.toLowerCase().includes('auto')
-      );
-      coverages.push({
-        certificate_id,
-        coverage_type: 'automobile_liability',
-        carrier_name: policy?.carrier ?? null,
-        policy_number: policy?.policy_number ?? null,
-        limit_amount: data.auto_liability,
-        limit_type: 'combined_single_limit',
-        effective_date: policy?.effective_date ?? null,
-        expiration_date: policy?.expiration_date ?? null,
-        additional_insured_listed: false,
-        additional_insured_entities: [],
-        waiver_of_subrogation: false,
-        confidence_flag: true,
-      });
-    }
-
-    if (data.workers_comp_found) {
-      const policy = data.policies?.find((p: { coverage_type: string }) =>
-        p.coverage_type?.toLowerCase().includes('worker')
-      );
-      coverages.push({
-        certificate_id,
-        coverage_type: 'workers_compensation',
-        carrier_name: policy?.carrier ?? null,
-        policy_number: policy?.policy_number ?? null,
-        limit_amount: null,
-        limit_type: 'statutory',
-        effective_date: policy?.effective_date ?? null,
-        expiration_date: policy?.expiration_date ?? null,
-        additional_insured_listed: false,
-        additional_insured_entities: [],
-        waiver_of_subrogation: false,
-        confidence_flag: true,
-      });
-    }
-
-    if (data.employers_liability != null) {
-      const policy = data.policies?.find((p: { coverage_type: string }) =>
-        p.coverage_type?.toLowerCase().includes('employer')
-      );
-      coverages.push({
-        certificate_id,
-        coverage_type: 'employers_liability',
-        carrier_name: policy?.carrier ?? null,
-        policy_number: policy?.policy_number ?? null,
-        limit_amount: data.employers_liability,
-        limit_type: 'per_accident',
-        effective_date: policy?.effective_date ?? null,
-        expiration_date: policy?.expiration_date ?? null,
-        additional_insured_listed: false,
-        additional_insured_entities: [],
-        waiver_of_subrogation: false,
-        confidence_flag: true,
-      });
-    }
-
-    if (data.umbrella_per_occurrence != null || data.umbrella_aggregate != null) {
-      const policy = data.policies?.find((p: { coverage_type: string }) =>
-        p.coverage_type?.toLowerCase().includes('umbrella') ||
-        p.coverage_type?.toLowerCase().includes('excess')
-      );
-      coverages.push({
-        certificate_id,
-        coverage_type: 'umbrella_excess_liability',
-        carrier_name: policy?.carrier ?? null,
-        policy_number: policy?.policy_number ?? null,
-        limit_amount: data.umbrella_per_occurrence ?? data.umbrella_aggregate,
-        limit_type: data.umbrella_per_occurrence ? 'per_occurrence' : 'aggregate',
-        effective_date: policy?.effective_date ?? null,
-        expiration_date: policy?.expiration_date ?? null,
-        additional_insured_listed: false,
-        additional_insured_entities: [],
-        waiver_of_subrogation: false,
-        confidence_flag: true,
-      });
-    }
-
-    // Insert extracted coverages
-    if (coverages.length > 0) {
-      await supabase.from('extracted_coverages').insert(coverages);
-    }
-
-    // Store extracted entities
-    const entities: Record<string, unknown>[] = [];
-
-    if (data.certificate_holder_name) {
-      entities.push({
-        certificate_id,
-        entity_name: data.certificate_holder_name,
-        entity_address: data.certificate_holder_address ?? null,
-        entity_type: 'certificate_holder',
-        confidence_flag: true,
-      });
-    }
-
-    if (data.additional_insured_names?.length) {
-      for (const name of data.additional_insured_names) {
-        entities.push({
-          certificate_id,
-          entity_name: name,
-          entity_address: null,
-          entity_type: 'additional_insured',
-          confidence_flag: true,
-        });
+        ...c,
+      }));
+      const { error: covError } = await supabase
+        .from('extracted_coverages')
+        .insert(coverageRows);
+      if (covError) {
+        console.error('Failed to insert extracted_coverages:', covError);
       }
     }
 
-    if (entities.length > 0) {
-      await supabase.from('extracted_entities').insert(entities);
+    // Store extracted entities
+    if (result.entities.length > 0) {
+      const entityRows = result.entities.map((e) => ({
+        certificate_id,
+        ...e,
+      }));
+      const { error: entError } = await supabase
+        .from('extracted_entities')
+        .insert(entityRows);
+      if (entError) {
+        console.error('Failed to insert extracted_entities:', entError);
+      }
     }
 
-    // Update certificate status
+    // Update certificate status and store insured name
     await supabase
       .from('certificates')
-      .update({ processing_status: 'extracted' })
+      .update({
+        processing_status: 'extracted',
+        ...(result.insuredName ? { insured_name: result.insuredName } : {}),
+      })
       .eq('id', certificate_id);
 
     // Log processing activity
@@ -337,10 +179,10 @@ export async function POST(
       [entityType === 'vendor' ? 'vendor_id' : 'tenant_id']: entityId,
       certificate_id,
       action: 'coi_processed',
-      description: 'COI processed via self-service portal',
+      description: `COI processed via self-service portal — ${result.coverages.length} coverage(s) and ${result.entities.length} entity/entities extracted.`,
     });
 
-    // Notify the PM - get the organization's users
+    // Notify the PM
     const { data: entityInfo } = await supabase
       .from(entityType === 'vendor' ? 'vendors' : 'tenants')
       .select('company_name, organization_id, property_id')
@@ -348,7 +190,6 @@ export async function POST(
       .single();
 
     if (entityInfo) {
-      // Create a notification record for the PM
       const { data: orgUsers } = await supabase
         .from('users')
         .select('id, email')

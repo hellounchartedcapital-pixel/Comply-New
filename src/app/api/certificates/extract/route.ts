@@ -154,7 +154,7 @@ export async function POST(req: NextRequest) {
         .update({ processing_status: 'failed' })
         .eq('id', certificateId);
 
-      // Log failure
+      // Log failure (raw error for debugging)
       await serviceClient.from('activity_log').insert({
         organization_id: orgId,
         certificate_id: certificateId,
@@ -165,7 +165,11 @@ export async function POST(req: NextRequest) {
         performed_by: user.id,
       });
 
-      return NextResponse.json({ error: result.error }, { status: 422 });
+      // Return user-friendly message to the client
+      return NextResponse.json(
+        { error: result.userMessage ?? result.error },
+        { status: 422 }
+      );
     }
 
     // ---- Store extraction results ----

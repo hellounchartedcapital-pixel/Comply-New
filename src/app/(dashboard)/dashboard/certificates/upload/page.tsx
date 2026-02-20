@@ -95,6 +95,7 @@ export default function CertificateUploadPage() {
   // Processing state
   const [uploadStep, setUploadStep] = useState<UploadStep>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [lastCertificateId, setLastCertificateId] = useState<string | null>(null);
 
   // ------ Bootstrap auth & context ------
   useEffect(() => {
@@ -293,6 +294,7 @@ export default function CertificateUploadPage() {
         .single();
 
       if (certError || !cert) throw new Error(`Failed to create certificate record: ${certError?.message}`);
+      setLastCertificateId(cert.id);
 
       // Log upload activity
       await supabase.from('activity_log').insert({
@@ -328,6 +330,42 @@ export default function CertificateUploadPage() {
       }, 1000);
     } catch (err) {
       const message = err instanceof Error ? err.message : "We couldn't process this certificate. Please try uploading a clearer copy.";
+      if (isPlanInactiveError(message)) {
+        showUpgradeModal(message.replace(PLAN_INACTIVE_TAG, '').trim());
+        setUploadStep('idle');
+        return;
+      }
+      setUploadStep('failed');
+      setErrorMessage(message);
+    }
+  };
+
+  // ------ Retry extraction (re-uses already-uploaded cert) ------
+  const handleRetryExtraction = async () => {
+    if (!lastCertificateId) return;
+    setErrorMessage(null);
+    setUploadStep('extracting');
+
+    try {
+      const extractRes = await fetch('/api/certificates/extract', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ certificateId: lastCertificateId }),
+      });
+
+      if (!extractRes.ok) {
+        const body = await extractRes.json().catch(() => ({}));
+        throw new Error(
+          body.error ?? 'AI extraction failed. Please try again.'
+        );
+      }
+
+      setUploadStep('done');
+      setTimeout(() => {
+        router.push(`/dashboard/certificates/${lastCertificateId}/review`);
+      }, 1000);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'AI extraction failed. Please try again.';
       if (isPlanInactiveError(message)) {
         showUpgradeModal(message.replace(PLAN_INACTIVE_TAG, '').trim());
         setUploadStep('idle');
@@ -537,17 +575,43 @@ export default function CertificateUploadPage() {
                   <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-destructive" />
                   <div className="flex-1 space-y-2">
                     <p className="text-sm text-destructive">{errorMessage}</p>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        setUploadStep('idle');
-                        setErrorMessage(null);
-                        removeFile();
-                      }}
-                    >
-                      Try Again
-                    </Button>
+                    <div className="flex gap-2">
+                      {lastCertificateId ? (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={handleRetryExtraction}
+                          >
+                            Retry
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              setUploadStep('idle');
+                              setErrorMessage(null);
+                              setLastCertificateId(null);
+                              removeFile();
+                            }}
+                          >
+                            Choose Different File
+                          </Button>
+                        </>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setUploadStep('idle');
+                            setErrorMessage(null);
+                            removeFile();
+                          }}
+                        >
+                          Try Again
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}
