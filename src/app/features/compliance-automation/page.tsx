@@ -4,7 +4,7 @@ import { Navbar } from '@/components/landing/navbar';
 import { Footer } from '@/components/landing/footer';
 
 export const metadata: Metadata = {
-  title: 'Automated Insurance Compliance for Property Managers | SmartCOI',
+  title: 'Automated Insurance Compliance | SmartCOI',
   description:
     'Automate insurance compliance verification for vendors and tenants. AI checks coverage limits, additional insured, and expiration dates automatically.',
   alternates: {
@@ -19,9 +19,52 @@ export const metadata: Metadata = {
   },
 };
 
+const faqJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: [
+    {
+      '@type': 'Question',
+      name: 'What compliance checks does SmartCOI perform automatically?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'SmartCOI checks coverage types against requirements, compares policy limits to your minimums, verifies additional insured entity names using fuzzy matching, flags expired or expiring policies, and identifies missing endorsements like waiver of subrogation.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'How does SmartCOI handle different limit types?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'The system understands per occurrence, general aggregate, products/completed operations aggregate, combined single limit, statutory, per-accident, and per-employee limits. Each is compared against the correct requirement type.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'Can I customize compliance requirements per vendor type?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'Yes. Create requirement templates for different vendor types (e.g., general contractors, landscapers, janitorial) and assign them per vendor. Templates can specify required coverage types, minimum limits, and endorsement requirements.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'What happens when a compliance gap is found?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'SmartCOI flags the specific gap (e.g., "General Liability per occurrence is $500,000 — your requirement is $1,000,000") and can automatically notify the vendor with a clear explanation and a link to upload an updated certificate.',
+      },
+    },
+  ],
+};
+
 export default function ComplianceAutomationPage() {
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+      />
       <Navbar />
 
       <main className="pt-24 pb-20">
@@ -138,15 +181,56 @@ export default function ComplianceAutomationPage() {
           </div>
         </section>
 
-        {/* Related Features */}
+        {/* FAQ */}
         <section className="mx-auto mt-16 max-w-4xl px-6">
-          <h2 className="text-xl font-bold text-slate-950">Related Features</h2>
-          <div className="mt-4 flex flex-wrap gap-4">
+          <h2 className="text-2xl font-bold text-slate-950 sm:text-3xl">
+            Frequently Asked Questions
+          </h2>
+          <div className="mt-8 space-y-6">
+            {[
+              {
+                q: 'What compliance checks does SmartCOI perform automatically?',
+                a: 'SmartCOI checks coverage types against requirements, compares policy limits to your minimums, verifies additional insured entity names using fuzzy matching, flags expired or expiring policies, and identifies missing endorsements like waiver of subrogation.',
+              },
+              {
+                q: 'How does SmartCOI handle different limit types?',
+                a: 'The system understands per occurrence, general aggregate, products/completed operations aggregate, combined single limit, statutory, per-accident, and per-employee limits. Each is compared against the correct requirement type.',
+              },
+              {
+                q: 'Can I customize compliance requirements per vendor type?',
+                a: 'Yes. Create requirement templates for different vendor types (e.g., general contractors, landscapers, janitorial) and assign them per vendor. Templates can specify required coverage types, minimum limits, and endorsement requirements.',
+              },
+              {
+                q: 'What happens when a compliance gap is found?',
+                a: 'SmartCOI flags the specific gap (e.g., "General Liability per occurrence is $500,000 — your requirement is $1,000,000") and can automatically notify the vendor with a clear explanation and a link to upload an updated certificate.',
+              },
+            ].map((faq) => (
+              <div key={faq.q} className="rounded-xl border border-slate-200 bg-white p-6">
+                <h3 className="text-base font-bold text-slate-950">{faq.q}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-slate-500">{faq.a}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Related Content */}
+        <section className="mx-auto mt-16 max-w-4xl px-6">
+          <h2 className="text-xl font-bold text-slate-950">Related</h2>
+          <div className="mt-4 flex flex-col gap-3">
             <Link href="/features/coi-tracking" className="text-sm font-medium text-[#4CC78A] hover:text-[#3aae72] underline">
               COI Tracking
             </Link>
             <Link href="/features/vendor-management" className="text-sm font-medium text-[#4CC78A] hover:text-[#3aae72] underline">
               Vendor Management
+            </Link>
+            <Link href="/blog/what-is-additional-insured-commercial-real-estate" className="text-sm font-medium text-[#4CC78A] hover:text-[#3aae72] underline">
+              What Does &quot;Additional Insured&quot; Mean in Commercial Real Estate?
+            </Link>
+            <Link href="/blog/coi-expiration-tracking-best-practices" className="text-sm font-medium text-[#4CC78A] hover:text-[#3aae72] underline">
+              COI Expiration Tracking: Best Practices
+            </Link>
+            <Link href="/ai-coi-extraction" className="text-sm font-medium text-[#4CC78A] hover:text-[#3aae72] underline">
+              AI-Powered COI Data Extraction
             </Link>
           </div>
         </section>

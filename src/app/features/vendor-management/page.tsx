@@ -4,7 +4,7 @@ import { Navbar } from '@/components/landing/navbar';
 import { Footer } from '@/components/landing/footer';
 
 export const metadata: Metadata = {
-  title: 'Vendor Certificate of Insurance Management | SmartCOI',
+  title: 'Vendor COI Management | SmartCOI',
   description:
     'Manage vendor COIs effortlessly. Track compliance, automate follow-ups, and give vendors a self-service portal to upload certificates.',
   alternates: {
@@ -19,9 +19,52 @@ export const metadata: Metadata = {
   },
 };
 
+const faqJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: [
+    {
+      '@type': 'Question',
+      name: 'How does the vendor upload portal work?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'Each vendor receives a unique link to their portal page. There, they see your insurance requirements and can upload their certificate PDF directly. No account or login needed — just a link. The AI extracts and checks the certificate automatically.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'Can I pause notifications for specific vendors?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'Yes. You can pause and resume notifications for any individual vendor. This is useful during contract negotiations, seasonal breaks, or when a vendor is being offboarded.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: "What happens when a vendor's certificate expires?",
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'SmartCOI sends automated reminder notifications at configurable intervals before expiration (typically 60, 30, 14, and 7 days). Each reminder explains what needs to be renewed and includes a link to upload the new certificate.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'Can different vendors have different insurance requirements?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'Yes. Create requirement templates by vendor type (landscaping, electrical, janitorial, etc.) and assign the appropriate template to each vendor. Different risk levels get different coverage requirements.',
+      },
+    },
+  ],
+};
+
 export default function VendorManagementPage() {
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+      />
       <Navbar />
 
       <main className="pt-24 pb-20">
@@ -138,15 +181,56 @@ export default function VendorManagementPage() {
           </div>
         </section>
 
-        {/* Related Features */}
+        {/* FAQ */}
         <section className="mx-auto mt-16 max-w-4xl px-6">
-          <h2 className="text-xl font-bold text-slate-950">Related Features</h2>
-          <div className="mt-4 flex flex-wrap gap-4">
+          <h2 className="text-2xl font-bold text-slate-950 sm:text-3xl">
+            Frequently Asked Questions
+          </h2>
+          <div className="mt-8 space-y-6">
+            {[
+              {
+                q: 'How does the vendor upload portal work?',
+                a: 'Each vendor receives a unique link to their portal page. There, they see your insurance requirements and can upload their certificate PDF directly. No account or login needed — just a link. The AI extracts and checks the certificate automatically.',
+              },
+              {
+                q: 'Can I pause notifications for specific vendors?',
+                a: 'Yes. You can pause and resume notifications for any individual vendor. This is useful during contract negotiations, seasonal breaks, or when a vendor is being offboarded.',
+              },
+              {
+                q: 'What happens when a vendor\'s certificate expires?',
+                a: 'SmartCOI sends automated reminder notifications at configurable intervals before expiration (typically 60, 30, 14, and 7 days). Each reminder explains what needs to be renewed and includes a link to upload the new certificate.',
+              },
+              {
+                q: 'Can different vendors have different insurance requirements?',
+                a: 'Yes. Create requirement templates by vendor type (landscaping, electrical, janitorial, etc.) and assign the appropriate template to each vendor. Different risk levels get different coverage requirements.',
+              },
+            ].map((faq) => (
+              <div key={faq.q} className="rounded-xl border border-slate-200 bg-white p-6">
+                <h3 className="text-base font-bold text-slate-950">{faq.q}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-slate-500">{faq.a}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Related Content */}
+        <section className="mx-auto mt-16 max-w-4xl px-6">
+          <h2 className="text-xl font-bold text-slate-950">Related</h2>
+          <div className="mt-4 flex flex-col gap-3">
             <Link href="/features/coi-tracking" className="text-sm font-medium text-[#4CC78A] hover:text-[#3aae72] underline">
               COI Tracking
             </Link>
             <Link href="/features/compliance-automation" className="text-sm font-medium text-[#4CC78A] hover:text-[#3aae72] underline">
               Compliance Automation
+            </Link>
+            <Link href="/blog/cost-of-not-tracking-vendor-insurance" className="text-sm font-medium text-[#4CC78A] hover:text-[#3aae72] underline">
+              The Hidden Cost of Not Tracking Vendor Insurance Compliance
+            </Link>
+            <Link href="/blog/what-is-additional-insured-commercial-real-estate" className="text-sm font-medium text-[#4CC78A] hover:text-[#3aae72] underline">
+              What Does &quot;Additional Insured&quot; Mean in CRE?
+            </Link>
+            <Link href="/vendor-insurance-compliance" className="text-sm font-medium text-[#4CC78A] hover:text-[#3aae72] underline">
+              Vendor Insurance Compliance Overview
             </Link>
           </div>
         </section>

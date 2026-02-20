@@ -4,7 +4,7 @@ import { Navbar } from '@/components/landing/navbar';
 import { Footer } from '@/components/landing/footer';
 
 export const metadata: Metadata = {
-  title: 'COI Tracking Software for Commercial Real Estate | SmartCOI',
+  title: 'COI Tracking for Commercial Real Estate | SmartCOI',
   description:
     'Streamline certificate of insurance tracking for your commercial properties. Upload COIs, get instant AI-powered compliance checks, and track status across your portfolio.',
   alternates: {
@@ -19,9 +19,52 @@ export const metadata: Metadata = {
   },
 };
 
+const faqJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: [
+    {
+      '@type': 'Question',
+      name: 'How long does it take to extract data from a COI?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: "SmartCOI's AI typically extracts all data from a certificate PDF in under 30 seconds. This includes coverage types, policy limits, dates, carriers, and named entities.",
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'Can I track both vendor and tenant COIs in SmartCOI?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'Yes. SmartCOI tracks vendors and tenants in a unified system. Each has their own insurance requirements, compliance status, certificate history, and notification settings.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'What types of insurance certificates does SmartCOI support?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: "SmartCOI supports ACORD 25 (Certificate of Liability Insurance) and handles all standard coverage types including general liability, automobile liability, workers' compensation, umbrella/excess liability, professional liability, and specialty coverages.",
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'Do vendors need an account to upload certificates?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'No. Each vendor receives a unique upload link to a self-service portal. They can see what coverage is required and upload their certificate directly — no account creation needed.',
+      },
+    },
+  ],
+};
+
 export default function COITrackingPage() {
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+      />
       <Navbar />
 
       <main className="pt-24 pb-20">
@@ -128,15 +171,56 @@ export default function COITrackingPage() {
           </div>
         </section>
 
-        {/* Related Features */}
+        {/* FAQ */}
         <section className="mx-auto mt-16 max-w-4xl px-6">
-          <h2 className="text-xl font-bold text-slate-950">Related Features</h2>
-          <div className="mt-4 flex flex-wrap gap-4">
+          <h2 className="text-2xl font-bold text-slate-950 sm:text-3xl">
+            Frequently Asked Questions
+          </h2>
+          <div className="mt-8 space-y-6">
+            {[
+              {
+                q: 'How long does it take to extract data from a COI?',
+                a: 'SmartCOI\'s AI typically extracts all data from a certificate PDF in under 30 seconds. This includes coverage types, policy limits, dates, carriers, and named entities.',
+              },
+              {
+                q: 'Can I track both vendor and tenant COIs in SmartCOI?',
+                a: 'Yes. SmartCOI tracks vendors and tenants in a unified system. Each has their own insurance requirements, compliance status, certificate history, and notification settings.',
+              },
+              {
+                q: 'What types of insurance certificates does SmartCOI support?',
+                a: 'SmartCOI supports ACORD 25 (Certificate of Liability Insurance) and handles all standard coverage types including general liability, automobile liability, workers\' compensation, umbrella/excess liability, professional liability, and specialty coverages.',
+              },
+              {
+                q: 'Do vendors need an account to upload certificates?',
+                a: 'No. Each vendor receives a unique upload link to a self-service portal. They can see what coverage is required and upload their certificate directly — no account creation needed.',
+              },
+            ].map((faq) => (
+              <div key={faq.q} className="rounded-xl border border-slate-200 bg-white p-6">
+                <h3 className="text-base font-bold text-slate-950">{faq.q}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-slate-500">{faq.a}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Related Content */}
+        <section className="mx-auto mt-16 max-w-4xl px-6">
+          <h2 className="text-xl font-bold text-slate-950">Related</h2>
+          <div className="mt-4 flex flex-col gap-3">
             <Link href="/features/compliance-automation" className="text-sm font-medium text-[#4CC78A] hover:text-[#3aae72] underline">
               Automated Compliance Checking
             </Link>
             <Link href="/features/vendor-management" className="text-sm font-medium text-[#4CC78A] hover:text-[#3aae72] underline">
               Vendor Management
+            </Link>
+            <Link href="/blog/coi-compliance-guide-property-managers" className="text-sm font-medium text-[#4CC78A] hover:text-[#3aae72] underline">
+              The Complete Guide to COI Compliance for Property Managers
+            </Link>
+            <Link href="/blog/acord-25-certificate-explained" className="text-sm font-medium text-[#4CC78A] hover:text-[#3aae72] underline">
+              ACORD 25 Certificate of Insurance: A Property Manager&apos;s Guide
+            </Link>
+            <Link href="/coi-tracking-software" className="text-sm font-medium text-[#4CC78A] hover:text-[#3aae72] underline">
+              COI Tracking Software Overview
             </Link>
           </div>
         </section>
