@@ -58,9 +58,10 @@ function ComplianceSummary({
     );
   }
 
-  let colorClass = 'text-status-compliant';
-  if (nonCompliant > 0) colorClass = 'text-status-non-compliant';
-  else if (expiring > 0) colorClass = 'text-status-expiring';
+  const pct = compliant / total;
+  let colorClass = 'text-emerald-600';
+  if (pct < 0.5) colorClass = 'text-red-600';
+  else if (pct < 1) colorClass = 'text-amber-600';
 
   return (
     <span className={`text-xs font-medium ${colorClass}`}>
