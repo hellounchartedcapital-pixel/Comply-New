@@ -9,6 +9,6 @@ export default function robots(): MetadataRoute.Robots {
         disallow: ['/dashboard/', '/api/', '/portal/', '/setup/'],
       },
     ],
-    sitemap: 'https://smartcoi.com/sitemap.xml',
+    sitemap: 'https://smartcoi.io/sitemap.xml',
   };
 }

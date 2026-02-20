@@ -8,14 +8,14 @@ export const metadata: Metadata = {
   description:
     'Automate insurance compliance verification for vendors and tenants. AI checks coverage limits, additional insured, and expiration dates automatically.',
   alternates: {
-    canonical: 'https://smartcoi.com/features/compliance-automation',
+    canonical: 'https://smartcoi.io/features/compliance-automation',
   },
   openGraph: {
     title: 'Automated Insurance Compliance for Property Managers | SmartCOI',
     description:
       'Automate insurance compliance verification for vendors and tenants. AI checks coverage limits, additional insured, and expiration dates automatically.',
     type: 'website',
-    url: 'https://smartcoi.com/features/compliance-automation',
+    url: 'https://smartcoi.io/features/compliance-automation',
   },
 };
 
