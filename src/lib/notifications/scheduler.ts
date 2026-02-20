@@ -40,12 +40,14 @@ export async function checkAndScheduleNotifications(): Promise<number> {
       .from('vendors')
       .select('id, company_name, contact_email, property_id, organization_id, compliance_status, notifications_paused, properties(name), organizations(name)')
       .is('deleted_at', null)
-      .eq('notifications_paused', false),
+      .or('notifications_paused.eq.false,notifications_paused.is.null')
+      .neq('compliance_status', 'compliant'),
     supabase
       .from('tenants')
       .select('id, company_name, contact_email, property_id, organization_id, compliance_status, notifications_paused, properties(name), organizations(name)')
       .is('deleted_at', null)
-      .eq('notifications_paused', false),
+      .or('notifications_paused.eq.false,notifications_paused.is.null')
+      .neq('compliance_status', 'compliant'),
   ]);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -137,6 +139,12 @@ export async function checkAndScheduleNotifications(): Promise<number> {
   const now = new Date();
   now.setHours(0, 0, 0, 0);
 
+  // Schedule for next day at 8 AM UTC so notifications appear in the
+  // "Scheduled" tab before being processed by the next cron run.
+  const scheduledFor = new Date();
+  scheduledFor.setDate(scheduledFor.getDate() + 1);
+  scheduledFor.setUTCHours(8, 0, 0, 0);
+
   // Get PM info per org for email templates
   const orgPmMap = new Map<string, { name: string; email: string }>();
   const orgIds = [...new Set(allEntities.map((e) => e.organization_id))];
@@ -197,7 +205,7 @@ export async function checkAndScheduleNotifications(): Promise<number> {
             tenant_id: entity._type === 'tenant' ? entity.id : null,
             organization_id: entity.organization_id,
             type: notifType,
-            scheduled_date: new Date().toISOString(),
+            scheduled_date: scheduledFor.toISOString(),
             status: 'scheduled',
             email_subject: template.subject,
             email_body: template.html,
@@ -288,7 +296,7 @@ export async function checkAndScheduleNotifications(): Promise<number> {
             tenant_id: entity._type === 'tenant' ? entity.id : null,
             organization_id: entity.organization_id,
             type: lastGapNotif ? 'follow_up_reminder' : 'gap_notification',
-            scheduled_date: new Date().toISOString(),
+            scheduled_date: scheduledFor.toISOString(),
             status: 'scheduled',
             email_subject: template.subject,
             email_body: template.html,

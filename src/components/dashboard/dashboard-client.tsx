@@ -196,7 +196,7 @@ function StatCard({
 }) {
   const content = (
     <Card className={href ? 'transition-shadow hover:shadow-md' : ''}>
-      <CardContent className="flex items-center gap-4 p-5">
+      <CardContent className="flex min-h-[88px] items-center gap-4 p-5">
         <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100">
           {icon}
         </div>
@@ -228,7 +228,7 @@ function StatCard({
 function ComplianceRateCard({ rate }: { rate: number | null }) {
   return (
     <Card>
-      <CardContent className="flex items-center gap-4 p-5">
+      <CardContent className="flex min-h-[88px] items-center gap-4 p-5">
         <div className="relative flex h-12 w-12 items-center justify-center">
           <svg className="h-12 w-12 -rotate-90" viewBox="0 0 36 36">
             <circle
@@ -538,12 +538,18 @@ function PropertyCard({ property }: { property: PropertyOverview }) {
                 />
               ))}
             </div>
-            <p className="mt-1.5 text-xs text-muted-foreground">
+            <p className={`mt-1.5 text-xs font-medium ${
+              compliantCount === total
+                ? 'text-emerald-600'
+                : compliantCount / total >= 0.5
+                  ? 'text-amber-600'
+                  : 'text-red-600'
+            }`}>
               {compliantCount} of {total} compliant
             </p>
           </>
         ) : (
-          <p className="mt-2 text-xs text-muted-foreground">No entities yet</p>
+          <p className="mt-2 text-xs text-slate-400">No entities yet</p>
         )}
       </div>
     </Link>

@@ -28,14 +28,14 @@ export async function sendNotificationEmail(
   const apiKey = process.env.RESEND_API_KEY;
 
   if (!apiKey) {
-    console.log('RESEND_API_KEY is missing — email will be logged to console only');
-    console.log('=== EMAIL (dev mode) ===');
+    console.warn('RESEND_API_KEY is missing — email NOT sent, logged to console only');
+    console.log('=== EMAIL (dev mode — NOT delivered) ===');
     console.log(`To: ${to}`);
     console.log(`From: ${getFromAddress()}`);
     console.log(`Subject: ${subject}`);
     console.log(`Body: ${html.substring(0, 200)}...`);
     console.log('=== END EMAIL ===');
-    return { success: true, devMode: true };
+    return { success: false, error: 'RESEND_API_KEY not configured', devMode: true };
   }
 
   const fromAddress = getFromAddress();
