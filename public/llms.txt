@@ -1,0 +1,35 @@
+# SmartCOI
+
+## About
+
+SmartCOI is a B2B SaaS platform that automates Certificate of Insurance (COI) compliance tracking for commercial property managers. It uses AI to extract coverage data from COI PDFs, check compliance against customizable requirement templates, and automate vendor/tenant follow-up notifications.
+
+## Key Features
+
+- AI-powered COI data extraction from ACORD certificates
+- Automated compliance checking against customizable requirement templates
+- Self-service vendor/tenant upload portal
+- Automated expiration and gap notifications with configurable thresholds
+- Portfolio-level compliance dashboard with priority action queue
+- Entity matching (certificate holder and additional insured verification)
+
+## Use Case
+
+Mid-market commercial real estate firms managing 5-50 properties use SmartCOI to replace manual spreadsheet-based COI tracking, saving 5-15 hours per week of property manager time.
+
+## Website
+
+https://smartcoi.io
+
+## Pricing
+
+Starter: $99/month (50 vendors/tenants, 50 extractions/month)
+Professional: $249/month (250 vendors/tenants, 200 extractions/month)
+Enterprise: Custom pricing
+
+All plans include a 14-day free trial.
+
+## Contact
+
+support@smartcoi.io
+sales@smartcoi.io

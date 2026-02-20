@@ -151,3 +151,41 @@
     background-clip: text;
   }
 }
+
+/* Prose-like typography for legal pages and blog posts */
+@layer components {
+  .prose-section h2 {
+    @apply text-xl font-semibold text-foreground;
+  }
+  .prose-section h3 {
+    @apply text-base font-semibold text-foreground mt-4;
+  }
+  .prose-section p {
+    @apply text-sm leading-relaxed text-slate-600 mt-3;
+  }
+  .prose-section ul,
+  .prose-section ol {
+    @apply text-sm text-slate-600 mt-3 pl-5 space-y-1.5;
+  }
+  .prose-section ul {
+    @apply list-disc;
+  }
+  .prose-section ol {
+    @apply list-decimal;
+  }
+  .prose-section li {
+    @apply leading-relaxed;
+  }
+  .prose-section a {
+    @apply text-brand-dark underline-offset-2 hover:underline;
+  }
+  .prose-section strong {
+    @apply font-semibold text-foreground;
+  }
+  .prose-section hr {
+    @apply my-8 border-slate-200;
+  }
+  .prose-section blockquote {
+    @apply mt-3 border-l-4 border-slate-200 pl-4 italic text-sm text-slate-500;
+  }
+}

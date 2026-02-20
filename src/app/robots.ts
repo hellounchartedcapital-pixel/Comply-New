@@ -6,7 +6,7 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: '*',
         allow: '/',
-        disallow: ['/dashboard/', '/api/', '/portal/'],
+        disallow: ['/dashboard/', '/api/', '/portal/', '/setup/'],
       },
     ],
     sitemap: 'https://smartcoi.com/sitemap.xml',

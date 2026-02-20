@@ -273,6 +273,12 @@ export default function SignUpPage() {
             Sign in
           </Link>
         </p>
+
+        <p className="text-center text-xs text-muted-foreground">
+          <Link href="/terms" className="underline-offset-2 hover:underline">Terms of Service</Link>
+          {' '}&middot;{' '}
+          <Link href="/privacy" className="underline-offset-2 hover:underline">Privacy Policy</Link>
+        </p>
       </div>
     </>
   );
