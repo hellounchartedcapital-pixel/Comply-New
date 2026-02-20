@@ -119,3 +119,37 @@ export async function createPortalSession(): Promise<{ url: string }> {
 
   return { url: session.url };
 }
+
+// ---------------------------------------------------------------------------
+// resetTrial — resets the current org's trial to 14 days from now (dev/debug)
+// ---------------------------------------------------------------------------
+
+export async function resetTrial(): Promise<{ trialEndsAt: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  const service = createServiceClient();
+  const { data: profile } = await service
+    .from('users')
+    .select('organization_id')
+    .eq('id', user.id)
+    .single();
+  if (!profile?.organization_id) throw new Error('No organization found');
+
+  const trialEndsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
+
+  const { error } = await service
+    .from('organizations')
+    .update({ plan: 'trial', trial_ends_at: trialEndsAt })
+    .eq('id', profile.organization_id);
+
+  if (error) throw new Error(`Failed to reset trial: ${error.message}`);
+
+  // eslint-disable-next-line no-console
+  console.log('[resetTrial] org:', profile.organization_id, 'trial_ends_at set to:', trialEndsAt);
+
+  return { trialEndsAt };
+}

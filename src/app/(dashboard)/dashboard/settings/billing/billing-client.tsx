@@ -10,7 +10,7 @@ import {
   Sparkles,
   ExternalLink,
 } from 'lucide-react';
-import { createCheckoutSession, createPortalSession } from '@/lib/actions/billing';
+import { createCheckoutSession, createPortalSession, resetTrial } from '@/lib/actions/billing';
 import { PRICE_IDS } from '@/lib/stripe-prices';
 
 // ---------------------------------------------------------------------------
@@ -82,6 +82,18 @@ export function BillingClient({
       window.location.href = url;
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to start checkout');
+      setLoading(null);
+    }
+  }
+
+  async function handleResetTrial() {
+    setLoading('reset');
+    try {
+      const { trialEndsAt: newTrialEnd } = await resetTrial();
+      toast.success(`Trial reset! New end date: ${new Date(newTrialEnd).toLocaleDateString()}`);
+      window.location.reload();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to reset trial');
       setLoading(null);
     }
   }
@@ -271,6 +283,27 @@ export function BillingClient({
             </a>
           </p>
         </>
+      )}
+
+      {/* Debug: Reset Trial (dev only) */}
+      {process.env.NODE_ENV !== 'production' && (
+        <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4">
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+            Debug
+          </p>
+          <p className="mt-1 text-xs text-slate-500">
+            plan: <code className="font-mono text-slate-700">{plan}</code>{' '}
+            &middot; trial_ends_at:{' '}
+            <code className="font-mono text-slate-700">{trialEndsAt ?? 'null'}</code>
+          </p>
+          <button
+            onClick={handleResetTrial}
+            disabled={loading === 'reset'}
+            className="mt-2 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100 disabled:opacity-50"
+          >
+            {loading === 'reset' ? 'Resetting...' : 'Reset Trial (14 days)'}
+          </button>
+        </div>
       )}
     </div>
   );

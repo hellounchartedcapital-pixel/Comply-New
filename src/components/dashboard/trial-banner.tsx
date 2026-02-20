@@ -43,9 +43,14 @@ export function TrialBanner({ plan, trialEndsAt, paymentFailed }: TrialBannerPro
   // Don't show for non-trial plans
   if (plan !== 'trial') return null;
 
+  // Debug: log the raw values so we can verify in the browser console
+  // eslint-disable-next-line no-console
+  console.log('[TrialBanner] plan:', plan, 'trialEndsAt:', trialEndsAt);
+
   const now = new Date();
   const expiresAt = trialEndsAt ? new Date(trialEndsAt) : null;
-  const isExpired = expiresAt ? now >= expiresAt : false;
+  // Treat null trial_ends_at as expired — legacy accounts without an end date
+  const isExpired = expiresAt ? now >= expiresAt : true;
 
   // Calculate days remaining
   let daysRemaining: number | null = null;
@@ -64,7 +69,7 @@ export function TrialBanner({ plan, trialEndsAt, paymentFailed }: TrialBannerPro
 
   const isUrgent = daysRemaining !== null && daysRemaining <= 3;
 
-  // Expired banner — NOT dismissible
+  // Expired or null trial_ends_at banner — NOT dismissible
   if (isExpired) {
     return (
       <div className="flex items-center justify-center gap-2 bg-amber-50 border-b border-amber-200 px-4 py-2.5 text-sm text-amber-800">
