@@ -8,14 +8,14 @@ export const metadata: Metadata = {
   description:
     'Manage vendor COIs effortlessly. Track compliance, automate follow-ups, and give vendors a self-service portal to upload certificates.',
   alternates: {
-    canonical: 'https://smartcoi.com/features/vendor-management',
+    canonical: 'https://smartcoi.io/features/vendor-management',
   },
   openGraph: {
     title: 'Vendor Certificate of Insurance Management | SmartCOI',
     description:
       'Manage vendor COIs effortlessly. Track compliance, automate follow-ups, and give vendors a self-service portal to upload certificates.',
     type: 'website',
-    url: 'https://smartcoi.com/features/vendor-management',
+    url: 'https://smartcoi.io/features/vendor-management',
   },
 };
 

@@ -8,14 +8,14 @@ export const metadata: Metadata = {
   description:
     'Streamline certificate of insurance tracking for your commercial properties. Upload COIs, get instant AI-powered compliance checks, and track status across your portfolio.',
   alternates: {
-    canonical: 'https://smartcoi.com/features/coi-tracking',
+    canonical: 'https://smartcoi.io/features/coi-tracking',
   },
   openGraph: {
     title: 'COI Tracking Software for Commercial Real Estate | SmartCOI',
     description:
       'Streamline certificate of insurance tracking for your commercial properties. Upload COIs, get instant AI-powered compliance checks, and track status across your portfolio.',
     type: 'website',
-    url: 'https://smartcoi.com/features/coi-tracking',
+    url: 'https://smartcoi.io/features/coi-tracking',
   },
 };
 

@@ -12,14 +12,14 @@ export const metadata: Metadata = {
   description:
     'Automate certificate of insurance tracking for your commercial properties. AI-powered compliance checking, automated follow-ups, and portfolio-wide visibility.',
   alternates: {
-    canonical: 'https://smartcoi.com',
+    canonical: 'https://smartcoi.io',
   },
   openGraph: {
     title: 'SmartCOI — AI-Powered COI Compliance Tracking for Property Managers',
     description:
       'Automate certificate of insurance tracking for your commercial properties. AI-powered compliance checking, automated follow-ups, and portfolio-wide visibility.',
     type: 'website',
-    url: 'https://smartcoi.com',
+    url: 'https://smartcoi.io',
   },
 };
 
