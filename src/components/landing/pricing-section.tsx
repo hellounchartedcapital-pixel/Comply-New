@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { AnimateIn } from '@/components/landing/animate-in';
+import { AnimateIn } from './animate-in';
 
 /* ─── Icons (inline to keep the component self-contained) ─── */
 
@@ -280,11 +280,18 @@ export function PricingSection() {
           <AnimateIn delay={450}>
             <p className="text-sm text-slate-400">
               Need help choosing?{' '}
+              <Link
+                href="/compare"
+                className="text-emerald-600 underline underline-offset-2 hover:text-emerald-700"
+              >
+                See how SmartCOI compares
+              </Link>
+              {' '}or{' '}
               <a
                 href="mailto:sales@smartcoi.io"
                 className="text-emerald-600 underline underline-offset-2 hover:text-emerald-700"
               >
-                Email us at sales@smartcoi.io
+                email us at sales@smartcoi.io
               </a>
             </p>
           </AnimateIn>

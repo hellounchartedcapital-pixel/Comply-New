@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -11,9 +11,17 @@ const navLinks = [
   { label: 'Pricing', href: '/#pricing' },
 ];
 
+const resourceLinks = [
+  { label: 'Blog', href: '/blog', desc: 'Insights on COI compliance and property management' },
+  { label: 'COI Compliance Guide', href: '/blog/coi-compliance-guide-property-managers', desc: 'The complete guide for property managers' },
+  { label: 'Compare Solutions', href: '/compare', desc: 'See how SmartCOI stacks up' },
+];
+
 export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [resourcesOpen, setResourcesOpen] = useState(false);
+  const resourcesRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
   const router = useRouter();
 
@@ -21,6 +29,16 @@ export function Navbar() {
     const onScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (resourcesRef.current && !resourcesRef.current.contains(e.target as Node)) {
+        setResourcesOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   function handleAnchorClick(e: React.MouseEvent<HTMLAnchorElement>, href: string) {
@@ -66,12 +84,35 @@ export function Navbar() {
               {link.label}
             </a>
           ))}
-          <Link
-            href="/blog"
-            className="text-sm font-medium text-slate-500 transition-colors hover:text-slate-950"
-          >
-            Blog
-          </Link>
+
+          {/* Resources dropdown */}
+          <div ref={resourcesRef} className="relative">
+            <button
+              onClick={() => setResourcesOpen(!resourcesOpen)}
+              className="flex items-center gap-1 text-sm font-medium text-slate-500 transition-colors hover:text-slate-950"
+            >
+              Resources
+              <svg className={cn('h-3.5 w-3.5 transition-transform', resourcesOpen && 'rotate-180')} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="6,9 12,15 18,9" />
+              </svg>
+            </button>
+
+            {resourcesOpen && (
+              <div className="absolute top-full left-1/2 mt-2 w-72 -translate-x-1/2 rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
+                {resourceLinks.map((item) => (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={() => setResourcesOpen(false)}
+                    className="block rounded-lg px-3 py-2.5 transition-colors hover:bg-slate-50"
+                  >
+                    <span className="text-sm font-medium text-slate-950">{item.label}</span>
+                    <span className="mt-0.5 block text-xs text-slate-400">{item.desc}</span>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Desktop CTAs */}
@@ -135,13 +176,17 @@ export function Navbar() {
                 {link.label}
               </a>
             ))}
-            <Link
-              href="/blog"
-              onClick={() => setMobileOpen(false)}
-              className="text-sm font-medium text-slate-600 transition-colors hover:text-slate-950"
-            >
-              Blog
-            </Link>
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 mt-2">Resources</span>
+            {resourceLinks.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => setMobileOpen(false)}
+                className="text-sm font-medium text-slate-600 transition-colors hover:text-slate-950"
+              >
+                {item.label}
+              </Link>
+            ))}
             <hr className="border-slate-200" />
             <Link
               href="/login"

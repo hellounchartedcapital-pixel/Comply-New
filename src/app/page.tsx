@@ -453,6 +453,17 @@ export default function LandingPage() {
                 </AnimateIn>
               ))}
             </div>
+
+            <AnimateIn delay={450}>
+              <div className="mt-12 text-center">
+                <Link
+                  href="/coi-tracking-software"
+                  className="text-sm font-medium text-[#73E2A7] underline underline-offset-4 transition-colors hover:text-white"
+                >
+                  Learn more about COI tracking software &rarr;
+                </Link>
+              </div>
+            </AnimateIn>
           </div>
         </section>
 
