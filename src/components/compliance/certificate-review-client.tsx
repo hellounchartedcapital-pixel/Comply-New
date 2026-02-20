@@ -4,6 +4,8 @@ import { useCallback, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { toast } from 'sonner';
+import { useUpgradeModal } from '@/components/dashboard/upgrade-modal';
+import { handleActionError } from '@/lib/handle-action-error';
 
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -228,6 +230,7 @@ function ReviewInterface({
   expirationThresholdDays,
 }: CertificateReviewClientProps & { isConfirmed: boolean }) {
   const router = useRouter();
+  const { showUpgradeModal } = useUpgradeModal();
   const [confirming, setConfirming] = useState(false);
 
   // Editable coverages
@@ -394,7 +397,7 @@ function ReviewInterface({
       toast.success('Certificate confirmed. Compliance status updated.');
       router.push(`/dashboard/${result.entityType}s/${result.entityId}`);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to confirm certificate');
+      handleActionError(err, 'Failed to confirm certificate', showUpgradeModal);
       setConfirming(false);
     }
   };

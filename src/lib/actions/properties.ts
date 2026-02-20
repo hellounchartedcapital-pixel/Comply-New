@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { checkVendorTenantLimit } from '@/lib/plan-limits';
+import { requireActivePlan } from '@/lib/require-active-plan';
 import type { PropertyType, EntityType } from '@/types';
 
 // ---------------------------------------------------------------------------
@@ -45,6 +46,7 @@ export interface CreatePropertyInput {
 }
 
 export async function createProperty(input: CreatePropertyInput) {
+  await requireActivePlan('Subscribe to add properties.');
   const { supabase, userId, orgId } = await getAuthContext();
 
   const { data: property, error: propError } = await supabase
@@ -216,6 +218,7 @@ export interface CreateVendorInput {
 }
 
 export async function createVendor(input: CreateVendorInput) {
+  await requireActivePlan('Subscribe to add vendors and tenants.');
   const { supabase, userId, orgId } = await getAuthContext();
 
   // Enforce plan limits
@@ -299,6 +302,7 @@ export interface CreateTenantInput {
 }
 
 export async function createTenant(input: CreateTenantInput) {
+  await requireActivePlan('Subscribe to add vendors and tenants.');
   const { supabase, userId, orgId } = await getAuthContext();
 
   // Enforce plan limits

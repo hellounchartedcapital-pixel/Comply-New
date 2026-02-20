@@ -9,6 +9,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { CreateTemplateDialog } from './create-template-dialog';
 import { duplicateTemplate } from '@/lib/actions/templates';
 import { toast } from 'sonner';
+import { useUpgradeModal } from '@/components/dashboard/upgrade-modal';
+import { handleActionError } from '@/lib/handle-action-error';
 import {
   RISK_LEVEL_LABELS,
   RISK_LEVEL_COLORS,
@@ -38,6 +40,7 @@ export function TemplatesListClient({
   hasCustomTemplates,
 }: TemplatesListClientProps) {
   const router = useRouter();
+  const { showUpgradeModal } = useUpgradeModal();
   const [createOpen, setCreateOpen] = useState(false);
   const [duplicating, setDuplicating] = useState<string | null>(null);
 
@@ -48,7 +51,7 @@ export function TemplatesListClient({
       toast.success('Template duplicated');
       router.push(`/dashboard/templates/${result.id}`);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to duplicate');
+      handleActionError(err, 'Failed to duplicate', showUpgradeModal);
     } finally {
       setDuplicating(null);
     }

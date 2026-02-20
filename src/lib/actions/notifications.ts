@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
+import { requireActivePlan } from '@/lib/require-active-plan';
 import { sendNotificationEmail } from '@/lib/notifications/email-sender';
 import {
   gapNotification,
@@ -55,6 +56,7 @@ export async function generatePortalLink(
   entityType: 'vendor' | 'tenant',
   entityId: string
 ): Promise<string> {
+  await requireActivePlan('Subscribe to use the upload portal.');
   const { supabase, orgId } = await getAuthContext();
 
   // Verify entity belongs to org
@@ -108,6 +110,7 @@ export async function sendManualFollowUp(
   entityType: 'vendor' | 'tenant',
   entityId: string
 ): Promise<{ devMode?: boolean }> {
+  await requireActivePlan('Subscribe to send notifications.');
   const { supabase, userId, orgId, pmName, pmEmail, orgName } = await getAuthContext();
 
   // Fetch entity

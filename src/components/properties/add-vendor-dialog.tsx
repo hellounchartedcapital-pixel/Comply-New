@@ -20,6 +20,8 @@ import {
 } from '@/components/ui/select';
 import { createVendor } from '@/lib/actions/properties';
 import { toast } from 'sonner';
+import { useUpgradeModal } from '@/components/dashboard/upgrade-modal';
+import { handleActionError } from '@/lib/handle-action-error';
 import type { RequirementTemplate } from '@/types';
 
 const VENDOR_TYPE_SUGGESTIONS = [
@@ -51,6 +53,7 @@ export function AddVendorDialog({
   onCreated,
 }: AddVendorDialogProps) {
   const [saving, setSaving] = useState(false);
+  const { showUpgradeModal } = useUpgradeModal();
   const [companyName, setCompanyName] = useState('');
   const [contactName, setContactName] = useState('');
   const [contactEmail, setContactEmail] = useState('');
@@ -91,7 +94,7 @@ export function AddVendorDialog({
       onOpenChange(false);
       onCreated?.(result.id, name);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to add vendor');
+      handleActionError(err, 'Failed to add vendor', showUpgradeModal);
     } finally {
       setSaving(false);
     }

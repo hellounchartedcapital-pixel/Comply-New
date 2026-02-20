@@ -3,6 +3,7 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { extractCOIFromPDF } from '@/lib/ai/extraction';
 import { checkExtractionLimit } from '@/lib/plan-limits';
+import { getActivePlanStatus, PLAN_INACTIVE_PREFIX } from '@/lib/plan-status';
 
 /**
  * Create a Supabase client with the service role key for storage access.
@@ -77,6 +78,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No organization found' }, { status: 403 });
     }
     const orgId = profile.organization_id;
+
+    // ---- Active plan check ----
+    const { data: orgForPlan } = await authClient
+      .from('organizations')
+      .select('plan, trial_ends_at')
+      .eq('id', orgId)
+      .single();
+    if (orgForPlan) {
+      const planStatus = getActivePlanStatus(orgForPlan);
+      if (!planStatus.isActive) {
+        return NextResponse.json(
+          { error: `${PLAN_INACTIVE_PREFIX} Subscribe to upload certificates.` },
+          { status: 403 }
+        );
+      }
+    }
 
     // ---- Plan limit check ----
     const limitCheck = await checkExtractionLimit(orgId);

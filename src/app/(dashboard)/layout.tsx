@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { isOrgOnboarded } from '@/lib/actions/auth';
 import { DashboardShell } from '@/components/dashboard/sidebar';
 import { TrialBanner } from '@/components/dashboard/trial-banner';
+import { UpgradeModalProvider } from '@/components/dashboard/upgrade-modal';
 
 export default async function DashboardLayout({
   children,
@@ -53,15 +54,17 @@ export default async function DashboardLayout({
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-slate-50">
-      <DashboardShell
-        userName={profile?.full_name ?? null}
-        userEmail={profile?.email ?? user.email ?? ''}
-        orgName={orgName}
-        topBanner={<TrialBanner plan={orgPlan} trialEndsAt={trialEndsAt} paymentFailed={paymentFailed} />}
-      >
-        {children}
-      </DashboardShell>
-    </div>
+    <UpgradeModalProvider>
+      <div className="flex h-screen overflow-hidden bg-slate-50">
+        <DashboardShell
+          userName={profile?.full_name ?? null}
+          userEmail={profile?.email ?? user.email ?? ''}
+          orgName={orgName}
+          topBanner={<TrialBanner plan={orgPlan} trialEndsAt={trialEndsAt} paymentFailed={paymentFailed} />}
+        >
+          {children}
+        </DashboardShell>
+      </div>
+    </UpgradeModalProvider>
   );
 }

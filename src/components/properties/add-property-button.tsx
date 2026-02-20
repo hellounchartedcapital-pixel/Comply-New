@@ -12,6 +12,8 @@ import {
 import { PropertyForm, type PropertyFormData } from './property-form';
 import { createProperty } from '@/lib/actions/properties';
 import { toast } from 'sonner';
+import { useUpgradeModal } from '@/components/dashboard/upgrade-modal';
+import { handleActionError } from '@/lib/handle-action-error';
 import type { EntityType } from '@/types';
 
 interface AddPropertyButtonProps {
@@ -30,6 +32,7 @@ export function AddPropertyButton({
 }: AddPropertyButtonProps) {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const { showUpgradeModal } = useUpgradeModal();
 
   async function handleSubmit(data: PropertyFormData) {
     setSaving(true);
@@ -50,7 +53,7 @@ export function AddPropertyButton({
       toast.success('Property created');
       setOpen(false);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to create property');
+      handleActionError(err, 'Failed to create property', showUpgradeModal);
     } finally {
       setSaving(false);
     }

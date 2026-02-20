@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { validatePDFFile, computeFileHash, formatFileSize } from '@/lib/utils/file-validation';
+import { isPlanInactiveError } from '@/lib/plan-status';
+import { useUpgradeModal } from '@/components/dashboard/upgrade-modal';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -54,6 +56,7 @@ type UploadStep =
 export default function CertificateUploadPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { showUpgradeModal } = useUpgradeModal();
 
   const supabase = createClient();
 
@@ -324,12 +327,14 @@ export default function CertificateUploadPage() {
         router.push(`/dashboard/certificates/${cert.id}/review`);
       }, 1000);
     } catch (err) {
+      const message = err instanceof Error ? err.message : "We couldn't process this certificate. Please try uploading a clearer copy.";
+      if (isPlanInactiveError(message)) {
+        showUpgradeModal(message);
+        setUploadStep('idle');
+        return;
+      }
       setUploadStep('failed');
-      setErrorMessage(
-        err instanceof Error
-          ? err.message
-          : "We couldn't process this certificate. Please try uploading a clearer copy."
-      );
+      setErrorMessage(message);
     }
   };
 

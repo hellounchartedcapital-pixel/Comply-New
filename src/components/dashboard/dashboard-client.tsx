@@ -4,6 +4,8 @@ import { useState, useCallback } from 'react';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { sendManualFollowUp } from '@/lib/actions/notifications';
+import { useUpgradeModal } from '@/components/dashboard/upgrade-modal';
+import { handleActionError } from '@/lib/handle-action-error';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -380,6 +382,7 @@ function ActionQueue({ items }: { items: ActionItem[] }) {
 function ActionItemRow({ item }: { item: ActionItem }) {
   const config = STATUS_CONFIG[item.status as keyof StatusDistribution] ?? STATUS_CONFIG.pending;
   const [sending, setSending] = useState(false);
+  const { showUpgradeModal } = useUpgradeModal();
 
   const handleFollowUp = useCallback(async () => {
     setSending(true);
@@ -387,11 +390,11 @@ function ActionItemRow({ item }: { item: ActionItem }) {
       await sendManualFollowUp(item.entityType as 'vendor' | 'tenant', item.id);
       toast.success(`Follow-up sent to ${item.name}`);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to send follow-up');
+      handleActionError(err, 'Failed to send follow-up', showUpgradeModal);
     } finally {
       setSending(false);
     }
-  }, [item.entityType, item.id, item.name]);
+  }, [item.entityType, item.id, item.name, showUpgradeModal]);
 
   let description = '';
   switch (item.status) {

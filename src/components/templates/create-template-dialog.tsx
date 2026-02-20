@@ -21,6 +21,8 @@ import {
 } from '@/components/ui/select';
 import { createTemplate } from '@/lib/actions/templates';
 import { toast } from 'sonner';
+import { useUpgradeModal } from '@/components/dashboard/upgrade-modal';
+import { handleActionError } from '@/lib/handle-action-error';
 import { RISK_LEVEL_LABELS, ALL_RISK_LEVELS } from './template-labels';
 import type { TemplateCategory, RiskLevel } from '@/types';
 
@@ -34,6 +36,7 @@ export function CreateTemplateDialog({
   onOpenChange,
 }: CreateTemplateDialogProps) {
   const router = useRouter();
+  const { showUpgradeModal } = useUpgradeModal();
   const [saving, setSaving] = useState(false);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -64,7 +67,7 @@ export function CreateTemplateDialog({
       onOpenChange(false);
       router.push(`/dashboard/templates/${result.id}`);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to create template');
+      handleActionError(err, 'Failed to create template', showUpgradeModal);
     } finally {
       setSaving(false);
     }

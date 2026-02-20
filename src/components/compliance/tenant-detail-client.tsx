@@ -19,6 +19,8 @@ import { sendManualFollowUp, generatePortalLink } from '@/lib/actions/notificati
 import { summarizeExpiredCoverages } from '@/lib/compliance/calculate';
 import { formatDate } from '@/lib/utils';
 import { toast } from 'sonner';
+import { useUpgradeModal } from '@/components/dashboard/upgrade-modal';
+import { handleActionError } from '@/lib/handle-action-error';
 import type {
   Tenant,
   Property,
@@ -62,6 +64,7 @@ export function TenantDetailClient({
   hasCertificate,
 }: TenantDetailClientProps) {
   const router = useRouter();
+  const { showUpgradeModal } = useUpgradeModal();
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -80,7 +83,7 @@ export function TenantDetailClient({
       }
       router.refresh();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to send follow-up');
+      handleActionError(err, 'Failed to send follow-up', showUpgradeModal);
     } finally {
       setSendingFollowUp(false);
     }
@@ -93,7 +96,7 @@ export function TenantDetailClient({
       await navigator.clipboard.writeText(link);
       toast.success('Portal link copied to clipboard');
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to generate portal link');
+      handleActionError(err, 'Failed to generate portal link', showUpgradeModal);
     } finally {
       setGeneratingLink(false);
     }

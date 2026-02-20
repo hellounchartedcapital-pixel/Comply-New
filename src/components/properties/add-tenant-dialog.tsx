@@ -20,6 +20,8 @@ import {
 } from '@/components/ui/select';
 import { createTenant } from '@/lib/actions/properties';
 import { toast } from 'sonner';
+import { useUpgradeModal } from '@/components/dashboard/upgrade-modal';
+import { handleActionError } from '@/lib/handle-action-error';
 import type { RequirementTemplate } from '@/types';
 
 const TENANT_TYPE_SUGGESTIONS = [
@@ -47,6 +49,7 @@ export function AddTenantDialog({
   onCreated,
 }: AddTenantDialogProps) {
   const [saving, setSaving] = useState(false);
+  const { showUpgradeModal } = useUpgradeModal();
   const [companyName, setCompanyName] = useState('');
   const [contactName, setContactName] = useState('');
   const [contactEmail, setContactEmail] = useState('');
@@ -90,7 +93,7 @@ export function AddTenantDialog({
       onOpenChange(false);
       onCreated?.(result.id, name);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to add tenant');
+      handleActionError(err, 'Failed to add tenant', showUpgradeModal);
     } finally {
       setSaving(false);
     }

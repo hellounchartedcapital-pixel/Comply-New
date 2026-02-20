@@ -22,6 +22,8 @@ import {
   getTemplateUsageCount,
 } from '@/lib/actions/templates';
 import { toast } from 'sonner';
+import { useUpgradeModal } from '@/components/dashboard/upgrade-modal';
+import { handleActionError } from '@/lib/handle-action-error';
 import {
   COVERAGE_LABELS,
   LIMIT_TYPE_LABELS,
@@ -82,6 +84,7 @@ export function TemplateEditorClient({
   usageCount,
 }: TemplateEditorClientProps) {
   const router = useRouter();
+  const { showUpgradeModal } = useUpgradeModal();
   const isReadOnly = template.is_system_default;
 
   // Form state
@@ -154,7 +157,7 @@ export function TemplateEditorClient({
       toast.success('Template saved');
       router.refresh();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to save');
+      handleActionError(err, 'Failed to save', showUpgradeModal);
     } finally {
       setSaving(false);
     }
@@ -167,7 +170,7 @@ export function TemplateEditorClient({
       toast.success('Template deleted');
       router.push('/dashboard/templates');
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to delete');
+      handleActionError(err, 'Failed to delete', showUpgradeModal);
     } finally {
       setDeleting(false);
       setDeleteOpen(false);
@@ -181,7 +184,7 @@ export function TemplateEditorClient({
       toast.success('Template duplicated');
       router.push(`/dashboard/templates/${result.id}`);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to duplicate');
+      handleActionError(err, 'Failed to duplicate', showUpgradeModal);
     } finally {
       setDuplicating(false);
     }
