@@ -67,6 +67,8 @@ export interface ExtractionResult {
   entities: ExtractedEntityRow[];
   insuredName: string | null;
   error?: string;
+  /** User-facing error message (friendly wording, no raw status codes) */
+  userMessage?: string;
 }
 
 // ============================================================================
@@ -134,58 +136,101 @@ Extract ALL entity names mentioned as additional insureds from this section and 
 // ============================================================================
 
 /**
+ * Map an HTTP status code from the Anthropic API to a user-friendly message.
+ */
+function getExtractionErrorMessage(status: number): string {
+  switch (status) {
+    case 529:
+      return 'Our AI service is temporarily busy. Please try uploading again in a moment.';
+    case 500:
+    case 502:
+    case 503:
+      return 'AI extraction is temporarily unavailable. Please try again in a few minutes.';
+    case 400:
+      return "We couldn't read this PDF. Please make sure it's a valid, non-corrupted PDF file.";
+    case 401:
+    case 403:
+      return 'Something went wrong. Please try again or contact support@smartcoi.io.';
+    default:
+      return 'AI extraction failed. Please try again.';
+  }
+}
+
+/**
  * Send a PDF (as base64) to the Anthropic Claude API and extract
  * structured COI data. Returns rows ready for database insertion.
+ *
+ * Automatically retries once for 529 (overloaded) errors after a 2-second delay.
  */
 export async function extractCOIFromPDF(pdfBase64: string): Promise<ExtractionResult> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
-    return { success: false, coverages: [], entities: [], insuredName: null, error: 'ANTHROPIC_API_KEY is not configured' };
+    console.error('[CRITICAL] ANTHROPIC_API_KEY is not configured');
+    return {
+      success: false, coverages: [], entities: [], insuredName: null,
+      error: 'ANTHROPIC_API_KEY is not configured',
+      userMessage: 'Something went wrong. Please try again or contact support@smartcoi.io.',
+    };
   }
 
-  // Call Claude API
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 4096,
-      system: SYSTEM_PROMPT,
-      messages: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'document',
-              source: {
-                type: 'base64',
-                media_type: 'application/pdf',
-                data: pdfBase64,
-              },
+  const requestBody = JSON.stringify({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 4096,
+    system: SYSTEM_PROMPT,
+    messages: [
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'document',
+            source: {
+              type: 'base64',
+              media_type: 'application/pdf',
+              data: pdfBase64,
             },
-            {
-              type: 'text',
-              text: 'Extract all insurance data from this Certificate of Insurance.',
-            },
-          ],
-        },
-      ],
-    }),
+          },
+          {
+            type: 'text',
+            text: 'Extract all insurance data from this Certificate of Insurance.',
+          },
+        ],
+      },
+    ],
   });
+
+  const headers = {
+    'Content-Type': 'application/json',
+    'x-api-key': apiKey,
+    'anthropic-version': '2023-06-01',
+  };
+
+  // Call Claude API with automatic retry for 529 (overloaded)
+  let response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers,
+    body: requestBody,
+  });
+
+  if (response.status === 529) {
+    console.warn('Claude API overloaded (529), retrying in 2s…');
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers,
+      body: requestBody,
+    });
+  }
 
   if (!response.ok) {
     const errorText = await response.text();
     console.error('Claude API error:', response.status, errorText);
+    if (response.status === 401 || response.status === 403) {
+      console.error('[CRITICAL] Anthropic API key issue — check ANTHROPIC_API_KEY');
+    }
     return {
-      success: false,
-      coverages: [],
-      entities: [],
-      insuredName: null,
+      success: false, coverages: [], entities: [], insuredName: null,
       error: `AI extraction failed (status ${response.status})`,
+      userMessage: getExtractionErrorMessage(response.status),
     };
   }
 
@@ -197,11 +242,9 @@ export async function extractCOIFromPDF(pdfBase64: string): Promise<ExtractionRe
   const jsonMatch = responseText.match(/\{[\s\S]*\}/);
   if (!jsonMatch) {
     return {
-      success: false,
-      coverages: [],
-      entities: [],
-      insuredName: null,
+      success: false, coverages: [], entities: [], insuredName: null,
       error: 'Could not parse structured data from AI response',
+      userMessage: "We couldn't read this PDF. Please make sure it's a valid, non-corrupted PDF file.",
     };
   }
 
@@ -210,11 +253,9 @@ export async function extractCOIFromPDF(pdfBase64: string): Promise<ExtractionRe
     parsed = JSON.parse(jsonMatch[0]);
   } catch {
     return {
-      success: false,
-      coverages: [],
-      entities: [],
-      insuredName: null,
+      success: false, coverages: [], entities: [], insuredName: null,
       error: 'AI returned malformed JSON',
+      userMessage: "We couldn't read this PDF. Please make sure it's a valid, non-corrupted PDF file.",
     };
   }
 
