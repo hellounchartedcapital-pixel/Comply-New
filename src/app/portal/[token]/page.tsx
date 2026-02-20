@@ -336,6 +336,11 @@ export default async function PortalPage({ params }: PortalPageProps) {
               </a>
             </p>
           )}
+          <p className="mt-3">
+            <a href="/terms" className="hover:text-slate-300">Terms</a>
+            {' '}&middot;{' '}
+            <a href="/privacy" className="hover:text-slate-300">Privacy</a>
+          </p>
         </div>
       </main>
     </div>

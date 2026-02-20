@@ -56,6 +56,12 @@ export function Navbar() {
               {link.label}
             </a>
           ))}
+          <Link
+            href="/blog"
+            className="text-sm font-medium text-slate-500 transition-colors hover:text-slate-950"
+          >
+            Blog
+          </Link>
         </div>
 
         {/* Desktop CTAs */}
@@ -119,6 +125,13 @@ export function Navbar() {
                 {link.label}
               </a>
             ))}
+            <Link
+              href="/blog"
+              onClick={() => setMobileOpen(false)}
+              className="text-sm font-medium text-slate-600 transition-colors hover:text-slate-950"
+            >
+              Blog
+            </Link>
             <hr className="border-slate-200" />
             <Link
               href="/login"

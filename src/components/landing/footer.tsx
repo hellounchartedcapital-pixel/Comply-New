@@ -28,6 +28,9 @@ export function Footer() {
             <Link href="/features/vendor-management" className="text-slate-400 transition-colors hover:text-white">
               Vendor Management
             </Link>
+            <Link href="/blog" className="text-slate-400 transition-colors hover:text-white">
+              Blog
+            </Link>
             <Link href="/login" className="text-slate-400 transition-colors hover:text-white">
               Login
             </Link>
@@ -38,6 +41,11 @@ export function Footer() {
         </div>
 
         <div className="mt-10 border-t border-slate-800 pt-6 text-center text-xs text-slate-500">
+          <div className="flex items-center justify-center gap-4 mb-3">
+            <Link href="/terms" className="transition-colors hover:text-slate-300">Terms of Service</Link>
+            <span className="text-slate-700">&middot;</span>
+            <Link href="/privacy" className="transition-colors hover:text-slate-300">Privacy Policy</Link>
+          </div>
           &copy; {new Date().getFullYear()} SmartCOI. All rights reserved.
         </div>
       </div>
