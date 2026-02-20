@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import { Info } from 'lucide-react';
 import { ComplianceBadge } from '@/components/properties/compliance-badge';
 import { ComplianceBreakdown } from './compliance-breakdown';
 import { EntityRequirements } from './entity-requirements';
@@ -283,20 +284,53 @@ export function TenantDetailClient({
             );
           })()}
 
-          {/* Compliance Breakdown */}
-          <ComplianceBreakdown
-            requirements={templateRequirements}
-            extractedCoverages={extractedCoverages}
-            complianceResults={complianceResults}
-            hasCertificate={hasCertificate}
-          />
+          {/* Compliance Breakdown — hide until certificate is confirmed */}
+          {(() => {
+            const latestCert = certificates
+              .slice()
+              .sort((a, b) => new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime())[0];
+            const pendingReview = latestCert?.processing_status === 'extracted' && !latestCert.reviewed_at;
 
-          {/* Entity Requirements */}
-          <EntityRequirements
-            entities={propertyEntities}
-            entityResults={entityResults}
-            hasCertificate={hasCertificate}
-          />
+            if (pendingReview) {
+              return (
+                <div className="rounded-lg border border-slate-200 bg-white p-5">
+                  <h3 className="text-sm font-semibold text-foreground">Compliance Check</h3>
+                  <div className="mt-4 flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3">
+                    <Info className="h-5 w-5 flex-shrink-0 text-blue-600 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium text-blue-800">
+                        Certificate uploaded &mdash; pending review
+                      </p>
+                      <p className="mt-1 text-xs text-blue-700">
+                        Compliance results will be available after you review and confirm the certificate.
+                      </p>
+                      <Button size="sm" className="mt-3" asChild>
+                        <Link href={`/dashboard/certificates/${latestCert.id}/review`}>
+                          Review Certificate
+                        </Link>
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+
+            return (
+              <>
+                <ComplianceBreakdown
+                  requirements={templateRequirements}
+                  extractedCoverages={extractedCoverages}
+                  complianceResults={complianceResults}
+                  hasCertificate={hasCertificate}
+                />
+                <EntityRequirements
+                  entities={propertyEntities}
+                  entityResults={entityResults}
+                  hasCertificate={hasCertificate}
+                />
+              </>
+            );
+          })()}
 
           {/* COI History */}
           <COIHistory certificates={certificates} />

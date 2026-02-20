@@ -149,6 +149,39 @@ export default async function CertificateReviewPage({ params }: Props) {
     .single();
   const expirationThresholdDays = org?.settings?.expiration_warning_threshold_days ?? 30;
 
+  // Generate signed URL for PDF preview
+  let pdfUrl: string | null = null;
+  if (certificate.file_path) {
+    try {
+      const { createServiceClient } = await import('@/lib/supabase/service');
+      const serviceClient = createServiceClient();
+
+      // Normalize: strip public URL prefix if stored as full URL
+      let storagePath = certificate.file_path;
+      const publicUrlPrefix = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/coi-documents/`;
+      if (storagePath.startsWith(publicUrlPrefix)) {
+        storagePath = storagePath.slice(publicUrlPrefix.length);
+      } else if (storagePath.startsWith('http')) {
+        const idx = storagePath.indexOf('/coi-documents/');
+        if (idx !== -1) {
+          storagePath = storagePath.slice(idx + '/coi-documents/'.length);
+        }
+      }
+
+      const { data: signedData, error: signError } = await serviceClient.storage
+        .from('coi-documents')
+        .createSignedUrl(storagePath, 3600);
+
+      if (!signError && signedData?.signedUrl) {
+        pdfUrl = signedData.signedUrl;
+      } else {
+        console.error('[review/page] Failed to generate PDF signed URL:', signError);
+      }
+    } catch (err) {
+      console.error('[review/page] Error generating PDF signed URL:', err);
+    }
+  }
+
   return (
     <CertificateReviewClient
       certificate={certificate}
@@ -160,6 +193,7 @@ export default async function CertificateReviewPage({ params }: Props) {
       entityId={entityId ?? ''}
       entityName={entityName}
       insuredName={certificate.insured_name ?? null}
+      pdfUrl={pdfUrl}
       propertyName={property?.name ?? null}
       reviewerName={reviewerName}
       expirationThresholdDays={expirationThresholdDays}
