@@ -31,7 +31,23 @@ interface PropertyWithCounts {
   tenant_compliant: number;
   tenant_expiring: number;
   tenant_non_compliant: number;
+  // Combined status counts for the compliance mini-bar
+  status_compliant: number;
+  status_expiring: number;
+  status_non_compliant: number;
+  status_expired: number;
+  status_pending: number;
+  status_under_review: number;
 }
+
+const BAR_COLORS: Record<string, string> = {
+  status_compliant: 'bg-status-compliant',
+  status_expiring: 'bg-status-expiring',
+  status_non_compliant: 'bg-status-non-compliant',
+  status_expired: 'bg-status-expired',
+  status_pending: 'bg-status-pending',
+  status_under_review: 'bg-status-under-review',
+};
 
 function formatAddress(p: PropertyWithCounts): string | null {
   const parts = [p.address, p.city, p.state ? `${p.state} ${p.zip ?? ''}`.trim() : p.zip]
@@ -58,13 +74,8 @@ function ComplianceSummary({
     );
   }
 
-  const pct = compliant / total;
-  let colorClass = 'text-emerald-600';
-  if (pct < 0.5) colorClass = 'text-red-600';
-  else if (pct < 1) colorClass = 'text-amber-600';
-
   return (
-    <span className={`text-xs font-medium ${colorClass}`}>
+    <span className="text-xs text-slate-600">
       {compliant} of {total} {label} compliant
     </span>
   );
@@ -119,6 +130,10 @@ export default async function PropertiesPage() {
 
       const vList = vendors ?? [];
       const tList = tenants ?? [];
+      const all = [...vList, ...tList];
+
+      const countStatus = (status: string) =>
+        all.filter((e) => e.compliance_status === status).length;
 
       propertyList.push({
         ...prop,
@@ -134,6 +149,12 @@ export default async function PropertiesPage() {
         tenant_non_compliant: tList.filter(
           (t) => t.compliance_status === 'non_compliant' || t.compliance_status === 'expired'
         ).length,
+        status_compliant: countStatus('compliant'),
+        status_expiring: countStatus('expiring_soon'),
+        status_non_compliant: countStatus('non_compliant'),
+        status_expired: countStatus('expired'),
+        status_pending: countStatus('pending'),
+        status_under_review: countStatus('under_review'),
       });
     }
   }
@@ -220,22 +241,47 @@ export default async function PropertiesPage() {
                       </p>
                     )}
 
-                    <div className="mt-4 space-y-1 border-t border-slate-100 pt-3">
-                      <ComplianceSummary
-                        label="vendors"
-                        total={prop.vendor_count}
-                        compliant={prop.vendor_compliant}
-                        expiring={prop.vendor_expiring}
-                        nonCompliant={prop.vendor_non_compliant}
-                      />
-                      <br />
-                      <ComplianceSummary
-                        label="tenants"
-                        total={prop.tenant_count}
-                        compliant={prop.tenant_compliant}
-                        expiring={prop.tenant_expiring}
-                        nonCompliant={prop.tenant_non_compliant}
-                      />
+                    <div className="mt-4 border-t border-slate-100 pt-3">
+                      {(() => {
+                        const total = prop.vendor_count + prop.tenant_count;
+                        const segments = [
+                          { key: 'status_compliant', count: prop.status_compliant },
+                          { key: 'status_expiring', count: prop.status_expiring },
+                          { key: 'status_non_compliant', count: prop.status_non_compliant },
+                          { key: 'status_expired', count: prop.status_expired },
+                          { key: 'status_pending', count: prop.status_pending },
+                          { key: 'status_under_review', count: prop.status_under_review },
+                        ].filter((s) => s.count > 0);
+
+                        return total > 0 ? (
+                          <div className="mb-2 flex h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+                            {segments.map((seg) => (
+                              <div
+                                key={seg.key}
+                                className={BAR_COLORS[seg.key]}
+                                style={{ width: `${(seg.count / total) * 100}%` }}
+                              />
+                            ))}
+                          </div>
+                        ) : null;
+                      })()}
+                      <div className="space-y-1">
+                        <ComplianceSummary
+                          label="vendors"
+                          total={prop.vendor_count}
+                          compliant={prop.vendor_compliant}
+                          expiring={prop.vendor_expiring}
+                          nonCompliant={prop.vendor_non_compliant}
+                        />
+                        <br />
+                        <ComplianceSummary
+                          label="tenants"
+                          total={prop.tenant_count}
+                          compliant={prop.tenant_compliant}
+                          expiring={prop.tenant_expiring}
+                          nonCompliant={prop.tenant_non_compliant}
+                        />
+                      </div>
                     </div>
                   </CardContent>
                 </Card>

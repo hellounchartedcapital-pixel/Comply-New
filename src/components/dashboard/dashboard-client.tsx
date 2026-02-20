@@ -538,13 +538,7 @@ function PropertyCard({ property }: { property: PropertyOverview }) {
                 />
               ))}
             </div>
-            <p className={`mt-1.5 text-xs font-medium ${
-              compliantCount === total
-                ? 'text-emerald-600'
-                : compliantCount / total >= 0.5
-                  ? 'text-amber-600'
-                  : 'text-red-600'
-            }`}>
+            <p className="mt-1.5 text-xs text-slate-600">
               {compliantCount} of {total} compliant
             </p>
           </>
