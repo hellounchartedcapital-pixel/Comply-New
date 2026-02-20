@@ -269,7 +269,7 @@ function ReviewInterface({
   const router = useRouter();
   const { showUpgradeModal } = useUpgradeModal();
   const [confirming, setConfirming] = useState(false);
-  const [mobileTab, setMobileTab] = useState<'document' | 'data'>('data');
+  const [pdfExpanded, setPdfExpanded] = useState(false);
 
   // Editable coverages
   const [coverages, setCoverages] = useState<EditableCoverage[]>(() =>
@@ -481,7 +481,20 @@ function ReviewInterface({
       </div>
 
       {/* Insured name verification — first thing the PM should check */}
-      {insuredName && (() => {
+      {(() => {
+        if (!insuredName) {
+          return (
+            <div className="flex items-start gap-3 rounded-lg border-2 border-slate-200 bg-slate-50 px-4 py-3">
+              <Info className="h-5 w-5 flex-shrink-0 mt-0.5 text-slate-400" />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-muted-foreground">Insured name not extracted</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  The AI could not identify the named insured on this certificate. Please verify manually.
+                </p>
+              </div>
+            </div>
+          );
+        }
         const matches = insuredNameMatches(entityName, insuredName);
         return (
           <div className={`flex items-start gap-3 rounded-lg border-2 px-4 py-3 ${
@@ -557,75 +570,53 @@ function ReviewInterface({
         </div>
       )}
 
-      {/* Mobile tab switcher (only when PDF is available) */}
-      {pdfUrl && (
-        <div className="flex gap-1 rounded-lg bg-slate-100 p-1 xl:hidden">
+      {/* Collapsible PDF section */}
+      {pdfUrl ? (
+        <div className="rounded-lg border border-slate-200 bg-white overflow-hidden">
           <button
-            onClick={() => setMobileTab('document')}
-            className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-              mobileTab === 'document'
-                ? 'bg-white text-foreground shadow-sm'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
+            onClick={() => setPdfExpanded(!pdfExpanded)}
+            className="flex w-full items-center justify-between px-4 py-2.5 hover:bg-slate-50 transition-colors"
           >
-            Original Document
-          </button>
-          <button
-            onClick={() => setMobileTab('data')}
-            className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-              mobileTab === 'data'
-                ? 'bg-white text-foreground shadow-sm'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            Extracted Data
-          </button>
-        </div>
-      )}
-
-      <div className={`grid gap-6 ${pdfUrl ? 'xl:grid-cols-2' : 'xl:grid-cols-[1fr_400px]'}`}>
-        {/* ============================================================ */}
-        {/* LEFT: PDF Viewer (desktop always visible; mobile tab-controlled) */}
-        {/* ============================================================ */}
-        {pdfUrl && (
-          <div className={`${mobileTab !== 'document' ? 'hidden xl:block' : ''}`}>
-            <div className="sticky top-4 rounded-lg border border-slate-200 bg-white overflow-hidden">
-              <div className="flex items-center justify-between border-b border-slate-100 px-4 py-2">
-                <p className="text-xs font-semibold text-foreground">Original Document</p>
-                <a
-                  href={pdfUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-brand-dark hover:underline"
-                >
-                  Open in new tab
-                </a>
-              </div>
-              <iframe
-                src={pdfUrl}
-                title="Certificate PDF"
-                className="h-[calc(100vh-12rem)] w-full"
-              />
+            <div className="flex items-center gap-2">
+              {pdfExpanded ? (
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              ) : (
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              )}
+              <span className="text-sm font-semibold text-foreground">Original Document</span>
             </div>
-          </div>
-        )}
+            <a
+              href={pdfUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="text-xs text-brand-dark hover:underline"
+            >
+              Open in new tab
+            </a>
+          </button>
+          {pdfExpanded && (
+            <iframe
+              src={pdfUrl}
+              title="Certificate PDF"
+              className="h-[500px] w-full border-t border-slate-100"
+            />
+          )}
+        </div>
+      ) : certificate.file_path ? (
+        <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-center">
+          <p className="text-sm text-muted-foreground">Unable to load PDF preview</p>
+          <Button size="sm" variant="outline" className="mt-2" asChild>
+            <a href={`/dashboard/certificates/${certificate.id}`}>
+              Download PDF
+            </a>
+          </Button>
+        </div>
+      ) : null}
 
-        {/* ============================================================ */}
-        {/* RIGHT (or full-width if no PDF): Extracted Data + Compliance */}
-        {/* ============================================================ */}
-        <div className={`space-y-6 ${pdfUrl && mobileTab !== 'data' ? 'hidden xl:block' : ''} ${pdfUrl ? 'xl:max-h-[calc(100vh-10rem)] xl:overflow-y-auto xl:pr-1' : ''}`}>
-
-        {/* PDF fallback banner when URL failed */}
-        {!pdfUrl && certificate.file_path && (
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-center">
-            <p className="text-sm text-muted-foreground">Unable to load PDF preview</p>
-            <Button size="sm" variant="outline" className="mt-2" asChild>
-              <a href={`/dashboard/certificates/${certificate.id}`}>
-                Download PDF
-              </a>
-            </Button>
-          </div>
-        )}
+      <div className="grid gap-6 xl:grid-cols-[1fr_400px]">
+        {/* Extracted Data */}
+        <div className="space-y-6">
 
           {/* Coverage section */}
           <div className="rounded-lg border border-slate-200 bg-white p-5">
