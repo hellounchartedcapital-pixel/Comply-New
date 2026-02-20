@@ -68,6 +68,8 @@ export async function createCheckoutSession(priceId: string): Promise<{ url: str
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
   const session = await stripe.checkout.sessions.create({
     customer: customerId,
+    customer_update: { address: 'auto' },
+    billing_address_collection: 'required',
     mode: 'subscription',
     line_items: [{ price: priceId, quantity: 1 }],
     success_url: `${appUrl}/dashboard/settings/billing?success=true`,
