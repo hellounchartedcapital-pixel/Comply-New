@@ -42,10 +42,17 @@ export function getActivePlanStatus(org: {
   return { isActive: true, reason: 'active' };
 }
 
-/** Prefix used by server actions so the client can detect plan-gated errors */
-export const PLAN_INACTIVE_PREFIX = 'Your free trial has expired.';
+/**
+ * Machine-readable tag embedded in error messages thrown by plan-gated server
+ * actions.  The client checks for this tag (not a human-readable prefix) so
+ * that detection is resilient to copy changes.
+ */
+export const PLAN_INACTIVE_TAG = '[PLAN_INACTIVE]';
+
+/** @deprecated Use PLAN_INACTIVE_TAG instead */
+export const PLAN_INACTIVE_PREFIX = PLAN_INACTIVE_TAG;
 
 /** Check whether an error message is a plan-gated error (for client-side use) */
 export function isPlanInactiveError(message: string): boolean {
-  return message.startsWith(PLAN_INACTIVE_PREFIX);
+  return message.includes(PLAN_INACTIVE_TAG);
 }

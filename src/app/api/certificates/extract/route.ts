@@ -3,7 +3,7 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { extractCOIFromPDF } from '@/lib/ai/extraction';
 import { checkExtractionLimit } from '@/lib/plan-limits';
-import { getActivePlanStatus, PLAN_INACTIVE_PREFIX } from '@/lib/plan-status';
+import { getActivePlanStatus, PLAN_INACTIVE_TAG } from '@/lib/plan-status';
 
 /**
  * Create a Supabase client with the service role key for storage access.
@@ -79,20 +79,23 @@ export async function POST(req: NextRequest) {
     }
     const orgId = profile.organization_id;
 
-    // ---- Active plan check ----
-    const { data: orgForPlan } = await authClient
+    // ---- Active plan check (service client to bypass RLS) ----
+    const serviceForPlan = createServiceClient();
+    const { data: orgForPlan, error: orgPlanError } = await serviceForPlan
       .from('organizations')
       .select('plan, trial_ends_at')
       .eq('id', orgId)
       .single();
-    if (orgForPlan) {
-      const planStatus = getActivePlanStatus(orgForPlan);
-      if (!planStatus.isActive) {
-        return NextResponse.json(
-          { error: `${PLAN_INACTIVE_PREFIX} Subscribe to upload certificates.` },
-          { status: 403 }
-        );
-      }
+    if (orgPlanError || !orgForPlan) {
+      console.error('[extract] org plan lookup failed:', orgPlanError);
+      return NextResponse.json({ error: 'Organization not found' }, { status: 403 });
+    }
+    const planStatus = getActivePlanStatus(orgForPlan);
+    if (!planStatus.isActive) {
+      return NextResponse.json(
+        { error: `${PLAN_INACTIVE_TAG} Subscribe to upload certificates.` },
+        { status: 403 }
+      );
     }
 
     // ---- Plan limit check ----

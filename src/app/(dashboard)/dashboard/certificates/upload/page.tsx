@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { validatePDFFile, computeFileHash, formatFileSize } from '@/lib/utils/file-validation';
-import { isPlanInactiveError } from '@/lib/plan-status';
+import { isPlanInactiveError, PLAN_INACTIVE_TAG } from '@/lib/plan-status';
 import { useUpgradeModal } from '@/components/dashboard/upgrade-modal';
 import { Button } from '@/components/ui/button';
 import {
@@ -329,7 +329,7 @@ export default function CertificateUploadPage() {
     } catch (err) {
       const message = err instanceof Error ? err.message : "We couldn't process this certificate. Please try uploading a clearer copy.";
       if (isPlanInactiveError(message)) {
-        showUpgradeModal(message);
+        showUpgradeModal(message.replace(PLAN_INACTIVE_TAG, '').trim());
         setUploadStep('idle');
         return;
       }

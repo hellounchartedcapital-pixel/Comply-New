@@ -1,5 +1,5 @@
 import { toast } from 'sonner';
-import { isPlanInactiveError } from '@/lib/plan-status';
+import { isPlanInactiveError, PLAN_INACTIVE_TAG } from '@/lib/plan-status';
 
 /**
  * Shared error handler for client-side action catch blocks.
@@ -14,7 +14,9 @@ export function handleActionError(
 ) {
   const message = err instanceof Error ? err.message : fallbackMessage;
   if (showUpgradeModal && isPlanInactiveError(message)) {
-    showUpgradeModal(message);
+    // Strip the machine-readable tag so the modal shows a clean message
+    const displayMessage = message.replace(PLAN_INACTIVE_TAG, '').trim();
+    showUpgradeModal(displayMessage);
   } else {
     toast.error(message);
   }
