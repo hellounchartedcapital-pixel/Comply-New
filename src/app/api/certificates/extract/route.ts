@@ -57,9 +57,6 @@ async function createAuthClient() {
  */
 export async function POST(req: NextRequest) {
   try {
-    // ---- Env check ----
-    console.log(process.env.ANTHROPIC_API_KEY ? 'ANTHROPIC_API_KEY is set' : 'ANTHROPIC_API_KEY is missing');
-
     // ---- Auth ----
     const authClient = await createAuthClient();
     const {

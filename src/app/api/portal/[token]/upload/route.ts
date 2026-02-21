@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/service';
+import { getActivePlanStatus } from '@/lib/plan-status';
 import crypto from 'crypto';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
@@ -143,6 +144,23 @@ export async function POST(
     }
 
     const organizationId = entityData.organization_id;
+
+    // Check org plan status — reject if canceled or trial expired
+    const { data: orgForPlan } = await supabase
+      .from('organizations')
+      .select('plan, trial_ends_at')
+      .eq('id', organizationId)
+      .single();
+
+    if (orgForPlan) {
+      const planStatus = getActivePlanStatus(orgForPlan);
+      if (!planStatus.isActive) {
+        return NextResponse.json(
+          { error: 'This upload portal is temporarily unavailable. Please contact your property manager.' },
+          { status: 403 }
+        );
+      }
+    }
 
     // Upload file to Supabase Storage
     const filePath = `${entityType}/${entityId}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;

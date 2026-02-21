@@ -2,15 +2,24 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
 // Routes that don't require authentication
-const publicRoutes = ['/', '/login', '/signup', '/opengraph-image', '/twitter-image', '/favicon.ico'];
-const publicPrefixes = ['/portal/', '/api/portal/', '/api/webhooks/'];
+const publicRoutes = [
+  '/', '/login', '/signup', '/opengraph-image', '/twitter-image', '/favicon.ico',
+  // Marketing / SEO pages
+  '/compare', '/terms', '/privacy', '/coi-tracking-software',
+  '/certificate-of-insurance-tracking', '/vendor-insurance-compliance',
+  '/tenant-insurance-tracking', '/ai-coi-extraction', '/llms.txt', '/og-image.png',
+];
+const publicPrefixes = [
+  '/portal/', '/api/portal/', '/api/webhooks/', '/api/cron/', '/api/auth/',
+  // Marketing / SEO prefixes
+  '/blog', '/features/',
+];
 
 function isPublicRoute(pathname: string): boolean {
   if (publicRoutes.includes(pathname)) return true;
   if (publicPrefixes.some((prefix) => pathname.startsWith(prefix))) return true;
   // Allow static assets and Next.js internals
   if (pathname.startsWith('/_next/')) return true;
-  if (pathname.startsWith('/api/auth/')) return true;
   if (/\.(?:svg|png|jpg|jpeg|gif|ico|css|js|woff2?)$/.test(pathname)) return true;
   return false;
 }
@@ -22,9 +31,9 @@ export async function middleware(request: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  // If Supabase is not configured, skip auth checks entirely
+  // If Supabase is not configured, block all requests — never fail open
   if (!supabaseUrl || !supabaseAnonKey) {
-    return NextResponse.next();
+    return new NextResponse('Service Unavailable', { status: 503 });
   }
 
   let supabaseResponse = NextResponse.next({ request });
