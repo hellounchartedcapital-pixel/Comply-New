@@ -117,7 +117,9 @@ export async function updateProperty(
 
   if (propError) throw new Error(propError.message);
 
-  // Replace entities: delete existing, insert new
+  // Replace entities: delete existing, insert new.
+  // The property update above verified org ownership via .eq('organization_id', orgId),
+  // so the entity delete is safe — the property_id is confirmed to belong to this org.
   await supabase
     .from('property_entities')
     .delete()
@@ -175,14 +177,17 @@ export async function deleteProperty(propertyId: string) {
     );
   }
 
-  // Get property name for log before deleting
+  // Verify property belongs to this org before deleting (defense in depth beyond RLS)
   const { data: prop } = await supabase
     .from('properties')
     .select('name')
     .eq('id', propertyId)
+    .eq('organization_id', orgId)
     .single();
 
-  // Delete entities first, then the property
+  if (!prop) throw new Error('Property not found');
+
+  // Delete entities first (safe — property ownership verified above), then the property
   await supabase.from('property_entities').delete().eq('property_id', propertyId);
 
   const { error } = await supabase

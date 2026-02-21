@@ -182,11 +182,22 @@ export async function POST(
       );
     }
 
-    // Store extracted coverages
+    // Store extracted coverages (explicitly pick known fields — never spread AI output)
     if (result.coverages.length > 0) {
       const coverageRows = result.coverages.map((c) => ({
         certificate_id,
-        ...c,
+        coverage_type: c.coverage_type,
+        carrier_name: c.carrier_name,
+        policy_number: c.policy_number,
+        limit_amount: c.limit_amount,
+        limit_type: c.limit_type,
+        effective_date: c.effective_date,
+        expiration_date: c.expiration_date,
+        additional_insured_listed: c.additional_insured_listed,
+        additional_insured_entities: c.additional_insured_entities,
+        waiver_of_subrogation: c.waiver_of_subrogation,
+        confidence_flag: c.confidence_flag,
+        raw_extracted_text: c.raw_extracted_text,
       }));
       const { error: covError } = await supabase
         .from('extracted_coverages')
@@ -196,11 +207,14 @@ export async function POST(
       }
     }
 
-    // Store extracted entities
+    // Store extracted entities (explicitly pick known fields)
     if (result.entities.length > 0) {
       const entityRows = result.entities.map((e) => ({
         certificate_id,
-        ...e,
+        entity_name: e.entity_name,
+        entity_address: e.entity_address,
+        entity_type: e.entity_type,
+        confidence_flag: e.confidence_flag,
       }));
       const { error: entError } = await supabase
         .from('extracted_entities')

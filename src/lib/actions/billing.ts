@@ -1,7 +1,6 @@
 'use server';
 
 import { stripe, PRICE_IDS } from '@/lib/stripe';
-import { createServiceClient } from '@/lib/supabase/service';
 import { createClient } from '@/lib/supabase/server';
 
 // ---------------------------------------------------------------------------
@@ -15,23 +14,21 @@ export async function createCheckoutSession(priceId: string): Promise<{ url: str
     throw new Error('Invalid price ID');
   }
 
-  // Get the current user from the session
+  // Use the authenticated client — RLS ensures the user can only read/write their own org
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
 
-  // Get org details via service client (bypasses RLS)
-  const service = createServiceClient();
-  const { data: profile } = await service
+  const { data: profile } = await supabase
     .from('users')
     .select('organization_id, email, full_name')
     .eq('id', user.id)
     .single();
   if (!profile?.organization_id) throw new Error('No organization found');
 
-  const { data: org } = await service
+  const { data: org } = await supabase
     .from('organizations')
     .select('id, name, stripe_customer_id, stripe_subscription_id')
     .eq('id', profile.organization_id)
@@ -58,7 +55,7 @@ export async function createCheckoutSession(priceId: string): Promise<{ url: str
     });
     customerId = customer.id;
 
-    await service
+    await supabase
       .from('organizations')
       .update({ stripe_customer_id: customerId })
       .eq('id', org.id);
@@ -97,15 +94,14 @@ export async function createPortalSession(): Promise<{ url: string }> {
   } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
 
-  const service = createServiceClient();
-  const { data: profile } = await service
+  const { data: profile } = await supabase
     .from('users')
     .select('organization_id')
     .eq('id', user.id)
     .single();
   if (!profile?.organization_id) throw new Error('No organization found');
 
-  const { data: org } = await service
+  const { data: org } = await supabase
     .from('organizations')
     .select('stripe_customer_id')
     .eq('id', profile.organization_id)
@@ -136,8 +132,7 @@ export async function resetTrial(): Promise<{ trialEndsAt: string }> {
   } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
 
-  const service = createServiceClient();
-  const { data: profile } = await service
+  const { data: profile } = await supabase
     .from('users')
     .select('organization_id')
     .eq('id', user.id)
@@ -146,7 +141,7 @@ export async function resetTrial(): Promise<{ trialEndsAt: string }> {
 
   const trialEndsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
 
-  const { error } = await service
+  const { error } = await supabase
     .from('organizations')
     .update({ plan: 'trial', trial_ends_at: trialEndsAt })
     .eq('id', profile.organization_id);

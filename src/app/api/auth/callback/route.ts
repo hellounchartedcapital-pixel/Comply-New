@@ -42,6 +42,19 @@ export async function GET(request: Request) {
     // (handles the case where signup created the auth user but org/profile
     // creation was deferred because email confirmation was required)
     try {
+      // Re-check to guard against race conditions (e.g., user double-clicks
+      // confirmation link, triggering two concurrent callbacks)
+      const { data: recheck } = await service
+        .from('users')
+        .select('organization_id')
+        .eq('id', user.id)
+        .single();
+
+      if (recheck?.organization_id) {
+        // Another callback already created the profile — skip to redirect
+        return NextResponse.redirect(`${origin}/setup`);
+      }
+
       const rawName = String(user.user_metadata?.full_name ?? '');
       // Sanitize: strip HTML tags and truncate to 100 characters
       const fullName = rawName.replace(/<[^>]*>/g, '').trim().slice(0, 100);
@@ -65,12 +78,18 @@ export async function GET(request: Request) {
           role: 'manager',
         });
 
-      if (profileError) throw profileError;
+      // If profile insert fails due to unique constraint (race condition),
+      // another callback already created the profile — that's OK
+      if (profileError && !profileError.message?.includes('duplicate key')) {
+        throw profileError;
+      }
 
-      // Send welcome email (fire-and-forget)
-      sendWelcomeEmail(email, fullName).catch((err) =>
-        console.error('Welcome email failed:', err)
-      );
+      // Send welcome email only if we actually created the profile
+      if (!profileError) {
+        sendWelcomeEmail(email, fullName).catch((err) =>
+          console.error('Welcome email failed:', err)
+        );
+      }
     } catch (err) {
       console.error('Auth callback: org/profile creation failed', err);
       // Still redirect to setup — it will retry org creation

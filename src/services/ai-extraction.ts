@@ -28,6 +28,11 @@ export async function extractCOI(file: File): Promise<COIExtractionResult> {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error('Authentication required');
 
+  // Validate session against the server (getSession reads from local storage
+  // which can be tampered; getUser verifies the JWT with the Supabase server)
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError || !user) throw new Error('Authentication required');
+
   const pdfBase64 = await fileToBase64(file);
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -215,6 +220,10 @@ function mapCoverageTypeName(name: string): CoverageType | null {
 export async function extractLeaseRequirements(file: File): Promise<LeaseExtractionResult> {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error('Authentication required');
+
+  // Validate session against the server
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError || !user) throw new Error('Authentication required');
 
   const pdfBase64 = await fileToBase64(file);
 

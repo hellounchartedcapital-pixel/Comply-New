@@ -4,17 +4,7 @@ import { cookies } from 'next/headers';
 import { extractCOIFromPDF } from '@/lib/ai/extraction';
 import { checkExtractionLimit } from '@/lib/plan-limits';
 import { getActivePlanStatus, PLAN_INACTIVE_TAG } from '@/lib/plan-status';
-
-/**
- * Create a Supabase client with the service role key for storage access.
- */
-function createServiceClient() {
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { cookies: { getAll: () => [], setAll: () => {} } }
-  );
-}
+import { createServiceClient } from '@/lib/supabase/service';
 
 /**
  * Create a Supabase client using the request cookies (for auth).
@@ -170,11 +160,22 @@ export async function POST(req: NextRequest) {
     }
 
     // ---- Store extraction results ----
-    // Insert extracted_coverages
+    // Insert extracted_coverages (explicitly pick known fields — never spread AI output)
     if (result.coverages.length > 0) {
       const coverageRows = result.coverages.map((c) => ({
         certificate_id: certificateId,
-        ...c,
+        coverage_type: c.coverage_type,
+        carrier_name: c.carrier_name,
+        policy_number: c.policy_number,
+        limit_amount: c.limit_amount,
+        limit_type: c.limit_type,
+        effective_date: c.effective_date,
+        expiration_date: c.expiration_date,
+        additional_insured_listed: c.additional_insured_listed,
+        additional_insured_entities: c.additional_insured_entities,
+        waiver_of_subrogation: c.waiver_of_subrogation,
+        confidence_flag: c.confidence_flag,
+        raw_extracted_text: c.raw_extracted_text,
       }));
       const { error: covError } = await serviceClient
         .from('extracted_coverages')
@@ -184,11 +185,14 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Insert extracted_entities
+    // Insert extracted_entities (explicitly pick known fields)
     if (result.entities.length > 0) {
       const entityRows = result.entities.map((e) => ({
         certificate_id: certificateId,
-        ...e,
+        entity_name: e.entity_name,
+        entity_address: e.entity_address,
+        entity_type: e.entity_type,
+        confidence_flag: e.confidence_flag,
       }));
       const { error: entError } = await serviceClient
         .from('extracted_entities')

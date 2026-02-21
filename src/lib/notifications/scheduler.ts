@@ -3,7 +3,7 @@
 // Runs daily via cron to check expirations and schedule/send notifications.
 // ============================================================================
 
-import { createServerClient } from '@supabase/ssr';
+import { createServiceClient } from '@/lib/supabase/service';
 import { sendNotificationEmail } from './email-sender';
 import {
   expirationWarning,
@@ -14,14 +14,6 @@ import {
   type EmailMergeFields,
 } from './email-templates';
 import { formatDate } from '@/lib/utils';
-
-function createServiceClient() {
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { cookies: { getAll: () => [], setAll: () => {} } }
-  );
-}
 
 // Threshold days at which expiration warnings are sent
 const EXPIRATION_THRESHOLDS = [60, 30, 14, 0, -7];

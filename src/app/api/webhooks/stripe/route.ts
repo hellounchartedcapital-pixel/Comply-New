@@ -43,10 +43,10 @@ export async function POST(request: Request) {
         const customerId = session.customer as string;
         const subscriptionId = session.subscription as string;
 
-        // Look up the org by stripe_customer_id
+        // Look up the org by stripe_customer_id (include fields for idempotency check)
         const { data: org } = await supabase
           .from('organizations')
-          .select('id')
+          .select('id, plan, stripe_subscription_id')
           .eq('stripe_customer_id', customerId)
           .single();
 
@@ -59,6 +59,12 @@ export async function POST(request: Request) {
         const subscription = await stripe.subscriptions.retrieve(subscriptionId);
         const priceId = subscription.items.data[0]?.price?.id;
         const plan = priceId ? planForPriceId(priceId) : null;
+
+        // Idempotency: skip if already applied
+        if (org.stripe_subscription_id === subscriptionId && org.plan === (plan ?? 'starter')) {
+          console.log(`[Stripe Webhook] checkout.session.completed — org ${org.id} already up to date, skipping`);
+          break;
+        }
 
         await supabase
           .from('organizations')
@@ -87,11 +93,17 @@ export async function POST(request: Request) {
 
         const { data: org } = await supabase
           .from('organizations')
-          .select('id')
+          .select('id, plan, stripe_subscription_id')
           .eq('stripe_customer_id', customerId)
           .single();
 
         if (!org) break;
+
+        // Idempotency: skip if already applied
+        if (org.plan === plan && org.stripe_subscription_id === subscription.id) {
+          console.log(`[Stripe Webhook] subscription.updated — org ${org.id} already on plan ${plan}, skipping`);
+          break;
+        }
 
         await supabase
           .from('organizations')
@@ -114,11 +126,17 @@ export async function POST(request: Request) {
 
         const { data: org } = await supabase
           .from('organizations')
-          .select('id')
+          .select('id, plan')
           .eq('stripe_customer_id', customerId)
           .single();
 
         if (!org) break;
+
+        // Idempotency: skip if already canceled
+        if (org.plan === 'canceled') {
+          console.log(`[Stripe Webhook] subscription.deleted — org ${org.id} already canceled, skipping`);
+          break;
+        }
 
         await supabase
           .from('organizations')
@@ -141,11 +159,17 @@ export async function POST(request: Request) {
 
         const { data: org } = await supabase
           .from('organizations')
-          .select('id')
+          .select('id, payment_failed')
           .eq('stripe_customer_id', customerId)
           .single();
 
         if (!org) break;
+
+        // Idempotency: skip if already flagged
+        if (org.payment_failed) {
+          console.log(`[Stripe Webhook] invoice.payment_failed — org ${org.id} already flagged, skipping`);
+          break;
+        }
 
         await supabase
           .from('organizations')
