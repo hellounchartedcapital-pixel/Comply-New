@@ -4,6 +4,16 @@
 // response rates. Tone scales with urgency.
 // ============================================================================
 
+/** Escape HTML special characters to prevent XSS in email templates. */
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 export interface EmailMergeFields {
   entity_name: string; // vendor or tenant company name
   contact_name?: string; // optional contact person name
@@ -38,7 +48,7 @@ function emailWrapper(body: string, fields: Pick<EmailMergeFields, 'organization
 <table width="100%" style="max-width:600px;background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
   <tr><td style="background:#059669;padding:20px 24px;">
     <span style="color:#ffffff;font-size:18px;font-weight:700;">SmartCOI</span>
-    <span style="color:#d1fae5;font-size:12px;margin-left:8px;">${fields.organization_name}</span>
+    <span style="color:#d1fae5;font-size:12px;margin-left:8px;">${escapeHtml(fields.organization_name)}</span>
   </td></tr>
   <tr><td style="padding:24px;">${body}</td></tr>
   <tr><td style="padding:16px 24px;background:#f1f5f9;font-size:11px;color:#64748b;text-align:center;">
@@ -60,13 +70,13 @@ function portalButton(link: string, label = 'Upload Your Certificate'): string {
 }
 
 function greeting(fields: Pick<EmailMergeFields, 'contact_name' | 'entity_name'>): string {
-  const name = fields.contact_name || fields.entity_name;
+  const name = escapeHtml(fields.contact_name || fields.entity_name);
   return `<p style="font-size:14px;color:#334155;line-height:1.6;margin:0 0 16px;">Hi ${name},</p>`;
 }
 
 function contactBlock(fields: Pick<EmailMergeFields, 'pm_name' | 'pm_email'>): string {
   return `<p style="font-size:13px;color:#475569;margin-top:24px;">
-  Questions? Reach out to <strong>${fields.pm_name}</strong> at <a href="mailto:${fields.pm_email}" style="color:#059669;">${fields.pm_email}</a>
+  Questions? Reach out to <strong>${escapeHtml(fields.pm_name)}</strong> at <a href="mailto:${encodeURI(fields.pm_email)}" style="color:#059669;">${escapeHtml(fields.pm_email)}</a>
 </p>`;
 }
 
@@ -82,17 +92,19 @@ function brokerInstruction(): string {
 
 export function expirationWarning(fields: EmailMergeFields): EmailTemplate {
   const days = fields.days_until_expiration;
+  const safeProperty = escapeHtml(fields.property_name);
+  const safeExpDate = escapeHtml(fields.expiration_date);
   let message: string;
 
   if (days > 45) {
     // 60+ days: casual and friendly
-    message = `Just a heads up that your certificate of insurance for <strong>${fields.property_name}</strong> expires on <strong>${fields.expiration_date}</strong>. No rush, but we wanted to give you plenty of time to get an updated certificate from your broker.`;
+    message = `Just a heads up that your certificate of insurance for <strong>${safeProperty}</strong> expires on <strong>${safeExpDate}</strong>. No rush, but we wanted to give you plenty of time to get an updated certificate from your broker.`;
   } else if (days > 20) {
     // ~30 days: friendly but clear
-    message = `Your certificate of insurance for <strong>${fields.property_name}</strong> expires on <strong>${fields.expiration_date}</strong> — about ${days} days from now. Please start the renewal process with your insurance broker so we can keep your file up to date.`;
+    message = `Your certificate of insurance for <strong>${safeProperty}</strong> expires on <strong>${safeExpDate}</strong> — about ${days} days from now. Please start the renewal process with your insurance broker so we can keep your file up to date.`;
   } else {
     // 14 days or less: direct
-    message = `Your certificate of insurance for <strong>${fields.property_name}</strong> expires on <strong>${fields.expiration_date}</strong> — that\u2019s just <strong>${days} day${days !== 1 ? 's' : ''} away</strong>. Please upload an updated certificate as soon as possible to avoid a lapse in compliance.`;
+    message = `Your certificate of insurance for <strong>${safeProperty}</strong> expires on <strong>${safeExpDate}</strong> — that\u2019s just <strong>${days} day${days !== 1 ? 's' : ''} away</strong>. Please upload an updated certificate as soon as possible to avoid a lapse in compliance.`;
   }
 
   const body = `
@@ -112,15 +124,17 @@ ${contactBlock(fields)}`;
 // ============================================================================
 
 export function gapNotification(fields: EmailMergeFields): EmailTemplate {
+  const safeProperty = escapeHtml(fields.property_name);
+  const safeExpDate = escapeHtml(fields.expiration_date);
   const expirationLead = fields.is_expired
     ? `<p style="font-size:14px;color:#dc2626;line-height:1.6;font-weight:600;margin-bottom:12px;">
-  Your certificate of insurance for <strong>${fields.property_name}</strong> expired on <strong>${fields.expiration_date}</strong>. An updated certificate is needed immediately.
+  Your certificate of insurance for <strong>${safeProperty}</strong> expired on <strong>${safeExpDate}</strong>. An updated certificate is needed immediately.
 </p>
 <p style="font-size:14px;color:#334155;line-height:1.6;">
   In addition, we found the following items that need to be addressed:
 </p>`
     : `<p style="font-size:14px;color:#334155;line-height:1.6;">
-  We reviewed your certificate of insurance for <strong>${fields.property_name}</strong> and found a few items that need to be updated:
+  We reviewed your certificate of insurance for <strong>${safeProperty}</strong> and found a few items that need to be updated:
 </p>`;
 
   const body = `
@@ -144,15 +158,17 @@ ${contactBlock(fields)}`;
 // ============================================================================
 
 export function followUpReminder(fields: EmailMergeFields): EmailTemplate {
+  const safeProperty = escapeHtml(fields.property_name);
+  const safeExpDate = escapeHtml(fields.expiration_date);
   const expirationLead = fields.is_expired
     ? `<p style="font-size:14px;color:#dc2626;line-height:1.6;font-weight:600;margin-bottom:12px;">
-  Your certificate of insurance for <strong>${fields.property_name}</strong> expired on <strong>${fields.expiration_date}</strong>. An updated certificate is needed immediately.
+  Your certificate of insurance for <strong>${safeProperty}</strong> expired on <strong>${safeExpDate}</strong>. An updated certificate is needed immediately.
 </p>
 <p style="font-size:14px;color:#334155;line-height:1.6;">
   We still need an updated certificate that also addresses the following:
 </p>`
     : `<p style="font-size:14px;color:#334155;line-height:1.6;">
-  We wanted to follow up on your certificate of insurance for <strong>${fields.property_name}</strong>. We still need an updated certificate that addresses the following:
+  We wanted to follow up on your certificate of insurance for <strong>${safeProperty}</strong>. We still need an updated certificate that addresses the following:
 </p>`;
 
   const body = `
@@ -176,10 +192,12 @@ ${contactBlock(fields)}`;
 // ============================================================================
 
 export function expiredNotice(fields: EmailMergeFields): EmailTemplate {
+  const safeProperty = escapeHtml(fields.property_name);
+  const safeExpDate = escapeHtml(fields.expiration_date);
   const body = `
 ${greeting(fields)}
 <p style="font-size:14px;color:#334155;line-height:1.6;">
-  Your certificate of insurance for <strong>${fields.property_name}</strong> expired on <strong>${fields.expiration_date}</strong>. Please upload a current certificate immediately to maintain compliance.
+  Your certificate of insurance for <strong>${safeProperty}</strong> expired on <strong>${safeExpDate}</strong>. Please upload a current certificate immediately to maintain compliance.
 </p>
 <p style="font-size:14px;color:#334155;line-height:1.6;margin-top:12px;">
   If you\u2019ve already renewed your policy, just ask your broker to send over the updated certificate and upload it using the button below.
@@ -201,11 +219,12 @@ export function formatGapsAsHtml(gaps: string[]): string {
   if (gaps.length === 0) return '<p style="font-size:13px;color:#475569;">No specific items listed.</p>';
   return `<ul style="margin:0;padding:0 0 0 18px;font-size:13px;color:#334155;line-height:2;">
 ${gaps.map((g) => {
+    const safe = escapeHtml(g);
     // Style "Certificate expired" items with urgency
     if (g.startsWith('Certificate expired')) {
-      return `  <li style="color:#dc2626;font-weight:600;">${g}</li>`;
+      return `  <li style="color:#dc2626;font-weight:600;">${safe}</li>`;
     }
-    return `  <li>${g}</li>`;
+    return `  <li>${safe}</li>`;
   }).join('\n')}
 </ul>`;
 }
@@ -220,7 +239,7 @@ interface WelcomeEmailFields {
 }
 
 export function welcomeEmail(fields: WelcomeEmailFields): EmailTemplate {
-  const name = fields.user_name || 'there';
+  const name = escapeHtml(fields.user_name || 'there');
 
   const body = `
 <p style="font-size:14px;color:#334155;line-height:1.6;margin:0 0 16px;">Hi ${name},</p>

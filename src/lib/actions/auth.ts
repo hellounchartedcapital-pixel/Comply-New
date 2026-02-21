@@ -1,8 +1,31 @@
 'use server';
 
 import { createServiceClient } from '@/lib/supabase/service';
+import { createClient } from '@/lib/supabase/server';
 import { sendNotificationEmail } from '@/lib/notifications/email-sender';
 import { welcomeEmail } from '@/lib/notifications/email-templates';
+
+/**
+ * Helper: authenticate the caller and return their user ID and organization ID.
+ * Throws if the user is not authenticated or has no profile.
+ */
+async function requireAuth(): Promise<{ userId: string; orgId: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  const service = createServiceClient();
+  const { data: profile } = await service
+    .from('users')
+    .select('organization_id')
+    .eq('id', user.id)
+    .single();
+  if (!profile?.organization_id) throw new Error('No organization found');
+
+  return { userId: user.id, orgId: profile.organization_id };
+}
 
 /**
  * Creates an organization and user profile after Supabase Auth signup.
@@ -18,8 +41,11 @@ import { welcomeEmail } from '@/lib/notifications/email-templates';
 export async function createOrgAfterSignup(
   userId: string,
   email: string,
-  fullName: string
+  rawFullName: string
 ): Promise<{ orgId: string }> {
+  // Sanitize: strip HTML tags and truncate to 100 characters
+  const fullName = rawFullName.replace(/<[^>]*>/g, '').trim().slice(0, 100);
+
   const supabase = createServiceClient();
 
   // Validate the auth user exists (prevents abuse — can't create profiles for
@@ -89,14 +115,19 @@ export async function createOrgAfterSignup(
  * 0 rows affected), causing the onboarding_completed flag to never be set
  * and a redirect loop between /dashboard and /setup.
  */
-export async function completeOnboarding(orgId: string): Promise<void> {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export async function completeOnboarding(orgId?: string): Promise<void> {
+  const auth = await requireAuth();
+  // Use the caller's org — ignore any orgId parameter to prevent cross-org access
+  const targetOrgId = auth.orgId;
+
   const supabase = createServiceClient();
 
   // Read current settings
   const { data: org } = await supabase
     .from('organizations')
     .select('settings')
-    .eq('id', orgId)
+    .eq('id', targetOrgId)
     .single();
 
   const currentSettings = (org?.settings as Record<string, unknown>) || {};
@@ -107,7 +138,7 @@ export async function completeOnboarding(orgId: string): Promise<void> {
     .update({
       settings: { ...currentSettings, onboarding_completed: true },
     })
-    .eq('id', orgId);
+    .eq('id', targetOrgId);
 
   if (error) {
     throw new Error(`Failed to complete onboarding: ${error.message}`);
@@ -124,14 +155,19 @@ export async function completeOnboarding(orgId: string): Promise<void> {
  * If case 2 triggers, also auto-fixes the settings flag so future checks are fast.
  * Uses the service role client to bypass RLS for both the check and the fix.
  */
-export async function isOrgOnboarded(orgId: string): Promise<boolean> {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export async function isOrgOnboarded(orgId?: string): Promise<boolean> {
+  const auth = await requireAuth();
+  // Use the caller's org — ignore any orgId parameter to prevent cross-org access
+  const targetOrgId = auth.orgId;
+
   const supabase = createServiceClient();
 
   // Check the flag first
   const { data: org } = await supabase
     .from('organizations')
     .select('settings')
-    .eq('id', orgId)
+    .eq('id', targetOrgId)
     .single();
 
   const raw = (org?.settings as Record<string, unknown>)?.onboarding_completed;
@@ -143,18 +179,18 @@ export async function isOrgOnboarded(orgId: string): Promise<boolean> {
   const { count } = await supabase
     .from('properties')
     .select('id', { count: 'exact', head: true })
-    .eq('organization_id', orgId);
+    .eq('organization_id', targetOrgId);
 
   if (count && count > 0) {
     // Auto-fix: set the flag so we don't repeat this query every request
-    console.log(`[isOrgOnboarded] Auto-fixing org ${orgId} — has ${count} properties but missing onboarding flag`);
+    console.log(`[isOrgOnboarded] Auto-fixing org ${targetOrgId} — has ${count} properties but missing onboarding flag`);
     const currentSettings = (org?.settings as Record<string, unknown>) || {};
     await supabase
       .from('organizations')
       .update({
         settings: { ...currentSettings, onboarding_completed: true },
       })
-      .eq('id', orgId);
+      .eq('id', targetOrgId);
     return true;
   }
 
@@ -162,17 +198,17 @@ export async function isOrgOnboarded(orgId: string): Promise<boolean> {
   const { count: vendorCount } = await supabase
     .from('vendors')
     .select('id', { count: 'exact', head: true })
-    .eq('organization_id', orgId);
+    .eq('organization_id', targetOrgId);
 
   if (vendorCount && vendorCount > 0) {
-    console.log(`[isOrgOnboarded] Auto-fixing org ${orgId} — has ${vendorCount} vendors but missing onboarding flag`);
+    console.log(`[isOrgOnboarded] Auto-fixing org ${targetOrgId} — has ${vendorCount} vendors but missing onboarding flag`);
     const currentSettings = (org?.settings as Record<string, unknown>) || {};
     await supabase
       .from('organizations')
       .update({
         settings: { ...currentSettings, onboarding_completed: true },
       })
-      .eq('id', orgId);
+      .eq('id', targetOrgId);
     return true;
   }
 

@@ -125,6 +125,11 @@ export async function createPortalSession(): Promise<{ url: string }> {
 // ---------------------------------------------------------------------------
 
 export async function resetTrial(): Promise<{ trialEndsAt: string }> {
+  // Only allow in development — prevent abuse in production
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('resetTrial is not available in production');
+  }
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -148,7 +153,6 @@ export async function resetTrial(): Promise<{ trialEndsAt: string }> {
 
   if (error) throw new Error(`Failed to reset trial: ${error.message}`);
 
-  // eslint-disable-next-line no-console
   console.log('[resetTrial] org:', profile.organization_id, 'trial_ends_at set to:', trialEndsAt);
 
   return { trialEndsAt };

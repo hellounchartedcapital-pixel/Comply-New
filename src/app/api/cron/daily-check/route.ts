@@ -11,7 +11,7 @@ export const runtime = 'nodejs';
 export const maxDuration = 60; // Allow up to 60 seconds
 
 export async function POST(request: Request) {
-  // Verify authorization
+  // Verify authorization — accept either Bearer token or Vercel cron signature
   const authHeader = request.headers.get('authorization');
   const cronSecret = process.env.CRON_SECRET;
 
@@ -20,7 +20,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Server misconfiguration' }, { status: 500 });
   }
 
-  if (authHeader !== `Bearer ${cronSecret}`) {
+  const hasBearerAuth = authHeader === `Bearer ${cronSecret}`;
+  const hasVercelSignature = request.headers.get('x-vercel-cron-signature') === cronSecret;
+
+  if (!hasBearerAuth && !hasVercelSignature) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -45,9 +48,8 @@ export async function POST(request: Request) {
       durationMs: duration,
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    console.error('[daily-check] Error:', message);
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error('[daily-check] Error:', err instanceof Error ? err.message : err);
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 }
 

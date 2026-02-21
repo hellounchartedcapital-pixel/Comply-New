@@ -42,7 +42,9 @@ export async function GET(request: Request) {
     // (handles the case where signup created the auth user but org/profile
     // creation was deferred because email confirmation was required)
     try {
-      const fullName = user.user_metadata?.full_name ?? '';
+      const rawName = String(user.user_metadata?.full_name ?? '');
+      // Sanitize: strip HTML tags and truncate to 100 characters
+      const fullName = rawName.replace(/<[^>]*>/g, '').trim().slice(0, 100);
       const email = user.email ?? '';
 
       const { data: org, error: orgError } = await service

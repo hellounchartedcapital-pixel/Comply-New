@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/service';
 import { extractCOIFromPDF } from '@/lib/ai/extraction';
+import { checkExtractionLimit } from '@/lib/plan-limits';
+import { getActivePlanStatus } from '@/lib/plan-status';
+
+const MAX_EXTRACTIONS_PER_HOUR = 5;
 
 interface TokenData {
   id: string;
@@ -57,6 +61,22 @@ export async function POST(
     const entityType = tokenData.vendor_id ? 'vendor' : 'tenant';
     const entityId = (tokenData.vendor_id ?? tokenData.tenant_id)!;
 
+    // Rate limit: max extractions per hour for this entity
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    const { count: recentExtractions } = await supabase
+      .from('certificates')
+      .select('id', { count: 'exact', head: true })
+      .eq(entityType === 'vendor' ? 'vendor_id' : 'tenant_id', entityId)
+      .in('processing_status', ['extracted', 'processing'])
+      .gte('uploaded_at', oneHourAgo);
+
+    if ((recentExtractions ?? 0) >= MAX_EXTRACTIONS_PER_HOUR) {
+      return NextResponse.json(
+        { error: "You've reached the extraction limit. Please try again later." },
+        { status: 429 }
+      );
+    }
+
     // Parse request body
     const { certificate_id } = await request.json();
     if (!certificate_id) {
@@ -86,6 +106,32 @@ export async function POST(
       return NextResponse.json(
         { error: 'Certificate not found.' },
         { status: 404 }
+      );
+    }
+
+    // Check org plan status — reject if canceled or trial expired
+    const { data: orgForPlan } = await supabase
+      .from('organizations')
+      .select('plan, trial_ends_at')
+      .eq('id', cert.organization_id)
+      .single();
+
+    if (orgForPlan) {
+      const planStatus = getActivePlanStatus(orgForPlan);
+      if (!planStatus.isActive) {
+        return NextResponse.json(
+          { error: 'This upload portal is temporarily unavailable. Please contact your property manager.' },
+          { status: 403 }
+        );
+      }
+    }
+
+    // Check monthly extraction limit for the org
+    const limitCheck = await checkExtractionLimit(cert.organization_id);
+    if (!limitCheck.allowed) {
+      return NextResponse.json(
+        { error: 'This organization has reached its monthly processing limit. Please contact your property manager.' },
+        { status: 403 }
       );
     }
 
